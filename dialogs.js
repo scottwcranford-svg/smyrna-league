@@ -1,0 +1,153 @@
+// The smaller dialogs and the sign-in screen: settle a bet, the League/roster
+// dialog (admins set passwords and flag admins), change your own password (forced
+// on the starting password), and the login card that is the whole page until
+// you're in. DOM in, auth.js/store.js out.
+
+import * as R from "./rules.js?v=16";
+import * as S from "./store.js?v=16";
+import * as A from "./auth.js?v=16";
+import { state, members } from "./state.js?v=16";
+import { toast, avatarHtml } from "./render.js?v=16";
+import { guard, findBet } from "./book.js?v=16";
+
+const esc=R.esc, money=R.money, entriesOf=R.entriesOf, toLocalInput=R.toLocalInput, defaultPw=R.defaultPw, DEFAULT_KICKOFF=R.DEFAULT_KICKOFF;
+const member=function(id){ return R.member(id,members()); };
+const mName=function(id){ return R.mName(id,members()); };
+const gameOf=function(b){ return R.gameOf(b,state.games); };
+const memberForEmail=function(email){ return R.memberForEmail(email,members()); };
+const adminIds=function(){ return R.adminIds(state.config); };
+const isAdminMember=function(id){ return R.isAdminMember(id,state.config); };
+
+/* ---- settle ---- */
+export function openSettleDlg(id){
+  if(!guard()) return;
+  var bet=findBet(id);
+  if(!bet) return;
+  var live=entriesOf(bet).filter(function(e){ return e.memberId; });
+  var head=bet.name?bet.name+" — "+bet.terms:bet.terms;
+  if(bet.game){
+    var g=gameOf(bet);
+    if(g&&g.awayScore!=null&&g.homeScore!=null) head+="  ·  "+g.away+" "+g.awayScore+", "+g.home+" "+g.homeScore+(g.status==="final"?" (Final)":" (in progress)");
+  }
+  document.getElementById("sTerms").textContent=head;
+  document.getElementById("sOptions").innerHTML =
+    live.map(function(e){
+      var take=(Number(bet.amount)||0)*(live.length-1);
+      return '<button class="btn lg blk" data-act="win" data-id="'+esc(id)+'" data-w="'+esc(e.memberId)+'">'+
+        esc(e.pick||mName(e.memberId))+" — "+esc(mName(e.memberId))+" collects "+money(take)+"</button>";
+    }).join("")+
+    '<button class="btn lg blk" data-act="win" data-id="'+esc(id)+'" data-w="push">Push — nobody pays</button>';
+  document.getElementById("settleDlg").showModal();
+}
+
+/* ---- the League dialog ---- */
+export function openRoster(){
+  var adm=!!state.admin;
+  document.getElementById("rName").value=state.config.leagueName;
+  document.getElementById("rSeason").value=state.config.season;
+  document.getElementById("rStake").value=String(state.config.stake||25);
+  document.getElementById("rKickoff").value=toLocalInput(state.config.kickoff||DEFAULT_KICKOFF);
+  ["rName","rSeason","rStake","rKickoff"].forEach(function(id){ document.getElementById(id).disabled=!adm; });
+  document.getElementById("rAddRow").hidden=!adm;
+  document.getElementById("rAdd").hidden=!adm;
+  document.getElementById("rSave").hidden=!adm;
+  document.getElementById("rHint").textContent=adm
+    ? "Set each manager's password here and hand it to them. Removing someone keeps their settled bets in the ledger."
+    : "App admin"+(adminIds().length===1?"":"s")+": "+esc(adminIds().map(mName).join(", ")||"none set")+". Only admins can change the league, set passwords or flag admins.";
+  drawRoster();
+  document.getElementById("rosterDlg").showModal();
+}
+export function drawRoster(){
+  var adm=!!state.admin;
+  document.getElementById("rosterList").innerHTML=members().map(function(m){
+    return '<div class="rrow">'+avatarHtml(m.id,26)+
+      '<span class="r-name">'+esc(m.name)+"</span>"+
+      (isAdminMember(m.id)?'<span class="r-adm">Admin</span>':"")+
+      '<span class="r-team">'+esc(m.team||"—")+"</span>"+
+      (adm?'<input class="field r-pw" type="password" data-pw="'+esc(m.id)+'" autocomplete="new-password" placeholder="Set password">'+
+           '<button class="btn" data-act="setPw" data-id="'+esc(m.id)+'">Set</button>'+
+           '<button class="btn" data-act="pwDefault" data-id="'+esc(m.id)+'" title="'+esc(defaultPw(m))+'">Default</button>':"")+
+      (adm?'<label class="check r-chk"><input type="checkbox" data-act="admToggle" data-id="'+esc(m.id)+'"'+(isAdminMember(m.id)?" checked":"")+'> Admin</label>':"")+
+      (adm&&m.id!==state.me?'<button class="btn danger" data-act="rmMember" data-id="'+esc(m.id)+'">Remove</button>':"")+
+    "</div>";
+  }).join("");
+}
+// The admin sets or changes a manager's password (auth.js does the work).
+export function setPassword(memberId,pw){
+  if(!state.admin) return Promise.reject({ message:"Only the admin can set passwords" });
+  var m=member(memberId); if(!m) return Promise.reject({ message:"No such manager" });
+  if(!pw||pw.length<6) return Promise.reject({ code:"auth/weak-password" });
+  return A.setPassword(m,pw,function(){ return prompt("An account for "+m.name+" already exists. Enter its current password to change it:"); });
+}
+
+/* ---- your own password ---- */
+export function openPasswordDlg(){
+  document.getElementById("pwCur").value=""; document.getElementById("pwNew").value=""; document.getElementById("pwHint").textContent="";
+  document.getElementById("pwDlg").showModal(); document.getElementById("pwCur").focus();
+}
+// Still on the starting password? Require a new one before anything else.
+export function enforceFreshPassword(user,typedPw){
+  var m=user?memberForEmail(user.email):null; if(!m||!typedPw) return;
+  if(A.isDefaultPassword(user,typedPw,members())) forcePasswordChange(m);
+}
+function forcePasswordChange(m){
+  var dlg=document.getElementById("pwDlg");
+  state.mustChange=true;
+  document.getElementById("pwCur").value=defaultPw(m);
+  document.getElementById("pwNew").value="";
+  document.getElementById("pwHint").textContent="You're on the starting password. Pick your own to continue.";
+  if(!dlg.open) dlg.showModal();
+  document.getElementById("pwNew").focus();
+}
+// A signed-in manager changes their own password — nobody else's. Firebase requires
+// a fresh sign-in first, which is what the current password is for.
+export function changeOwnPassword(){
+  var user=A.currentUser(), hint=document.getElementById("pwHint");
+  if(!user) return toast("Sign in first");
+  var cur=document.getElementById("pwCur").value, nw=document.getElementById("pwNew").value;
+  if(!cur) return toast("Enter your current password");
+  if(!nw||nw.length<6) return toast("New password needs at least 6 characters");
+  var mm=memberForEmail(user.email);
+  if(mm&&nw===defaultPw(mm)) return toast("That's the starting password — pick a different one");
+  hint.textContent="Changing…";
+  A.changePassword(user,cur,nw).then(function(){
+    document.getElementById("pwCur").value=""; document.getElementById("pwNew").value=""; hint.textContent="";
+    state.mustChange=false;
+    document.getElementById("pwDlg").close(); toast("Password changed");
+  }).catch(function(e){ hint.textContent=A.authMsg(e); });
+}
+
+/* ---- the login screen: the whole page until you're in ---- */
+export function showLogin(msg){
+  document.getElementById("app").hidden=true;
+  var lg=document.getElementById("login"); lg.hidden=false;
+  document.getElementById("siKeyRow").hidden=!!S.storedKey();
+  document.getElementById("siHint").textContent=msg||"";
+  var nm=document.getElementById("siName"); (nm.value?document.getElementById("siPw"):nm).focus();
+}
+// Check the passcode, sign in, then hand the user to `enterBook` (app.js opens the book).
+export function submitLogin(enterBook){
+  var name=document.getElementById("siName").value.trim(), pw=document.getElementById("siPw").value, hint=document.getElementById("siHint");
+  var key=S.storedKey()||document.getElementById("siKey").value.trim();
+  if(!name) return toast("Enter your name");
+  if(!pw) return toast("Enter your password");
+  if(!key){ document.getElementById("siKeyRow").hidden=false; return toast("Enter the league passcode"); }
+  hint.textContent="Signing in…";
+  S.tryKey(key).then(function(ok){
+    if(!ok){ document.getElementById("siKeyRow").hidden=false; S.forgetKey(); hint.textContent="That passcode isn't right"; return; }
+    S.setKey(key);
+    return A.signIn(name,pw)
+      .then(function(cred){
+        hint.textContent="Opening the book…";
+        state.typedPw=pw;
+        // if this browser was already signed in, auth state won't "change" — open the book directly
+        enterBook(cred.user||A.currentUser());
+      })
+      .catch(function(e){ hint.textContent=A.authMsg(e); });
+  });
+}
+// The login card's "start over": forget everything on this device and reload clean.
+export function startOver(){
+  try{ localStorage.clear(); }catch(e){}
+  A.signOut().catch(function(){}).then(function(){ location.replace(location.pathname); });
+}
