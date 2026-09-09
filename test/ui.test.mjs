@@ -46,7 +46,7 @@ async function page() {
     const { state } = await import("./state.js?v=dev");
     state.config = { leagueName: "T", season: "2026", stake: 25, adminEmails: [],
       members: [{ id: "a", name: "Alice" }, { id: "b", name: "Bob" }, { id: "c", name: "Cara" }],
-      kickoff: "2026-09-10T00:20:00Z" };
+      kickoff: "2036-09-10T00:20:00Z" };   // far off: season-long bets must stay open whenever this runs
     state.me = "a"; state.local = true; state.bets = []; state.admin = false; state.isAdmin = false;
     state.roster = { players: [["1", "Chase Brown", "RB", "CIN"], ["2", "Ja'Marr Chase", "WR", "CIN", "Q"], ["3", "Drake Maye", "QB", "NE"], ["SEA", "Seattle Seahawks", "DEF", "SEA"], ["KC", "Kansas City Chiefs", "DEF", "KC"]] };
     state.games = { games: [{ id: "g5", week: 5, away: "NE", home: "SEA", date: "2026-10-11T17:00:00Z", status: "pre" }] };

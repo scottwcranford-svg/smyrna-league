@@ -9,7 +9,7 @@ import * as R from "./rules.js?v=dev";
 import { lease } from "./store.js?v=dev";
 
 export const SLEEPER="https://api.sleeper.app";
-export const NFLVERSE_GAMES="https://github.com/nflverse/nfldata/raw/master/data/games.csv";
+export const NFLVERSE_GAMES="https://raw.githubusercontent.com/nflverse/nfldata/master/data/games.csv";
 const ANON="anon"+Math.random().toString(36).slice(2,8);   // lease holder for a page with nobody signed in
 
 export function seasonOf(config){ return String((config&&config.season)||"2026"); }

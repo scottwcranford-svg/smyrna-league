@@ -145,7 +145,7 @@ function splitCsv(line) {
 async function weekStarts() {
   const starts = {};
   try {
-    const rows = parseCsv(await getText("https://github.com/nflverse/nfldata/raw/master/data/games.csv"));
+    const rows = parseCsv(await getText("https://raw.githubusercontent.com/nflverse/nfldata/master/data/games.csv"));
     const first = {};
     for (const r of rows) {
       if (r.season !== SEASON || r.game_type !== "REG" || !r.gameday || !r.gametime) continue;
