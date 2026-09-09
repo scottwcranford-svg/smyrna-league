@@ -1,0 +1,3 @@
+# Text files are committed and checked out with LF, so Windows checkouts stop warning about CRLF.
+* text=auto eol=lf
+*.png binary

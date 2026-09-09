@@ -1,0 +1,49 @@
+// Firestore rules for the book. Not deployed from git: paste into Firebase console →
+// Firestore → Rules → Publish. Everything needs a sign-in; the passcode document
+// under SmyrnaLeague must exist for the key; only the admin emails named in
+// league/config may change league/config. Everything else in the book is open to
+// any signed-in manager, because the app itself writes it from the browser: bets
+// (take, join, auto-void, auto-settle), leases, and the refresh docs (stats, roster,
+// games) that whichever phone hit Refresh writes back.
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{db}/documents {
+    function signedIn() { return request.auth != null && request.auth.token.email != null; }
+    function hasKey(key) { return exists(/databases/$(db)/documents/SmyrnaLeague/$(key)); }
+    function member(key) { return signedIn() && hasKey(key); }
+    function isAdmin(key) {
+      let cfg = get(/databases/$(db)/documents/books/$(key)/league/config).data;
+      let me = request.auth.token.email.lower();
+      return member(key) && (
+        (('adminEmails' in cfg) && me in cfg.adminEmails) ||
+        (('adminEmail' in cfg) && me == cfg.adminEmail));
+    }
+
+    // The passcode documents themselves are never readable or writable by clients.
+    match /SmyrnaLeague/{key} { allow read, write: if false; }
+
+    // The login card checks the passcode before anyone signs in, by reading league/gate:
+    // readable with the right key alone, never written by a client.
+    match /books/{key}/league/gate {
+      allow read: if hasKey(key);
+      allow write: if false;
+    }
+
+    // The league settings, roster of managers and admin list: admins only.
+    // A brand-new book (no config yet) may be published by any signed-in holder of the key.
+    match /books/{key}/league/config {
+      allow read: if member(key);
+      allow write: if isAdmin(key) || !exists(/databases/$(db)/documents/books/$(key)/league/config);
+    }
+
+    // seen, refresh, roster, games: any manager, since the app writes them from the browser.
+    // (Admin emails are the app's own <slug>@smyrna.league ids, always lowercase, so the
+    // plain `in` comparison above is safe.)
+    match /books/{key}/league/{doc} {
+      allow read, write: if member(key);
+    }
+
+    match /books/{key}/bets/{id} { allow read, write: if member(key); }
+    match /books/{key}/leases/{id} { allow read, write: if member(key); }
+  }
+}

@@ -63,19 +63,12 @@ document reads and a few hundred writes, against 50,000 and 20,000 a day.
 
 1. Firebase console → new project → Firestore Database (production mode).
 2. Register a web app; paste its `firebaseConfig` into `firebase-config.js`.
-3. Rules (Firestore → Rules → Publish). The passcode collection is `SmyrnaLeague` in
-   this project; any name works as long as the rules and the data agree:
-   ```
-   rules_version = '2';
-   service cloud.firestore {
-     match /databases/{db}/documents {
-       match /SmyrnaLeague/{key} { allow read, write: if false; }
-       match /books/{key}/{doc=**} {
-         allow read, write: if exists(/databases/$(db)/documents/SmyrnaLeague/$(key));
-       }
-     }
-   }
-   ```
+3. Rules (Firestore → Rules → paste `firestore.rules` → Publish). The passcode
+   collection is `SmyrnaLeague` in this project; any name works as long as the rules
+   and the data agree. The rules require a sign-in for everything, and let only the
+   admin emails named in `league/config` change that document — the app's admin
+   checks are in the browser, so the rules are what actually stop a curious manager
+   with the console open. The rules aren't deployed from git; publish them by hand.
 4. Firestore → Data → collection `SmyrnaLeague` → a document whose **ID is the passcode**
    (letters, digits, dashes; e.g. `smyrna-league-2026`) with any field.
 5. Copy the book across: `python migrate-to-firebase.py --project <projectId> --key <passcode>`.
@@ -86,16 +79,29 @@ document reads and a few hundred writes, against 50,000 and 20,000 a day.
 ## Working on it
 
 ```
-npm install          # puppeteer-core, for the browser test
-npm test             # rules, store, auth, sleeper — pure logic and fake Firebase/Sleeper
-E2E_USER=<name> E2E_PASS=<password> node test/e2e/flow.js
+npm install          # puppeteer-core, for the browser tests
+npm test             # rules, store, auth, sleeper (pure logic, fake Firebase/Sleeper) + the UI suite
+E2E_USER=<name> E2E_PASS=<password> [E2E_ADMIN=1] node test/e2e/flow.js
 ```
 
-The browser test signs in to the live site, checks the login card is really gone
-(computed style), the tickets and ledger render, and drives the filters, the League
-dialog and the propose form (stat and game modes, the player picker) read-only. It
-runs against the live URL because the Firebase key is locked to that domain; a local
-copy renders but can't sign in. Use a spare manager account for it, never an admin.
+`test/ui.test.mjs` loads the real page in headless Chrome from a local server, feeds the
+modules fake state, and reads the DOM back, computed style included. It covers what a
+signed-in run can't: the admin's form, a bye week, a ticket from the proposer's side,
+the League dialog's last-seen dates. Nothing reaches Firestore. It skips itself when
+Chrome isn't at the usual path (set `CHROME` to point at it).
+
+The live test signs in to the site, checks the login card is really gone (computed
+style), the tickets and ledger render, and drives the filters, the League dialog and
+the propose form (stat and game modes, the player picker) read-only. Signing in
+writes one thing: the account's last-seen stamp. It runs against the live URL because
+the Firebase key is locked to that domain; a local copy renders but can't sign in.
+
+Give it its own manager. A real manager's password changes the first time they sign
+in (the forced change), and the test dies with them. Add a manager such as `testbot`
+in the League dialog with the admin switch on, set its password there, and keep that
+password in the environment, never in git. Run with `E2E_ADMIN=1` only when the account
+is an app admin: the header switch must then show, off, and everything else still
+render as it does for everyone.
 
 ## What it does
 

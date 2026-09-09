@@ -252,7 +252,9 @@ function sideHtml(e,i,b){
   var who = vacant ? (invited?"Waiting on "+mName(invited):passed?mName(passed)+" passed · open seat":"Open seat") : mName(e.memberId);
   var pick = e.pick || (vacant?(invited?mName(invited)+"?":"Anyone"):who);
   // Invitations are accepted from the ticket's action row; open seats are taken here.
-  var canTake=vacant&&state.me&&!isLocked(b)&&!invited;
+  // Not by someone already on the bet — the proposer sees the seat, not a button.
+  var onIt=state.me&&entriesOf(b).some(function(x){ return x.memberId===state.me; });
+  var canTake=vacant&&state.me&&!isLocked(b)&&!invited&&!onIt;
   return '<div class="'+cls+(invited?" invited":"")+'">'+
     (vacant?(invited?'<span class="avatar-wait">'+avatarHtml(invited,28)+"</span>":openAvatarHtml(28)):avatarHtml(e.memberId,28))+'<div>'+
     '<div class="side-pick">'+esc(pick)+"</div>"+
@@ -285,7 +287,7 @@ function gamelineHtml(b){
 // The standings strip: a bet tracks one stat or several. Older bets carry a single
 // `stat`/`value`; newer ones a `tracks` list with per-row `values`. Normalise, then
 // draw one standings block per track, each with its own leader.
-function stripHtml(S,ents){
+function stripHtml(S,ents,week){
   if(!(S&&Array.isArray(S.rows)&&S.rows.length)) return "";
   var tracks=(Array.isArray(S.tracks)&&S.tracks.length)?S.tracks:[{ stat:S.stat, metric:S.metric, lower:S.lower }];
   var valueOf=function(r,t){ return Number((r.values&&t.stat in r.values)?r.values[t.stat]:r.value)||0; };
@@ -293,6 +295,9 @@ function stripHtml(S,ents){
   var blocks=tracks.map(function(t){
     var max=0, min=Infinity, anyPlayed=false;
     S.rows.forEach(function(r){ var v=valueOf(r,t); if(v>max) max=v; if(v<min) min=v; if(v) anyPlayed=true; });
+    // On a weekly bet, a row whose team sits out the week says so (a combined pick: any of its teams).
+    var playing=R.teamsPlaying(week,state.games);
+    var onBye=function(r){ return !!r.team&&String(r.team).split(" · ").some(function(tm){ return R.onBye(tm,playing); }); };
     // "lower is better" stats (points allowed) lead from the bottom; nobody leads at 0–0.
     var best=t.lower?min:max;
     return (multiTrack?'<div class="track-title">'+esc(t.metric||t.stat||"")+"</div>":"")+
@@ -307,6 +312,7 @@ function stripHtml(S,ents){
             (owner?'<span class="dot" style="background:'+esc(own)+'"></span>':"")+
             '<span class="s-lab">'+esc(r.label||(owner?mName(owner):"Open seat"))+"</span>"+
             (r.team?'<span class="s-team">'+esc(r.team)+"</span>":"")+
+            (onBye(r)?'<span class="s-bye" title="Off this week">bye</span>':"")+
             (owner&&r.label?'<span class="s-own">'+esc(mName(owner))+"</span>":"")+
           "</span>"+
           '<span class="sbar"><i style="width:'+(max>0?Math.round(v/max*100):0)+'%;background:'+esc(own)+'"></i></span>'+
@@ -396,7 +402,7 @@ function ticketHtml(b){
     (b.name?'<p class="bet-desc">'+esc(b.terms)+"</p>":"")+
     (b.game?gamelineHtml(b):"")+
     '<div class="sides">'+sides+"</div>"+
-    stripHtml(b.stats,ents)+
+    stripHtml(b.stats,ents,b.week)+
     '<div class="t-foot">'+
       '<div class="t-stake"><b>'+money(b.amount)+"</b> a side"+
         (live.length>2?' <span class="pot">· '+money(pot)+" pot</span>":"")+"</div>"+
