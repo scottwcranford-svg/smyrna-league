@@ -27,7 +27,14 @@ function makeDb(key){ return S.makeDb(key,{ refresh:runRefresh }); }
 // looks and behaves as it does for everyone else. The switch is remembered per device.
 const ADMIN_LS="smyrna.adminMode";
 try{ state.adminMode=localStorage.getItem(ADMIN_LS)==="on"; }catch(e){}
-function applyAuth(user){ var w=A.whoAmI(user,state.config); state.me=w.me; state.isAdmin=w.admin; state.admin=w.admin&&state.adminMode; }
+function applyAuth(user){ var w=A.whoAmI(user,state.config); state.me=w.me; state.isAdmin=w.admin; state.admin=w.admin&&state.adminMode; stampSeen(); }
+// Once per visit, note that this manager opened the app: league/seen is { memberId: iso }.
+function stampSeen(){
+  if(!state.me||!state.db||state.local||state.seenStamped===state.me) return;
+  state.seenStamped=state.me;
+  var d={}; d[state.me]=new Date().toISOString();
+  state.db.doc("league/seen").update(d).catch(function(){ /* a missed stamp is no loss */ });
+}
 export function toggleAdmin(){
   state.adminMode=!state.adminMode;
   try{ localStorage.setItem(ADMIN_LS,state.adminMode?"on":"off"); }catch(e){}
@@ -111,6 +118,11 @@ function subscribeBook(db){
     state.games=snap.exists?snap.data():null;
     ticker();
   },function(){ /* no ticker without the games doc */ });
+
+  db.doc("league/seen").onSnapshot(function(snap){
+    state.seen=snap.exists?snap.data():null;
+    if(document.getElementById("rosterDlg").open) drawRoster();
+  },function(){ /* the League dialog just shows no dates */ });
 
   db.doc("league/roster").onSnapshot(function(snap){
     state.roster=snap.exists?snap.data():null;   // read-only; no clone needed

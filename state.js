@@ -8,6 +8,7 @@ export const state = {
   config:null, bets:[], me:null, isAdmin:false, admin:false, adminMode:false,
   filter:{ status:"all", week:"all", mine:false },
   refresh:null, roster:null, games:null,
+  seen:null, seenStamped:null,   // league/seen: when each manager last opened the app
   // the propose / join forms' draft
   draftScope:"", draftStats:[], editId:null,
   draftGame:null, draftMarket:"ml", draftLine:"", draftFav:"", joinId:null,

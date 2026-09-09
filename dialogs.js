@@ -57,13 +57,20 @@ export function openRoster(){
   drawRoster();
   document.getElementById("rosterDlg").showModal();
 }
+// When a manager last opened the app, from league/seen.
+function seenHtml(id){
+  var iso=state.seen&&state.seen[id], t=Date.parse(iso||"");
+  if(isNaN(t)) return '<span class="r-seen never">Never signed in</span>';
+  var when; try{ when=new Date(t).toLocaleDateString(undefined,{month:"short",day:"numeric"}); }catch(e){ when=R.ago(iso); }
+  return '<span class="r-seen" title="'+esc(R.fmtWhen(t))+'">Last in '+esc(Date.now()-t<86400e3?R.ago(iso):when)+"</span>";
+}
 export function drawRoster(){
   var adm=!!state.admin;
   document.getElementById("rosterList").innerHTML=members().map(function(m){
     return '<div class="rrow">'+avatarHtml(m.id,26)+
       '<span class="r-name">'+esc(m.name)+"</span>"+
       (isAdminMember(m.id)?'<span class="r-adm">Admin</span>':"")+
-      '<span class="r-team">'+esc(m.team||"—")+"</span>"+
+      '<span class="r-team">'+esc(m.team||"—")+"</span>"+seenHtml(m.id)+
       (adm?'<input class="field r-pw" type="password" data-pw="'+esc(m.id)+'" autocomplete="new-password" placeholder="Set password">'+
            '<button class="btn" data-act="setPw" data-id="'+esc(m.id)+'">Set</button>'+
            '<button class="btn" data-act="pwDefault" data-id="'+esc(m.id)+'" title="'+esc(defaultPw(m))+'">Default</button>':"")+

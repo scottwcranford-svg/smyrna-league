@@ -79,6 +79,9 @@ let browser; const errors = [], checks = {};
   await page.waitForFunction(() => document.getElementById("rosterDlg").open);
   checks.rosterRows = await page.evaluate(() => document.querySelectorAll("#rosterList .rrow").length);
   checks.rosterReadOnly = await page.evaluate(() => document.getElementById("rSave").hidden && document.getElementById("rName").disabled);
+  // signing in stamps league/seen, so this account's own row should say it was just in
+  await page.waitForFunction(() => [...document.querySelectorAll("#rosterList .rrow")].some(r => /mwong22/.test(r.querySelector(".r-name").textContent) && /Last in/.test(r.querySelector(".r-seen").textContent)), { timeout: 10000 });
+  checks.seenSelf = await page.evaluate(() => [...document.querySelectorAll("#rosterList .rrow")].filter(r => /mwong22/.test(r.querySelector(".r-name").textContent)).map(r => r.querySelector(".r-seen").textContent)[0]);
   await page.evaluate(() => document.getElementById("rosterDlg").close());
 
   // the propose form: player mode with the picker, stat chips toggle, game mode lists games
@@ -113,7 +116,7 @@ let browser; const errors = [], checks = {};
 
   const ok = checks.appDisplay !== "none" && checks.me === USER && checks.tickets >= 1 && checks.seats >= 1 && checks.liveOnly === true
     && checks.joinOn.length >= 1 && !checks.joinOn.some(t => /White Men Can Catch|NE @ SEA/.test(t)) && checks.adminSwitchHidden === true && checks.seeking >= 1 && checks.seekingGlow === true
-    && checks.rosterRows >= 1 && checks.rosterReadOnly === true
+    && checks.rosterRows >= 1 && checks.rosterReadOnly === true && /Last in/.test(checks.seenSelf)
     && checks.title === "Propose a bet" && checks.scopeChips === 3 && checks.statChips >= 10 && checks.entryRows === 1 && checks.rowOneLocked === true && checks.twoStats === 2
     && /Chase/.test(checks.pickChip) && checks.gameOptions >= 1 && checks.sideTaken === 1 && errors.length === 0;
   console.log(JSON.stringify({ ...checks, errors }, null, 0));
