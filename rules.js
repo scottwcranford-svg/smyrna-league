@@ -245,6 +245,20 @@ export function gameOf(b,games){
   return hit||b.game;   // fall back to what the bet stored
 }
 
+/* ---- who can join ----
+   A stat bet is open to joiners until it locks unless the proposer switched joining
+   off, or it's a player-vs-the-field bet (sides with different player counts, set up
+   on purpose). A game bet is two sides and never takes a third. */
+
+export function isFieldBet(b){
+  var counts=[]; entriesOf(b).forEach(function(e){ var n=(e.picks||[]).length; if(n&&counts.indexOf(n)<0) counts.push(n); });
+  return counts.length>1;
+}
+
+export function canJoin(b){
+  return !!b&&!b.game&&b.joinable!==false&&(b.status==="open"||b.status==="active")&&!isFieldBet(b);
+}
+
 /* ---- settling without a button ----
    A game bet settles from the final score. A stat bet settles once every game of
    its period is final and the standings were refreshed after the last one ended;

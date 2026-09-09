@@ -318,7 +318,7 @@ function stripHtml(S,ents){
 function actionsHtml(b,ents,live,mine,unpaid){
   var acts=[];
   // Pot-style bet you're not in yet? Add yourself.
-  if(state.me&&b.joinable&&!b.game&&(b.status==="open"||b.status==="active")&&!isLocked(b)&&!mine)
+  if(state.me&&R.canJoin(b)&&!isLocked(b)&&!mine)
     acts.push('<button class="btn pri" data-act="join" data-id="'+esc(b.id)+'">Join</button>');
   // Proposed to you? Accept or pass, right on the ticket.
   if(state.me&&(b.status==="open")&&!isLocked(b)){

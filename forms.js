@@ -348,7 +348,7 @@ export function openJoinDlg(id){
   if(!guard()) return;
   if(!state.me) return toast("Pick your name first");
   var bet=findBet(id);
-  if(!bet||!bet.joinable||bet.game) return;
+  if(!bet||!R.canJoin(bet)) return toast("This one isn't open to joiners");
   if(isLocked(bet)) return toast("Locked — too close to kickoff");
   if(entriesOf(bet).some(function(e){ return e.memberId===state.me; })) return toast("You’re already in this one");
   state.joinId=id;
