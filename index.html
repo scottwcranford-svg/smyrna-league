@@ -301,7 +301,7 @@ footer.foot{margin-top:36px;padding-top:16px;border-top:1px solid var(--rule);fo
     <div class="hint" id="siHint"></div>
     <a class="hint login-help" href="help-login.png" target="_blank" rel="noopener">Need help signing in?</a>
     <button type="button" class="btn" id="siReset" hidden>Start over on this device</button>
-    <div class="hint" id="siVer" style="font-size:10px;opacity:.6">build 12</div>
+    <div class="hint" id="siVer" style="font-size:10px;opacity:.6">build 13</div>
   </div>
 </div>
 
@@ -470,27 +470,14 @@ footer.foot{margin-top:36px;padding-top:16px;border-top:1px solid var(--rule);fo
 
 <div id="toast" role="status" aria-live="polite"></div>
 
-<script>
+<script type="module">
+import * as R from "./rules.js?v=13";
 (function(){
 "use strict";
 
-var COLORS = ["#3B5799","#A8353B","#1C6F53","#8A6A12","#6D4C9F","#0F7284","#B4542A","#2F6B34","#8C3D6B","#4A5D75","#A0522D","#365F9E"];
-var REG_WEEKS = 14, PLAYOFF_START = 15, LAST_WEEK = 17;
-// What a bet can be scored on. [sleeper field or composite, label, lowerIsBetter]
-var STATS = {
-  player:[
-    ["pts_ppr","PPR points"],["pts_std","Standard points"],
-    ["pass_yd","Passing yards"],["pass_td","Passing TDs"],["pass_int","Interceptions thrown",true],
-    ["rush_yd","Rushing yards"],["rush_td","Rushing TDs"],
-    ["rec","Receptions"],["rec_yd","Receiving yards"],["rec_td","Receiving TDs"],
-    ["td_scored","Rushing + receiving TDs"],["fum_lost","Fumbles lost",true]
-  ],
-  team:[
-    ["takeaways","Takeaways · INT + fumble recoveries"],["int","Interceptions"],["ff","Forced fumbles"],
-    ["sack","Sacks"],["def_td","Defensive TDs"],["pts_allow","Points allowed",true],
-    ["yds_allow","Yards allowed",true],["pts_ppr","Defense fantasy points"]
-  ]
-};
+var COLORS=R.COLORS;
+var REG_WEEKS=R.REG_WEEKS, PLAYOFF_START=R.PLAYOFF_START, LAST_WEEK=R.LAST_WEEK;
+var STATS=R.STATS;
 
 var state = {
   db:null, connected:false, ready:false, local:true,
@@ -506,19 +493,14 @@ function defaultLeague(){ return { leagueName:"Smyrna League", season:"2026", st
 function defaultBets(){ return []; }
 
 /* ---- utils ---- */
-function esc(s){ return String(s==null?"":s).replace(/[&<>"']/g,function(c){
-  return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]; }); }
-function money(n){ var v=Math.abs(Number(n)||0);
-  var s = v%1===0?String(v):v.toFixed(2);
-  return "$"+s.replace(/\B(?=(\d{3})+(?!\d))/g,","); }
-function signed(n){ return (n>0?"+":n<0?"−":"")+money(n); }
-function member(id){ if(!state.config) return null;
-  for(var i=0;i<state.config.members.length;i++){ if(state.config.members[i].id===id) return state.config.members[i]; }
-  return null; }
-function mName(id){ var m=member(id); return m?m.name:"Former manager"; }
-function mColor(id){ var m=member(id); return m?m.color:"var(--ink-3)"; }
+function esc(s){ return R.esc(s); }
+function money(n){ return R.money(n); }
+function signed(n){ return R.signed(n); }
+function member(id){ return R.member(id,((state.config&&state.config.members)||[])); }
+function mName(id){ return R.mName(id,((state.config&&state.config.members)||[])); }
+function mColor(id){ return R.mColor(id,((state.config&&state.config.members)||[])); }
 // Circular initials avatar — the recurring identity mark, the way Sleeper tags a manager everywhere.
-function initials(name){ var s=String(name||"").replace(/[^A-Za-z0-9]/g,""); return (s.slice(0,2)||"?").toUpperCase(); }
+function initials(name){ return R.initials(name); }
 function avatarHtml(id,size){
   size=size||28;
   var m=member(id);
@@ -530,82 +512,37 @@ function openAvatarHtml(size){
   size=size||28;
   return '<span class="avatar open" style="width:'+size+'px;height:'+size+'px;font-size:'+Math.round(size*0.5)+'px">+</span>';
 }
-function weekLabel(w){ w=Number(w); return w===0?"SEASON":"WK "+w; }
-function isPlayoff(w){ return Number(w)>=PLAYOFF_START; }
-function kindLabel(k){ return k==="matchup"?"Head to head":k==="future"?"Season future":"Prop"; }
+function weekLabel(w){ return R.weekLabel(w); }
+function isPlayoff(w){ return R.isPlayoff(w); }
+function kindLabel(k){ return R.kindLabel(k); }
 
 /* ---- kickoff locks ----
    A bet locks when its week kicks off: no edits, no taking a seat, no new bets for
    that week. Season-long bets (week 0) lock at Week 1. Week N kicks off on the
    Thursday N-1 weeks after the opener; the opener is a league setting. */
-var DEFAULT_KICKOFF="2026-09-10T00:20:00Z";   // the opener: Wed Sep 9 2026, 8:20 PM ET (Seattle)
-var WEEK_ANCHOR="2026-09-11T00:15:00Z";       // Week 1's Thursday, 8:15 PM ET — weeks 2+ lock on that cadence
-function kickoffTime(){ var t=Date.parse((state.config&&state.config.kickoff)||DEFAULT_KICKOFF); return isNaN(t)?Date.parse(DEFAULT_KICKOFF):t; }
-var LOCK_LEAD=60*60*1000;                     // bets lock one hour before the week's first game
+var DEFAULT_KICKOFF=R.DEFAULT_KICKOFF;
+var WEEK_ANCHOR=R.WEEK_ANCHOR;
+function kickoffTime(){ return R.kickoffTime(state.config); }
+var LOCK_LEAD=R.LOCK_LEAD;
 // First game of a week. Prefer the stored schedule (league/config.weekStarts, written by
 // the refresh script from the real NFL schedule); fall back to the Thursday formula.
-function firstGame(week){
-  week=Number(week)||0;
-  var ws=state.config&&state.config.weekStarts;
-  var key=String(week<=1?1:week);
-  if(ws&&ws[key]){ var t=Date.parse(ws[key]); if(!isNaN(t)) return t; }
-  if(week<=1) return kickoffTime();
-  return Date.parse(WEEK_ANCHOR)+(week-1)*7*86400000;
-}
-function lockTime(week){ return firstGame(week)-LOCK_LEAD; }
+function firstGame(w){ return R.firstGame(w,state.config); }
+function lockTime(w){ return R.lockTime(w,state.config); }
 // A bet on one game locks an hour before that game; everything else, the week's first.
-function betLock(b){
-  if(b&&b.game&&b.game.date){ var t=Date.parse(b.game.date); if(!isNaN(t)) return t-LOCK_LEAD; }
-  return lockTime(b?b.week:0);
-}
+function betLock(b){ return R.betLock(b,state.config); }
 
 /* ---- game bets: the live game behind a ticket ---- */
-function allGames(){ return (state.games&&Array.isArray(state.games.games))?state.games.games:[]; }
-function gameOf(b){
-  if(!b||!b.game) return null;
-  var G=allGames(), hit=null;
-  G.forEach(function(g){ if(!hit&&g.id===b.game.id) hit=g; });
-  if(!hit) G.forEach(function(g){ if(!hit&&g.week===b.game.week&&g.away===b.game.away&&g.home===b.game.home) hit=g; });
-  return hit||b.game;   // fall back to what the bet stored
-}
-function teamName(code){
-  var rows=rosterRows();
-  for(var i=0;i<rows.length;i++){ if(rows[i][2]==="DEF"&&rows[i][0]===code) return rows[i][1]; }
-  return code;
-}
-function lineText(b){
-  if(!b.game) return "";
-  if(b.market==="spread") return (b.fav||b.game.home)+" −"+b.line;
-  if(b.market==="total") return "O/U "+b.line;
-  return "Straight up";
-}
+function allGames(){ return R.allGames(state.games); }
+function gameOf(b){ return R.gameOf(b,state.games); }
+function teamName(code){ return R.teamName(code,state.roster); }
+function lineText(b){ return R.lineText(b); }
 // Which side is covering right now: "away"/"home"/"over"/"under", "push", or null before kickoff.
-function coverSide(b,g){
-  if(!g||g.awayScore==null||g.homeScore==null) return null;
-  var a=g.awayScore, h=g.homeScore;
-  if(b.market==="total"){ var tot=a+h, ln=Number(b.line); return tot>ln?"over":tot<ln?"under":"push"; }
-  if(b.market==="spread"){
-    var favHome=(b.fav||b.game.home)===b.game.home, ln2=Number(b.line);
-    var favPts=(favHome?h:a)-ln2, dogPts=favHome?a:h;
-    return favPts>dogPts?(favHome?"home":"away"):favPts<dogPts?(favHome?"away":"home"):"push";
-  }
-  return a>h?"away":h>a?"home":"push";
-}
+function coverSide(b,g){ return R.coverSide(b,g); }
 function sideCode(b,e){ return e.side||""; }
-function weekLocked(week){ return Date.now()>=lockTime(week); }
-function isLocked(b){ return (b.status==="open"||b.status==="active")&&Date.now()>=betLock(b); }
-function fmtWhen(t){
-  var d=new Date(t);
-  try{ return d.toLocaleString(undefined,{weekday:"short",month:"short",day:"numeric",hour:"numeric",minute:"2-digit"}); }
-  catch(e){ return d.toString(); }
-}
-function countdown(t){
-  var s=Math.max(0,Math.round((t-Date.now())/1000));
-  var d=Math.floor(s/86400), h=Math.floor(s%86400/3600), m=Math.floor(s%3600/60);
-  if(d) return d+"d "+h+"h";
-  if(h) return h+"h "+m+"m";
-  return m>0?m+"m":"under a minute";
-}
+function weekLocked(w){ return R.weekLocked(w,state.config); }
+function isLocked(b){ return R.isLocked(b,state.config); }
+function fmtWhen(t){ return R.fmtWhen(t); }
+function countdown(t){ return R.countdown(t); }
 // Tick the countdowns; once one passes, redraw so its Edit/Take buttons go away.
 setInterval(function(){
   var passed=false;
@@ -615,17 +552,13 @@ setInterval(function(){
   });
   if(passed) render();
 },10000);
-function toLocalInput(iso){
-  var d=new Date(iso); if(isNaN(d)) return "";
-  var p=function(n){ return (n<10?"0":"")+n; };
-  return d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate())+"T"+p(d.getHours())+":"+p(d.getMinutes());
-}
-function uid(){ return "b"+Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+function toLocalInput(iso){ return R.toLocalInput(iso); }
+function uid(){ return R.uid(); }
 // Snapshot bodies arrive frozen. Anything we intend to edit — and we edit bets
 // constantly — has to be a deep copy first, or the write throws under strict mode.
-function clone(o){ return o?JSON.parse(JSON.stringify(o)):o; }
-function entriesOf(b){ return Array.isArray(b.entries)?b.entries:[]; }
-function openSeats(b){ return entriesOf(b).filter(function(e){ return !e.memberId; }).length; }
+function clone(o){ return R.clone(o); }
+function entriesOf(b){ return R.entriesOf(b); }
+function openSeats(b){ return R.openSeats(b); }
 
 var toastTimer=null;
 function toast(msg){
@@ -640,54 +573,7 @@ function guard(){
 }
 
 /* ---- ledger ---- */
-function computeLedger(){
-  var pnl={}, pairs={}, risk={}, offered={}, picks={};
-  (state.config?state.config.members:[]).forEach(function(m){
-    pnl[m.id]={net:0,w:0,l:0,p:0}; risk[m.id]=0; offered[m.id]=0; picks[m.id]=[];
-  });
-  var touch=function(id){ if(id&&!pnl[id]) pnl[id]={net:0,w:0,l:0,p:0}; };
-
-  state.bets.forEach(function(b){
-    var amt=Number(b.amount)||0;
-    var ents=entriesOf(b).filter(function(e){ return e.memberId; });
-
-    if(b.status==="open") ents.forEach(function(e){ if(offered[e.memberId]!=null) offered[e.memberId]+=amt; });
-    if(b.status==="active") ents.forEach(function(e){ if(risk[e.memberId]!=null) risk[e.memberId]+=amt; });
-    if(b.status==="open"||b.status==="active"){
-      // The ledger card lists the bets a manager is in, by name.
-      var title=b.name||String(b.terms||"").slice(0,32);
-      ents.forEach(function(e){
-        if(picks[e.memberId]&&picks[e.memberId].indexOf(title)<0) picks[e.memberId].push(title);
-      });
-    }
-    if(b.status!=="settled"||ents.length<2) return;
-
-    ents.forEach(function(e){ touch(e.memberId); });
-    if(b.winner==="push"){ ents.forEach(function(e){ pnl[e.memberId].p++; }); return; }
-    var win=b.winner;
-    if(!win||!pnl[win]) return;
-
-    var losers=ents.filter(function(e){ return e.memberId!==win; });
-    pnl[win].net += amt*losers.length; pnl[win].w++;
-    var paid=Array.isArray(b.paid)?b.paid:[];
-    losers.forEach(function(e){
-      pnl[e.memberId].net -= amt; pnl[e.memberId].l++;
-      if(paid.indexOf(e.memberId)>=0) return;
-      var key=[win,e.memberId].sort().join("|");
-      if(pairs[key]==null) pairs[key]=0;
-      pairs[key] += (key.split("|")[0]===win?amt:-amt);
-    });
-  });
-
-  var debts=[];
-  Object.keys(pairs).forEach(function(key){
-    var v=pairs[key]; if(Math.abs(v)<0.005) return;
-    var ids=key.split("|");
-    debts.push(v>0?{from:ids[1],to:ids[0],amount:v,key:key}:{from:ids[0],to:ids[1],amount:-v,key:key});
-  });
-  debts.sort(function(a,b){ return b.amount-a.amount; });
-  return { pnl:pnl, debts:debts, risk:risk, offered:offered, picks:picks };
-}
+function computeLedger(){ return R.computeLedger(state.config,state.bets); }
 
 /* ---- render ---- */
 function render(){ expireBets(); head(); ticker(); banner(); board(); settle(); filters(); tickets(); statsBar(); foot(); }
@@ -708,15 +594,7 @@ function expireBets(){
 /* ---- games ticker ----
    The current week's slate, written into league/games by the refresh script.
    Before kickoff: matchup and time. After a refresh: the score and Final. */
-function currentWeek(){
-  var now=Date.now(), w=1;
-  for(var i=1;i<=18;i++){ if(now>=firstGame(i)-LOCK_LEAD) w=i; }
-  // once a week's last game is comfortably over, roll to the next
-  var G=state.games&&state.games.games||[], last=0;
-  G.forEach(function(g){ if(g.week===w){ var t=Date.parse(g.date); if(t>last) last=t; } });
-  if(last&&now>last+5*3600000&&w<18) w++;
-  return w;
-}
+function currentWeek(){ return R.currentWeek(state.config,state.games); }
 function fmtKick(t){
   var d=new Date(t);
   try{ return d.toLocaleString(undefined,{weekday:"short",hour:"numeric",minute:"2-digit"}); }catch(e){ return ""; }
@@ -1069,14 +947,7 @@ function tickets(){
    The page cannot reach Sleeper itself (published artifacts can't make outside
    requests), so the button records a request in the shared book and the refresh
    script writes the numbers back. This strip shows how fresh they are. */
-function ago(iso){
-  var t=Date.parse(iso||""); if(isNaN(t)) return "";
-  var s=Math.max(0,(Date.now()-t)/1000);
-  if(s<60) return "just now";
-  if(s<3600) return Math.round(s/60)+"m ago";
-  if(s<86400) return Math.round(s/3600)+"h ago";
-  return Math.round(s/86400)+"d ago";
-}
+function ago(iso){ return R.ago(iso); }
 function statsBar(){
   var bar=document.getElementById("statsBar"), btn=document.getElementById("refreshBtn");
   var latest=null, through="";
@@ -1232,21 +1103,11 @@ function openSettleDlg(id){
 /* ---- propose dialog ---- */
 /* Roster lookups for the picker. The roster is a snapshot the refresh script
    writes into the shared book — the page itself can't reach Sleeper. */
-function rosterRows(){ return (state.roster&&Array.isArray(state.roster.players))?state.roster.players:[]; }
-function rosterFind(id){ var rows=rosterRows(); for(var i=0;i<rows.length;i++){ if(rows[i][0]===id) return rows[i]; } return null; }
-function rosterSearch(q,scope){
-  q=String(q||"").trim().toLowerCase(); if(q.length<2) return [];
-  var out=[], rows=rosterRows();
-  for(var i=0;i<rows.length&&out.length<8;i++){
-    var r=rows[i], isDef=r[2]==="DEF";
-    if(scope==="team"?!isDef:isDef) continue;
-    var hay=(r[1]+" "+r[3]).toLowerCase();
-    if(hay.indexOf(q)>=0) out.push(r);
-  }
-  return out;
-}
-function shortName(row){ return row[2]==="DEF"?row[1].split(" ").pop():row[1].split(" ").slice(1).join(" ")||row[1]; }
-function picksText(picks){ return (picks||[]).map(function(p){ return p.name; }).join(" + "); }
+function rosterRows(){ return R.rosterRows(state.roster); }
+function rosterFind(id){ return R.rosterFind(id,state.roster); }
+function rosterSearch(q,scope){ return R.rosterSearch(q,scope,state.roster); }
+function shortName(row){ return R.shortName(row); }
+function picksText(picks){ return R.picksText(picks); }
 
 // Games still open for a bet in a week: not yet within an hour of kickoff.
 function openGames(week){
@@ -1454,68 +1315,16 @@ function openBetDlg(editId){
   document.getElementById("bName").focus();
 }
 // The strip's identity: what it scores and who it scores. Same identity, keep the numbers.
-function statsKey(S){
-  if(!S||!Array.isArray(S.rows)) return "";
-  var tracks=(Array.isArray(S.tracks)&&S.tracks.length)?S.tracks:[{stat:S.stat}];
-  return (S.scope||"")+"|"+tracks.map(function(t){ return t.stat; }).join(",")+"|"+
-    S.rows.map(function(r){ return r.key+"@"+(r.entry!=null?r.entry:""); }).join(";");
-}
+function statsKey(S){ return R.statsKey(S); }
 // Terms for a stat bet, written from what's already chosen:
 // "Most receiving yards on the season — Chase + Jefferson vs London + St. Brown."
-function autoTerms(scope,tracks,week,entries){
-  var names=(tracks||[]).map(function(t){ return String(t.metric||t.stat||"").replace(/ · combined$/,""); });
-  var lc=function(s){ return s.charAt(0).toLowerCase()+s.slice(1); };
-  var what;
-  if(names.length>1){
-    // several stats: name them plainly; "most"/"fewest" would misread across the list
-    var list=names.map(lc); list[0]=names[0];
-    what=list.slice(0,-1).join(", ")+" and "+list[list.length-1]+" (each its own standings)";
-  } else what=((tracks[0]&&tracks[0].lower)?"Fewest ":"Most ")+lc(names[0]||"");
-  var when=Number(week)?" in Week "+Number(week):" on the season";
-  var sides=(entries||[]).map(function(e){
-    var picks=e.picks||[];
-    if(picks.length) return picks.map(function(p){ return shortName([p.id,p.name,p.pos,p.team]); }).join(" + ");
-    if(e.pick) return e.pick;
-    return e.memberId?mName(e.memberId):"an open seat";
-  });
-  return what+when+(sides.length?" — "+sides.join(" vs "):"")+".";
-}
+function autoTerms(scope,tracks,week,entries){ return R.autoTerms(scope,tracks,week,entries,((state.config&&state.config.members)||[])); }
 // A name when the proposer didn't give one: the matchup for two sides, the stat
 // and period for a pot.
-function autoName(tracks,week,entries){
-  var sides=(entries||[]).map(function(e){
-    var picks=e.picks||[];
-    if(picks.length) return picks.map(function(p){ return shortName([p.id,p.name,p.pos,p.team]); }).join(" + ");
-    return e.pick||"";
-  }).filter(Boolean);
-  if(sides.length===2&&(entries||[]).length===2) return sides[0]+" vs "+sides[1];
-  var m=String((tracks&&tracks[0]&&(tracks[0].metric||tracks[0].stat))||"Stat").replace(/ · combined$/,"");
-  return m+(Number(week)?" · Week "+Number(week):" · Season")+((entries||[]).length>2?" pot":"");
-}
+function autoName(tracks,week,entries){ return R.autoName(tracks,week,entries); }
 // Build the standings strip for a stat-backed bet: one row per side, keyed by
 // Sleeper IDs, zero until the refresh script fills it in.
-function buildStats(entries){
-  var scope=state.draftScope; if(!scope||!STATS[scope]) return null;
-  var tracks=[];
-  STATS[scope].forEach(function(s){ if(state.draftStats.indexOf(s[0])>=0) tracks.push({ stat:s[0], metric:s[1], lower:!!s[2] }); });
-  if(!tracks.length) return null;
-  var rows=[], multi=false;
-  entries.forEach(function(e,i){
-    var picks=e.picks||[]; if(!picks.length) return;
-    if(picks.length>1) multi=true;
-    var values={}; tracks.forEach(function(t){ values[t.stat]=0; });
-    var row={ key:picks.map(function(p){ return p.id; }).join("+"),
-              label:picks.map(function(p){ return shortName([p.id,p.name,p.pos,p.team]); }).join(" + "),
-              memberId:e.memberId||null, entry:i, value:0, values:values };
-    if(scope==="player") row.team=picks.map(function(p){ return p.team; }).join(" · ");
-    rows.push(row);
-  });
-  if(!rows.length) return null;
-  if(multi) tracks.forEach(function(t){ t.metric+=" · combined"; });
-  // `stat`/`metric`/`lower` mirror the first track so older readers still work.
-  return { scope:scope, tracks:tracks, stat:tracks[0].stat, metric:tracks[0].metric, lower:tracks[0].lower,
-           rows:rows, through:"Not refreshed yet", source:"Sleeper", updatedAt:null };
-}
+function buildStats(entries){ return R.buildStats(entries,state.draftScope,state.draftStats); }
 function submitBet(){
   var name=document.getElementById("bName").value.trim();
   var terms=document.getElementById("bTerms").value.trim();
@@ -1750,16 +1559,12 @@ function tryKey(k){
    writes the results into the book for everyone. Short leases keep it to one
    writer at a time so ten phones don't do the same work or burn the free quota. */
 var SLEEPER="https://api.sleeper.app";
-var COMPOSITES={ takeaways:["int","fum_rec"], td_scored:["rush_td","rec_td"] }, FANTASY_POS={QB:1,RB:1,WR:1,TE:1,K:1};
+var COMPOSITES=R.COMPOSITES, FANTASY_POS=R.FANTASY_POS;
 function nflSeason(){ return String((state.config&&state.config.season)||"2026"); }
 function sj(url){ return fetch(url).then(function(r){ if(!r.ok) throw new Error(r.status+" "+url); return r.json(); }); }
 function isoNow(){ return new Date().toISOString().replace(/\.\d{3}Z$/,"Z"); }
 function ageMin(iso){ var t=Date.parse(iso||""); return isNaN(t)?1e9:(Date.now()-t)/60000; }
-function valueFor(key,kind,totals){
-  var total=0, fields=COMPOSITES[kind]||[kind];
-  String(key).split("+").forEach(function(k){ var row=totals[k.trim()]||{}; fields.forEach(function(f){ total+=Number(row[f]||0); }); });
-  return Math.round(total*10)/10;
-}
+function valueFor(key,kind,totals){ return R.valueFor(key,kind,totals); }
 var LEASE_ID="anon"+Math.random().toString(36).slice(2,8);
 function lease(db,name,ttl){ return db.doc("leases/"+name).acquire({ holder:state.me||LEASE_ID, ttlMs:ttl }).then(function(r){ return r.acquired; }).catch(function(){ return false; }); }
 
@@ -1840,24 +1645,10 @@ function runRefresh(db,by,forced){
   });
 }
 // first kickoff of each week from nflverse (gameday + gametime in Eastern)
-function weekStartsFromCsv(csv,season){
-  var lines=csv.split(/\r?\n/).filter(Boolean), head=splitCsv(lines[0]), first={}, ix={};
-  head.forEach(function(h,i){ ix[h]=i; });
-  for(var i=1;i<lines.length;i++){ var c=splitCsv(lines[i]);
-    if(c[ix.season]!==String(season)||c[ix.game_type]!=="REG"||!c[ix.gameday]||!c[ix.gametime]) continue;
-    var t=etToUtc(c[ix.gameday],c[ix.gametime]), w=String(Number(c[ix.week]));
-    if(!(w in first)||t<first[w]) first[w]=t; }
-  var out={}; Object.keys(first).forEach(function(w){ out[w]=new Date(first[w]).toISOString().replace(/\.\d{3}Z$/,"Z"); });
-  return out;
-}
-function splitCsv(line){ var out=[],cur="",q=false; for(var i=0;i<line.length;i++){ var ch=line[i];
-  if(q){ if(ch==='"'){ if(line[i+1]==='"'){ cur+='"'; i++; } else q=false; } else cur+=ch; }
-  else if(ch==='"') q=true; else if(ch===","){ out.push(cur); cur=""; } else cur+=ch; } out.push(cur); return out; }
-function etOffsetMin(t){ var f=new Intl.DateTimeFormat("en-US",{ timeZone:"America/New_York", hour12:false, year:"numeric", month:"2-digit", day:"2-digit", hour:"2-digit", minute:"2-digit" });
-  var p={}; f.formatToParts(new Date(t)).forEach(function(x){ p[x.type]=x.value; });
-  return Math.round((t-Date.UTC(+p.year,+p.month-1,+p.day,(+p.hour)%24,+p.minute))/60000); }
-function etToUtc(dateStr,timeStr){ var a=dateStr.split("-").map(Number), b=timeStr.split(":").map(Number), t=Date.UTC(a[0],a[1]-1,a[2],b[0],b[1]);
-  for(var i=0;i<2;i++) t=Date.UTC(a[0],a[1]-1,a[2],b[0],b[1])+etOffsetMin(t)*60000; return t; }
+function weekStartsFromCsv(csv,season){ return R.weekStartsFromCsv(csv,season); }
+function splitCsv(line){ return R.splitCsv(line); }
+function etOffsetMin(t){ return R.etOffsetMin(t); }
+function etToUtc(dateStr,timeStr){ return R.etToUtc(dateStr,timeStr); }
 
 
 /* ---- who you are: Firebase Auth ----
@@ -1865,18 +1656,14 @@ function etToUtc(dateStr,timeStr){ var a=dateStr.split("-").map(Number), b=timeS
    email involved. Identity is the signed-in account, so "acting as" can't be faked.
    Admins are the accounts listed in league/config.adminEmails; any admin can flag others.
    Nothing renders until someone is signed in: the login screen is the whole page. */
-var AUTH_DOMAIN="smyrna.league";
-function slugName(n){ return String(n||"").toLowerCase().replace(/[^a-z0-9]/g,""); }
-function emailFor(m){ return slugName(m.name)+"@"+AUTH_DOMAIN; }
-function defaultPw(m){ return String(m.name||"")+"123!"; }   // the league's starting password: name + 123!
-function memberForEmail(email){
-  email=String(email||"").toLowerCase();
-  var hit=null; (state.config?state.config.members:[]).forEach(function(m){ if(!hit&&emailFor(m)===email) hit=m; });
-  return hit;
-}
-function adminEmails(){ return (state.config&&Array.isArray(state.config.adminEmails))?state.config.adminEmails.map(function(e){ return String(e).toLowerCase(); }):[]; }
-function adminIds(){ return adminEmails().map(function(e){ var m=memberForEmail(e); return m?m.id:null; }).filter(Boolean); }
-function isAdminMember(id){ var m=member(id); return !!m&&adminEmails().indexOf(emailFor(m))>=0; }
+var AUTH_DOMAIN=R.AUTH_DOMAIN;
+function slugName(n){ return R.slugName(n); }
+function emailFor(m){ return R.emailFor(m); }
+function defaultPw(m){ return R.defaultPw(m); }   // the league's starting password: name + 123!
+function memberForEmail(email){ return R.memberForEmail(email,((state.config&&state.config.members)||[])); }
+function adminEmails(){ return R.adminEmails(state.config); }
+function adminIds(){ return R.adminIds(state.config); }
+function isAdminMember(id){ return R.isAdminMember(id,state.config); }
 function applyAuth(user){
   var m=user?memberForEmail(user.email):null;
   state.me=m?m.id:null;
