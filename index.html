@@ -297,7 +297,7 @@ footer.foot{margin-top:36px;padding-top:16px;border-top:1px solid var(--rule);fo
     </form>
     <div class="hint" id="siHint"></div>
     <button type="button" class="btn" id="siReset" hidden>Start over on this device</button>
-    <div class="hint" id="siVer" style="font-size:10px;opacity:.6">build 9</div>
+    <div class="hint" id="siVer" style="font-size:10px;opacity:.6">build 10</div>
   </div>
 </div>
 
@@ -1926,13 +1926,15 @@ function enterBook(user){
   enforceFreshPassword(user);
   // If the book hasn't opened shortly, say why on the login screen instead of sitting there.
   clearTimeout(state.bookTimer);
+  var t0=Date.now();
   state.bookTimer=setTimeout(function(){
     if(!document.getElementById("app").hidden) return;
+    console.warn("book not open after",Math.round((Date.now()-t0)/1000),"s; local=",state.local,"error=",state.bookError);
     var why=state.bookError?("The book refused to load: "+dbMsg(state.bookError)+" ("+(state.bookError.code||"")+").")
       :"Signed in, but the book hasn't loaded. Something on this browser may be blocking firestore.googleapis.com — an ad blocker or strict tracking prevention. Try another browser, or start over below.";
     document.getElementById("siHint").textContent=why;
     document.getElementById("siReset").hidden=false;
-  },10000);
+  },6000);
 }
 
 // Still on the default password? Prove it (a silent re-sign-in with the default) and,
@@ -2231,6 +2233,18 @@ state.bets=defaultBets();
 render();
 
 state.ready=true;
+// Any script error while the login card is up gets printed on the card, so a stuck
+// screen always says why.
+window.addEventListener("error",function(ev){
+  var h=document.getElementById("siHint"); if(!h||document.getElementById("login").hidden) return;
+  h.textContent="Error: "+(ev.message||"unknown")+(ev.lineno?" (line "+ev.lineno+")":"");
+  document.getElementById("siReset").hidden=false;
+});
+window.addEventListener("unhandledrejection",function(ev){
+  var h=document.getElementById("siHint"); if(!h||document.getElementById("login").hidden) return;
+  var r=ev.reason||{}; h.textContent="Error: "+(r.code||"")+" "+(r.message||String(r));
+  document.getElementById("siReset").hidden=false;
+});
 if(!window.FIREBASE_CONFIG||!window.FIREBASE_CONFIG.projectId||!window.firebase){
   showLogin("This copy isn't connected to the league's book.");
 } else {
