@@ -90,8 +90,11 @@ export function drawScope(){
   else hint.textContent=(scope==="team"?"Pick your defense.":"Pick your player, or several to combine them.")+" Post it and others join with their own until it locks. Add a side to set up a specific matchup or invite someone. Track one stat or several — each gets its own standings.";
 }
 
+// The propose form and the Join dialog draw the same rows and share element ids, so
+// every lookup is scoped to whichever dialog is open.
+function entriesHost(){ return document.getElementById("joinDlg").open?"jEntries":"bEntries"; }
 export function drawEntries(hostId){
-  var host=document.getElementById(hostId||"bEntries");
+  var host=document.getElementById(hostId||entriesHost());
   var scope=state.draftScope, usePicker=!!scope&&rosterRows().length>0;
   host.innerHTML=state.draft.map(function(e,i){
     // You can only put yourself on a bet. Row one is you; other rows are open, or an
@@ -169,7 +172,7 @@ function byePick(entries,week){
 }
 
 export function drawSugg(i,q){
-  var box=document.getElementById("sugg"+i); if(!box) return;
+  var box=document.querySelector("#"+entriesHost()+" #sugg"+i); if(!box) return;
   // A player or defense can be on one side only — hide anything any side already holds.
   var taken={}; state.draft.forEach(function(e){ (e.picks||[]).forEach(function(p){ taken[p.id]=1; }); });
   var hits=rosterSearch(q,state.draftScope).filter(function(r){ return !taken[r[0]]; });
@@ -193,7 +196,7 @@ export function addPick(i,id){
   e.picks.push({ id:r[0], name:r[1], pos:r[2], team:r[3] });
   e.pick=picksText(e.picks);
   drawEntries();
-  var next=document.querySelector('[data-act="dSearch"][data-i="'+i+'"]'); if(next) next.focus();
+  var next=document.querySelector("#"+entriesHost()+' [data-act="dSearch"][data-i="'+i+'"]'); if(next) next.focus();
 }
 export function dropPick(i,pid){
   var de=state.draft[i];

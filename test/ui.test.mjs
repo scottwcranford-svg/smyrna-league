@@ -159,7 +159,7 @@ test("bye week: off teams are greyed in the picker and refused on post or join",
     state.bets = [{ id: "j1", week: 5, status: "open", joinable: true, createdBy: "b", amount: 10, name: "Pot", terms: "t",
       stats: { scope: "player", tracks: [{ stat: "rec_yd" }] }, entries: [{ memberId: "b", picks: [{ id: "3", name: "Drake Maye", pos: "QB", team: "NE" }] }] }];
     state.joinId = "j1"; state.draftScope = "player"; state.draft = [{ memberId: "a", pick: "", picks: [] }]; F.drawEntries("jEntries"); document.getElementById("joinDlg").showModal();
-    F.drawSugg(0, "chase"); const joinChase = sugg();
+    F.drawSugg(0, "chase"); const joinChase = [...document.querySelectorAll("#jEntries #sugg0 button")].map(x => [x.textContent, x.disabled]);
     return { w5chase, w5maye, w5def, w0chase, w5saved, w5toast, w0saved, joinChase };
   });
   assert.deepEqual(out.w5chase.map(r => r[1]), [true, true], "both CIN rows disabled");
@@ -203,6 +203,30 @@ test("a test account is off the ledger board and out of the pickers; League show
   assert.deepEqual(out.rosterAsAdmin, [["Alice", false, false], ["Bob", false, false], ["Cara", true, true]], "an admin sees her, tagged, box ticked");
   assert.deepEqual(out.boardAsCara, ["Alice", "Bob"], "the board is the league's even for her");
   assert.deepEqual(out.rosterAsCara, ["Alice", "Bob", "Cara"], "but she sees herself in League");
+  assert.deepEqual(errors, []);
+  await p.close();
+});
+
+test("Join dialog search works after the propose form has been drawn (shared ids)", { skip }, async () => {
+  const { p, errors } = await page();
+  const out = await p.evaluate(async () => {
+    const { state } = await import("./state.js?v=dev"); const F = await import("./forms.js?v=dev");
+    // the propose form has been drawn, as it would be for anyone who opened it earlier
+    state.draftScope = "player"; state.draftStats = ["pass_yd"]; state.draft = [{ memberId: "a", pick: "", picks: [] }]; F.drawEntries("bEntries");
+    // now a join
+    state.bets = [{ id: "j1", week: 0, status: "open", joinable: true, createdBy: "b", amount: 25, name: "Gun Slinger", terms: "t",
+      stats: { scope: "player", tracks: [{ stat: "pass_yd" }] }, entries: [{ memberId: "b", picks: [{ id: "9", name: "Joe Burrow", pos: "QB", team: "CIN" }] }] }];
+    state.joinId = "j1"; state.draft = [{ memberId: "a", pick: "", picks: [] }]; F.drawEntries("jEntries"); document.getElementById("joinDlg").showModal();
+    F.drawSugg(0, "maye");
+    const inJoin = document.querySelectorAll("#jEntries #sugg0 button").length, inPropose = document.querySelectorAll("#bEntries #sugg0 button").length;
+    F.addPick(0, "3");
+    const chipsJoin = [...document.querySelectorAll("#jEntries .pick-chip")].map(c => c.textContent), chipsPropose = document.querySelectorAll("#bEntries .pick-chip").length;
+    const focused = document.activeElement && document.activeElement.closest("#jEntries") ? "join" : "elsewhere";
+    return { inJoin, inPropose, chipsJoin, chipsPropose, focused };
+  });
+  assert.equal(out.inJoin, 1, "suggestions appear in the Join dialog"); assert.equal(out.inPropose, 0, "not in the hidden propose form");
+  assert.equal(out.chipsJoin.length, 1); assert.match(out.chipsJoin[0], /Drake Maye/); assert.equal(out.chipsPropose, 0, "the pick lands in the Join dialog");
+  assert.equal(out.focused, "join", "focus returns to the Join dialog's search");
   assert.deepEqual(errors, []);
   await p.close();
 });
