@@ -296,7 +296,7 @@ test("Settle Up opens with the season table: managers across, hi/low, weekly, se
     state.highlow = { weeks: { "1": { high: [{ id: "b", name: "Bob", pts: 140 }], low: [{ id: "c", name: "Cara", pts: 90 }] } } };
     V.render();
     const t = document.querySelector("#settle table.pivot");
-    return { heads: [...t.querySelectorAll("thead th")].slice(1).map(h => [h.querySelector(".pv-head span").textContent, h.classList.contains("me")]),
+    return { heads: [...t.querySelectorAll("thead th")].slice(1).map(h => [h.querySelector(".pv-head span:not(.avatar)").textContent, h.classList.contains("me")]),
       rows: [...t.querySelectorAll("tbody tr")].map(r => [r.querySelector("th").textContent, ...[...r.querySelectorAll("td")].map(d => d.textContent + ":" + d.className.replace("num ", "").replace(" total", ""))]),
       scrolls: getComputedStyle(document.querySelector("#settle .pivot-wrap")).overflowX, debts: document.querySelectorAll("#settle .debt").length };
   });
