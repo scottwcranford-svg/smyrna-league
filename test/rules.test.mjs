@@ -70,12 +70,18 @@ test("ledger: winner collects the stake from each loser, unpaid debts net pairwi
   const L = R.computeLedger(config, [
     { id: "b1", status: "settled", amount: 25, winner: "m0", entries: [{ memberId: "m0" }, { memberId: "m1" }, { memberId: "m2" }], paid: ["m2"] },
     { id: "b2", status: "active", amount: 10, entries: [{ memberId: "m1", pick: "x" }, { memberId: "m2", pick: "y" }] },
+    { id: "b3", status: "open", amount: 15, entries: [{ memberId: "m0", pick: "x" }, { memberId: null }] },
+    { id: "b4", status: "void", amount: 40, autoVoid: true, entries: [{ memberId: "m0", pick: "x" }, { memberId: null }] },
+    { id: "b5", status: "void", amount: 70, cancelled: true, entries: [{ memberId: "m2", pick: "x" }, { memberId: null }] },
   ]);
   assert.equal(L.pnl.m0.net, 50); assert.equal(L.pnl.m1.net, -25); assert.equal(L.pnl.m2.net, -25);
   assert.equal(L.pnl.m0.w, 1); assert.equal(L.pnl.m1.l, 1);
   // values come from a separate VM realm, so compare by JSON rather than prototype identity
   assert.equal(JSON.stringify(L.debts.map(d => [d.from, d.to, d.amount])), JSON.stringify([["m1", "m0", 25]]), "m2 already paid");
   assert.equal(L.risk.m1, 10); assert.equal(L.risk.m2, 10);
+  assert.equal(L.risk.m0, 0, "an open bet isn't in play yet"); assert.equal(L.offered.m0, 15); assert.equal(L.offered.m1, 0);
+  assert.equal(L.cancelled.m0, 40, "no takers by lock counts"); assert.equal(L.cancelled.m2, 0, "pulled by hand doesn't"); assert.equal(L.cancelled.m1, 0);
+  assert.equal(L.pnl.m0.net, 50, "a cancelled bet moves no money");
 });
 
 test("coverSide: winner, total, and pushes", () => {

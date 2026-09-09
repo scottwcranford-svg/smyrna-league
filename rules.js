@@ -166,9 +166,11 @@ export function statsKey(S){
 /* ---- ledger ---- */
 
 export function computeLedger(config,bets){
-  var pnl={}, pairs={}, risk={}, offered={}, picks={};
+  // risk: stake on live bets. offered: stake on bets still waiting for takers.
+  // cancelled: stake on bets that reached the lock with no takers and cancelled themselves.
+  var pnl={}, pairs={}, risk={}, offered={}, cancelled={}, picks={};
   (config?config.members:[]).forEach(function(m){
-    pnl[m.id]={net:0,w:0,l:0,p:0}; risk[m.id]=0; offered[m.id]=0; picks[m.id]=[];
+    pnl[m.id]={net:0,w:0,l:0,p:0}; risk[m.id]=0; offered[m.id]=0; cancelled[m.id]=0; picks[m.id]=[];
   });
   var touch=function(id){ if(id&&!pnl[id]) pnl[id]={net:0,w:0,l:0,p:0}; };
 
@@ -178,6 +180,7 @@ export function computeLedger(config,bets){
 
     if(b.status==="open") ents.forEach(function(e){ if(offered[e.memberId]!=null) offered[e.memberId]+=amt; });
     if(b.status==="active") ents.forEach(function(e){ if(risk[e.memberId]!=null) risk[e.memberId]+=amt; });
+    if(b.status==="void"&&b.autoVoid) ents.forEach(function(e){ if(cancelled[e.memberId]!=null) cancelled[e.memberId]+=amt; });
     if(b.status==="open"||b.status==="active"){
       // The ledger card lists the bets a manager is in, by name.
       var title=b.name||String(b.terms||"").slice(0,32);
@@ -211,7 +214,7 @@ export function computeLedger(config,bets){
     debts.push(v>0?{from:ids[1],to:ids[0],amount:v,key:key}:{from:ids[0],to:ids[1],amount:-v,key:key});
   });
   debts.sort(function(a,b){ return b.amount-a.amount; });
-  return { pnl:pnl, debts:debts, risk:risk, offered:offered, picks:picks };
+  return { pnl:pnl, debts:debts, risk:risk, offered:offered, cancelled:cancelled, picks:picks };
 }
 
 /* ---- game bets ---- */

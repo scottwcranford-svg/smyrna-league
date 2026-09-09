@@ -118,11 +118,13 @@ section{margin-top:28px}
 .avatar.open{background:var(--surface-2)!important;color:var(--ink-3)!important;border:1.5px dashed var(--rule-2)}
 .seat-name{font-weight:700;font-size:13.5px;letter-spacing:-.005em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ink)}
 .seat-team{font-size:11.5px;line-height:1.3;min-height:1.3em;color:var(--ink-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.figs{display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap;margin-top:1px}
+.figs{display:flex;gap:12px 14px;align-items:flex-end;flex-wrap:wrap;margin-top:1px}
 .fig b{display:block;font-variant-numeric:tabular-nums;font-size:19px;font-weight:800;line-height:1;letter-spacing:-.02em}
 .fig span{display:block;font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);margin-top:4px}
 .fig.stake b{color:var(--gold)}
-.fig.stake b.zero{color:var(--ink-3)}
+.fig.prop b{color:var(--open)}
+.fig.gone b{color:var(--void)}
+.fig b.zero{color:var(--ink-3)}
 .fig.net b.pos{color:var(--win)} .fig.net b.neg{color:var(--loss)} .fig.net b.flat{color:var(--ink-3)}
 .seat-picks{font-size:11.5px;color:var(--ink-2);line-height:1.35;overflow-wrap:anywhere}
 .seat-picks.none{color:var(--ink-3)}

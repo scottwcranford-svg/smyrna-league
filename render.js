@@ -146,14 +146,15 @@ function board(){
   host.innerHTML=list.map(function(m){
     var p=L.pnl[m.id], played=p.w+p.l+p.p;
     var cls=p.net>0?"pos":p.net<0?"neg":"flat";
-    var inPlay=(L.risk[m.id]||0)+(L.offered[m.id]||0);
+    var inPlay=L.risk[m.id]||0, proposed=L.offered[m.id]||0, gone=L.cancelled[m.id]||0;
     var mine=L.picks[m.id]||[];
-    return '<div class="seat'+(m.id===state.me?" me":"")+((played||inPlay)?"":" idle")+'">'+
+    var fig=function(cls,v,lab){ return '<div class="fig '+cls+'"><b class="'+(v?"":"zero")+'">'+money(v)+"</b><span>"+lab+"</span></div>"; };
+    return '<div class="seat'+(m.id===state.me?" me":"")+((played||inPlay||proposed)?"":" idle")+'">'+
       '<div class="seat-top">'+avatarHtml(m.id,30)+
       '<span class="seat-name">'+esc(m.name)+"</span></div>"+
       '<div class="seat-team">'+esc(m.team||"")+"</div>"+
       '<div class="figs">'+
-        '<div class="fig stake"><b class="'+(inPlay?"":"zero")+'">'+money(inPlay)+"</b><span>in play</span></div>"+
+        fig("stake",inPlay,"in play")+fig("prop",proposed,"proposed")+fig("gone",gone,"cancelled")+
         '<div class="fig net"><b class="'+cls+'">'+signed(p.net)+"</b><span>"+
           (played?p.w+"–"+p.l+(p.p?"–"+p.p:"")+" settled":"settled")+"</span></div>"+
       "</div>"+
