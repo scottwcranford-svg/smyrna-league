@@ -46,6 +46,9 @@ test("autoTerms writes the sentence from stat, period and picks", () => {
   const lower = R.autoTerms("team", [{ stat: "pts_allow", metric: "Points allowed", lower: true }], 3, [
     { picks: [{ id: "HOU", name: "Houston Texans", pos: "DEF", team: "HOU" }] }, { memberId: "m0", picks: [] }], config.members);
   assert.equal(lower, "Fewest points allowed in Week 3 — Texans vs gmelan1.");
+  const solo = R.autoTerms("player", [{ stat: "rec_yd", metric: "Receiving yards" }], 0, [
+    { memberId: "m0", picks: [{ id: "1", name: "Ja'Marr Chase", pos: "WR", team: "CIN" }] }], config.members);
+  assert.equal(solo, "Most receiving yards on the season — Chase vs the field.", "a one-sided proposal waits for joiners");
 });
 
 test("autoName: matchup for two sides, stat + period for pots", () => {

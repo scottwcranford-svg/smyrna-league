@@ -361,7 +361,7 @@ function ticketHtml(b){
   else {
     var waiting=ents.filter(function(e){ return !e.memberId&&e.invite&&!e.declined; }).map(function(e){ return mName(e.invite); });
     var anyone=ents.filter(function(e){ return !e.memberId&&(!e.invite||e.declined); }).length;
-    chip='<span class="status open">'+(anyone?anyone+" seat"+(anyone===1?"":"s")+" open":"Waiting on "+waiting.join(", "))+"</span>";
+    chip='<span class="status open">'+(anyone?anyone+" seat"+(anyone===1?"":"s")+" open":waiting.length?"Waiting on "+waiting.join(", "):"Open · join in")+"</span>";
   }
 
   var paid=Array.isArray(b.paid)?b.paid:[];

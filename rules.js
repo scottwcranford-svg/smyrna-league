@@ -263,7 +263,8 @@ export function autoTerms(scope,tracks,week,entries,members){
     if(e.pick) return e.pick;
     return e.memberId?mName(e.memberId,members):"an open seat";
   });
-  return what+when+(sides.length?" — "+sides.join(" vs "):"")+".";
+  // one side so far: the proposal stands against whoever joins
+  return what+when+(sides.length===1?" — "+sides[0]+" vs the field":sides.length?" — "+sides.join(" vs "):"")+".";
 }
 
 export function autoName(tracks,week,entries){

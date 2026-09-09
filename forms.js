@@ -87,7 +87,7 @@ export function drawScope(){
   }
   if(!scope) hint.textContent="Anything goes. Settle it by hand when it's decided.";
   else if(!rosterRows().length) hint.textContent="Roster isn't loaded yet — hit Refresh stats first, or switch to free text.";
-  else hint.textContent=(scope==="team"?"Pick a defense for each side.":"Pick one player per side, or several to combine them.")+" Track one stat or several — each gets its own standings. The terms write themselves from your picks.";
+  else hint.textContent=(scope==="team"?"Pick your defense.":"Pick your player, or several to combine them.")+" Post it and others join with their own until it locks. Add a side to set up a specific matchup or invite someone. Track one stat or several — each gets its own standings.";
 }
 
 export function drawEntries(hostId){
@@ -136,7 +136,7 @@ export function drawEntries(hostId){
       '<span class="entry-tag" style="margin-top:11px">'+(i===0?"You":"vs")+"</span>"+
       '<select class="field" data-act="dMem" data-i="'+i+'"'+(lockedSeat?" disabled":"")+'>'+opts+"</select>"+
       pickUi+
-      (state.draft.length>2&&scope!=="game"?'<button class="btn danger rm" data-act="dRm" data-i="'+i+'">✕</button>':"")+
+      (i>0&&scope!=="game"?'<button class="btn danger rm" data-act="dRm" data-i="'+i+'">✕</button>':"")+
     "</div>";
   }).join("");
 }
@@ -226,7 +226,8 @@ export function openBetDlg(editId){
       if(!state.draftStats.length&&S.stat) state.draftStats=[S.stat];
     }
   } else {
-    state.draft=[{memberId:state.me,pick:"",picks:[]},{memberId:null,pick:"",picks:[]}];
+    // a stat bet starts as just you: others join with their own picks until it locks
+    state.draft=[{memberId:state.me,pick:"",picks:[]}];
     state.draftScope="player"; state.draftStats=[];
   }
   drawScope(); drawEntries();
@@ -253,6 +254,11 @@ export function submitBet(){
     if(!state.editId&&Date.now()>=Date.parse(G.date)-LOCK_LEAD) return toast("That game is about to kick off — pick another");
   }
   var statScope=state.draftScope==="player"||state.draftScope==="team";
+  if(statScope&&rosterRows().length){
+    // An open seat with nothing picked adds nothing — joiners bring their own players.
+    var kept=state.draft.filter(function(e,i){ return i===0||e.memberId||e.invite||(e.picks&&e.picks.length); });
+    if(kept.length!==state.draft.length){ state.draft=kept; drawEntries(); }
+  }
   if(!name&&statScope){
     var tracksNm=STATS[state.draftScope].filter(function(s){ return state.draftStats.indexOf(s[0])>=0; })
       .map(function(s){ return { stat:s[0], metric:s[1] }; });
@@ -285,7 +291,7 @@ export function submitBet(){
   // Stat bets need a pick on every side. A game bet's sides are the two teams, set above.
   if(statScope&&rosterRows().length){
     var missing=state.draft.some(function(e){ return !(e.picks&&e.picks.length); });
-    if(missing) return toast(state.draftScope==="team"?"Pick a defense for every side":"Pick a player for every side");
+    if(missing) return toast(state.draftScope==="team"?"Pick a defense for every side you've named":"Pick a player for every side you've named");
     var held={}, dup=null;
     state.draft.forEach(function(e){ (e.picks||[]).forEach(function(p){ if(held[p.id]) dup=p.name; held[p.id]=1; }); });
     if(dup) return toast(dup+" is on two sides");
@@ -311,8 +317,9 @@ export function submitBet(){
     bet.game={ id:G.id, week:G.week, away:G.away, home:G.home, date:G.date };
     bet.market=state.draftMarket==="total"?"total":"ml";
   }
-  // Pot-style: others can add themselves after posting. Never on a two-team game bet.
-  bet.joinable=!isGame&&document.getElementById("bJoin").checked;
+  // Pot-style: others can add themselves after posting. Never on a two-team game bet;
+  // always on a stat bet with nobody named against you, or nobody ever could.
+  bet.joinable=!isGame&&(document.getElementById("bJoin").checked||entries.length<2);
   if(isGame&&bet.market==="total") bet.line=parseFloat(state.draftLine);
   var stats=buildStats(state.draft);
   if(statScope){
@@ -326,7 +333,10 @@ export function submitBet(){
   if(existing&&existing.stats&&stats&&statsKey(existing.stats)===statsKey(stats)) stats=existing.stats;
   if(stats) bet.stats=stats;
   if(existing){ bet.editedAt=new Date().toISOString(); bet.editedBy=state.me; }
-  bet.status=bet.entries.some(function(e){ return !e.memberId; })?"open":"active";
+  // Open until every seat is filled and at least two managers are in; at lock an
+  // open bet cancels itself.
+  var inIt=bet.entries.filter(function(e){ return e.memberId; }).length;
+  bet.status=(bet.entries.some(function(e){ return !e.memberId; })||inIt<2)?"open":"active";
   saveBet(bet);
   state.editId=null;
   document.getElementById("betDlg").close();
@@ -388,7 +398,8 @@ export function submitJoin(){
       if(S.scope==="player") row.team=entry.picks.map(function(p){ return p.team; }).join(" · ");
       S.rows.push(row);
     }
-    if(cur.status==="open"&&!cur.entries.some(function(e){ return !e.memberId; })) cur.status="active";
+    var inIt=cur.entries.filter(function(e){ return e.memberId; }).length;
+    if(cur.status==="open"&&inIt>=2&&!cur.entries.some(function(e){ return !e.memberId; })) cur.status="active";
     if(S&&S.scope&&entry.picks) cur.terms=autoTerms(S.scope,(Array.isArray(S.tracks)&&S.tracks.length)?S.tracks:[{stat:S.stat,metric:S.metric,lower:S.lower}],cur.week,cur.entries);
     return true;
   };

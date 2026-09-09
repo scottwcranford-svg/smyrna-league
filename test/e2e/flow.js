@@ -105,7 +105,7 @@ let browser; const errors = [], checks = {};
 
   const ok = checks.appDisplay !== "none" && checks.me === USER && checks.tickets >= 1 && checks.seats >= 1 && checks.liveOnly === true
     && checks.rosterRows >= 1 && checks.rosterReadOnly === true
-    && checks.title === "Propose a bet" && checks.scopeChips === 3 && checks.statChips >= 10 && checks.entryRows === 2 && checks.twoStats === 2
+    && checks.title === "Propose a bet" && checks.scopeChips === 3 && checks.statChips >= 10 && checks.entryRows === 1 && checks.twoStats === 2
     && /Chase/.test(checks.pickChip) && checks.gameOptions >= 1 && checks.sideTaken === 1 && errors.length === 0;
   console.log(JSON.stringify({ ...checks, errors }, null, 0));
   console.log(ok ? "E2E OK — screenshot " + shot : "E2E FAILED");
