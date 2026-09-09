@@ -1928,7 +1928,9 @@ function enterBook(user){
   if(!key){ showLogin("Signed in — now the league passcode."); return; }
   if(!state.db){ state.db=makeDb(key); state.connected=true; subscribeBook(state.db); }
   else if(!state.local){ document.getElementById("login").hidden=true; document.getElementById("app").hidden=false; render(); }
-  if(state.typedPw){ enforceFreshPassword(user,state.typedPw); state.typedPw=null; }
+  // the default-password check needs the roster; if it isn't here yet, the config
+  // snapshot runs it once the names arrive
+  if(state.typedPw&&memberForEmail(user.email)){ enforceFreshPassword(user,state.typedPw); state.typedPw=null; }
   // If the book hasn't opened shortly, say why on the login screen instead of sitting there.
   clearTimeout(state.bookTimer);
   var t0=Date.now();
@@ -2296,6 +2298,8 @@ function subscribeBook(db){
           state.bets=remoteBets||[];
         }
         applyAuth(firebase.auth().currentUser);   // the roster may have arrived after sign-in
+        var u=firebase.auth().currentUser;
+        if(u&&state.typedPw&&memberForEmail(u.email)){ enforceFreshPassword(u,state.typedPw); state.typedPw=null; }
         // the book is here and you're signed in: show the app
         clearTimeout(state.bookTimer);
         document.getElementById("login").hidden=true;

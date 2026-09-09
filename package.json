@@ -1,0 +1,12 @@
+{
+  "name": "smyrna-league",
+  "private": true,
+  "description": "Smyrna League side-bet board",
+  "scripts": {
+    "test": "node --test test/rules.test.js",
+    "e2e": "node test/e2e/flow.js"
+  },
+  "devDependencies": {
+    "puppeteer-core": "^23.11.1"
+  }
+}
