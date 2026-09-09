@@ -127,6 +127,41 @@ export function currentWeek(config,games){
 
 /* ---- stats ---- */
 
+/* ---- projections ----
+   Sleeper's weekly projections, trimmed to the roster and to the stats the app tracks,
+   ride in league/proj as { weeks: { "5": "<json>" } }. A projection is read with the
+   same valueFor as the actuals, so it is always the bet's own stat. */
+export const STAT_SHORT={ pts_ppr:"pts", pts_std:"pts", pass_yd:"pass yds", pass_td:"pass TD", pass_int:"INT", rush_yd:"rush yds", rush_td:"rush TD",
+  rec:"rec", rec_yd:"rec yds", rec_td:"rec TD", td_scored:"TD", fum_lost:"fum", takeaways:"takeaways", int:"INT", ff:"FF", sack:"sacks",
+  def_td:"TD", pts_allow:"pts allowed", yds_allow:"yds allowed" };
+export function projKeys(){
+  var ks={};
+  ["player","team"].forEach(function(sc){ STATS[sc].forEach(function(s){ ks[s[0]]=1; (COMPOSITES[s[0]]||[]).forEach(function(f){ ks[f]=1; }); }); });
+  return Object.keys(ks);
+}
+export function trimProjections(raw,rosterIds){
+  var keys=projKeys(), out={};
+  if(!raw||typeof raw!=="object"||Array.isArray(raw)) return out;
+  (rosterIds||[]).forEach(function(id){
+    var v=raw[id]; if(!v||typeof v!=="object") return;
+    var o={}, any=false;
+    keys.forEach(function(k){ var n=Number(v[k]); if(n){ o[k]=Math.round(n*10)/10; any=true; } });
+    if(any) out[id]=o;
+  });
+  return out;
+}
+var projCache={};   // week -> [json string, parsed]
+export function projFor(week,proj){
+  var w=proj&&proj.weeks?proj.weeks[String(week)]:null;
+  if(!w) return null;
+  if(typeof w!=="string") return w;
+  var c=projCache[week];
+  if(c&&c[0]===w) return c[1];
+  var parsed=null; try{ parsed=JSON.parse(w); }catch(e){ parsed=null; }
+  projCache[week]=[w,parsed];
+  return parsed;
+}
+
 export function valueFor(key,kind,totals){
   var total=0, fields=COMPOSITES[kind]||[kind];
   String(key).split("+").forEach(function(k){ var row=totals[k.trim()]||{}; fields.forEach(function(f){ total+=Number(row[f]||0); }); });

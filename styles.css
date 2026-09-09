@@ -191,6 +191,17 @@ section{margin-top:28px}
 .srow.lead .s-lab{color:var(--ink);font-weight:700}
 .srow.lead .s-own{color:var(--ink-2)}
 .srow.lead b{color:var(--gold)}
+/* Projections read as tentative: lighter weight, a "proj" mark, and a small "p 82" beside an actual. */
+.srow b.proj{font-weight:700;color:var(--ink-2)}
+.srow b small{display:block;font-size:8.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);line-height:1.1;margin-top:2px}
+.srow b small.proj-was{text-transform:none;letter-spacing:0;font-size:9.5px}
+.srow.lead b.proj{color:var(--gold)}
+.proj-note{font-size:11px;color:var(--ink-3)}
+.sugg .proj{margin-left:auto;font-size:11px;font-weight:700;color:var(--ink-3);white-space:nowrap}
+.sugg .proj + .team{margin-left:8px}
+.pick-chip small.proj{color:var(--ink-2)}
+.sbar{position:relative}
+.ptick{position:absolute;top:-2px;bottom:-2px;width:2px;margin-left:-1px;background:var(--ink-3);opacity:.8;border-radius:1px}
 @media(max-width:520px){ .srow{grid-template-columns:1fr auto} .srow .sbar{display:none} }
 
 .t-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding-top:2px}

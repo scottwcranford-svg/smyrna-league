@@ -300,9 +300,20 @@ function stripHtml(S,ents,week){
   var tracks=(Array.isArray(S.tracks)&&S.tracks.length)?S.tracks:[{ stat:S.stat, metric:S.metric, lower:S.lower }];
   var valueOf=function(r,t){ return Number((r.values&&t.stat in r.values)?r.values[t.stat]:r.value)||0; };
   var multiTrack=tracks.length>1;
+  // Sleeper's projections for this week, if the app has them: shown in place of the
+  // actuals until something has been played, then as a small reference beside them.
+  var P=Number(week)>0?R.projFor(week,state.proj):null, anyPre=false;
   var blocks=tracks.map(function(t){
-    var max=0, min=Infinity, anyPlayed=false;
-    S.rows.forEach(function(r){ var v=valueOf(r,t); if(v>max) max=v; if(v<min) min=v; if(v) anyPlayed=true; });
+    var anyPlayed=false;
+    S.rows.forEach(function(r){ if(valueOf(r,t)) anyPlayed=true; });
+    var projOf=function(r){ return P?R.valueFor(r.key||r.id,t.stat,P):null; };
+    var pre=!anyPlayed&&!!P&&S.rows.some(function(r){ return projOf(r); });
+    if(pre) anyPre=true;
+    var shownOf=function(r){ return pre?projOf(r):valueOf(r,t); };
+    var max=0, min=Infinity;
+    S.rows.forEach(function(r){ var v=shownOf(r); if(v>max) max=v; if(v<min) min=v; });
+    // Bars are scaled so the projection tick fits too, once actuals are showing.
+    var barMax=max; if(!pre&&P) S.rows.forEach(function(r){ var q=projOf(r)||0; if(q>barMax) barMax=q; });
     // On a weekly bet, a row whose team sits out the week says so (a combined pick: any of its teams).
     var playing=R.teamsPlaying(week,state.games);
     var onBye=function(r){ return !!r.team&&String(r.team).split(" · ").some(function(tm){ return R.onBye(tm,playing); }); };
@@ -310,7 +321,7 @@ function stripHtml(S,ents,week){
     var best=t.lower?min:max;
     return (multiTrack?'<div class="track-title">'+esc(t.metric||t.stat||"")+"</div>":"")+
       '<div class="stat-rows">'+S.rows.map(function(r){
-        var v=valueOf(r,t), lead=anyPlayed&&v===best;
+        var v=shownOf(r), pv=projOf(r), lead=(anyPlayed||pre)&&v===best&&(pre?v>0:true);
         // Each row is a player or team; the dot, tag and bar colour say whose side it's on.
         // A row made in the form points at its entry, so a seat taken later still colours it.
         var owner=r.memberId||((r.entry!=null&&ents[r.entry])?ents[r.entry].memberId:null);
@@ -324,10 +335,13 @@ function stripHtml(S,ents,week){
             (onBye(r)?'<span class="s-bye" title="Off this week">bye</span>':"")+
             (owner&&r.label?'<span class="s-own">'+esc(mName(owner))+"</span>":"")+
           "</span>"+
-          '<span class="sbar"><i style="width:'+(max>0?Math.round(v/max*100):0)+'%;background:'+esc(own)+'"></i></span>'+
-          "<b>"+esc(String(v))+"</b></div>";
+          '<span class="sbar"><i style="width:'+(barMax>0?Math.round(v/barMax*100):0)+'%;background:'+esc(own)+'"></i>'+
+            (!pre&&pv?'<u class="ptick" style="left:'+Math.round(pv/barMax*100)+'%" title="Sleeper projected '+esc(String(pv))+'"></u>':"")+"</span>"+
+          (pre?'<b class="proj" title="Sleeper projection">'+esc(String(v))+"<small>proj</small></b>"
+              :"<b>"+esc(String(v))+(pv!=null?'<small class="proj-was" title="Sleeper projected '+esc(String(pv))+'">p '+esc(String(pv))+"</small>":"")+"</b>")+"</div>";
       }).join("")+"</div>";
   }).join("");
+  if(anyPre) blocks='<div class="proj-note">Projected by Sleeper · nothing played yet</div>'+blocks;
   return '<div class="statline">'+
     '<div class="stat-head"><span class="lbl">'+esc(multiTrack?"Standings · "+tracks.length+" stats":(tracks[0].metric||"Standings"))+"</span>"+
     '<span class="stat-when">'+esc(S.through||"")+(S.source?" · "+esc(S.source):"")+"</span></div>"+

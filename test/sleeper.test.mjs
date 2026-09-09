@@ -90,6 +90,28 @@ test("scoresTick skips when the scores are fresh, or when nobody has signed in y
   assert.equal(w[2].count, w[2].games.length);
 });
 
+test("runRefresh: projections for this week, next, and live weekly bets; rewritten only when changed", async () => {
+  const db = fakeDb();
+  const projUrls = [];
+  const raw = { "2": { rec_yd: 82.46, rec: 5.2 }, "3": { pass_yd: 241.3 }, "9": { rec_yd: 40 } };
+  globalThis.fetch = async (u) => {
+    if (/projections/.test(u)) projUrls.push(u);
+    return { ok: true, json: async () => (/state\/nfl/.test(u) ? { week: 3 } : /projections/.test(u) ? raw : /stats\/nfl\/regular\/2026\/\d+$/.test(u) ? {} : /stats\/nfl\/regular\/2026$/.test(u) ? {} : []), text: async () => "" };
+  };
+  const roster = { updatedAt: N.isoNow(), players: [["2", "Ja'Marr Chase", "WR", "CIN"], ["3", "Drake Maye", "QB", "NE"]] };
+  const bets = [{ id: "b1", week: 7, status: "open", stats: { stat: "rec_yd", rows: [{ key: "2", entry: 0 }] } }, { id: "g", week: 5, status: "active", game: { id: "x" }, stats: null }];
+  await N.runRefresh(db, "m1", true, { config: { ...config, scheduleUpdatedAt: N.isoNow() }, refresh: {}, bets, roster, holder: "m1", mobile: true });
+  assert.deepEqual(projUrls.map((u) => u.split("/").pop()).sort(), ["3", "4", "7"], "this week, next, and the open week-7 bet; not the game bet's week");
+  const w = db.writes.find((x) => x[1] === "league/proj");
+  assert.ok(w, "projections written");
+  assert.deepEqual(Object.keys(w[2].weeks).sort(), ["3", "4", "7"]);
+  assert.deepEqual(JSON.parse(w[2].weeks["7"]), { "2": { rec_yd: 82.5, rec: 5.2 }, "3": { pass_yd: 241.3 } }, "trimmed to the roster, one decimal");
+  // same data again: nothing to write
+  const db2 = fakeDb();
+  await N.runRefresh(db2, "m1", true, { config: { ...config, scheduleUpdatedAt: N.isoNow() }, refresh: {}, bets, roster, holder: "m1", mobile: true, proj: w[2] });
+  assert.equal(db2.writes.some((x) => x[1] === "league/proj"), false, "unchanged projections are not rewritten");
+});
+
 test("runRefresh honours the hourly rule, then writes stats, games and the refresh stamp", async () => {
   const db = fakeDb();
   assert.equal((await N.runRefresh(db, "m1", false, { config, refresh: { finishedAt: N.isoNow() } })).note, "recent");

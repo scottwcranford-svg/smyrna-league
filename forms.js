@@ -125,7 +125,9 @@ export function drawEntries(hostId){
       }
     } else if(usePicker){
       var chips=(e.picks||[]).map(function(p){
+        var pt=projText(p.id);
         return '<span class="pick-chip">'+esc(p.name)+(p.pos!=="DEF"?" <small>"+esc(p.pos+" · "+p.team)+"</small>":"")+statusTagsHtml(p.id)+
+          (pt?'<small class="proj" title="Sleeper projection">'+esc(pt)+"</small>":"")+
           '<button type="button" data-act="dDrop" data-i="'+i+'" data-id="'+esc(p.id)+'" aria-label="Remove">✕</button></span>';
       }).join("");
       pickUi='<div class="picker">'+
@@ -153,6 +155,12 @@ function draftWeek(){
   if(document.getElementById("joinDlg").open){ var b=findBet(state.joinId); return b?Number(b.week)||0:0; }
   return Number(document.getElementById("bWeek").value)||0;
 }
+// "82 rec yds · 5 rec": a pick's projection for the form's week and the stats it tracks.
+function projText(id){
+  var wk=draftWeek(), P=wk>0?R.projFor(wk,state.proj):null;
+  if(!P) return "";
+  return (state.draftStats||[]).slice(0,2).map(function(st){ return R.valueFor(id,st,P)+" "+(R.STAT_SHORT[st]||st); }).join(" · ");
+}
 // The first pick whose team is off in the week, or null.
 function byePick(entries,week){
   var playing=R.teamsPlaying(week,state.games), hit=null;
@@ -169,9 +177,10 @@ export function drawSugg(i,q){
   var playing=R.teamsPlaying(draftWeek(),state.games);
   box.hidden=!hits.length;
   box.innerHTML=hits.map(function(r){
-    var bye=R.onBye(r[3],playing);
+    var bye=R.onBye(r[3],playing), pt=projText(r[0]);
     return '<button type="button" data-act="dAdd" data-i="'+i+'" data-id="'+esc(r[0])+'"'+(bye?' disabled title="Off this week"':"")+'>'+esc(r[1])+
-      (r[2]!=="DEF"?'<span class="tag">'+esc(r[2])+"</span>":"")+statusTagsHtml(r[0])+(bye?'<span class="tag bye">bye</span>':"")+'<span class="team">'+esc(r[3])+"</span></button>";
+      (r[2]!=="DEF"?'<span class="tag">'+esc(r[2])+"</span>":"")+statusTagsHtml(r[0])+(bye?'<span class="tag bye">bye</span>':"")+
+      (pt?'<span class="proj" title="Sleeper projection">'+esc(pt)+"</span>":"")+'<span class="team">'+esc(r[3])+"</span></button>";
   }).join("");
 }
 export function addPick(i,id){

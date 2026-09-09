@@ -70,7 +70,18 @@ test("a proposer sees the open seat, not a Take it button; anyone else gets the 
       entries: [{ memberId: "b", picks: [{ id: "2", name: "Ja'Marr Chase", pos: "WR", team: "CIN" }] }, { memberId: "c", picks: [{ id: "3", name: "Drake Maye", pos: "QB", team: "NE" }] }], paid: [] };
     state.bets = [h2h, done, pot];
     const res = {};
+    // week-5 projections: nothing played yet, so the strip shows them, and Maye leads on them
+    state.proj = { weeks: { "5": JSON.stringify({ "2": { rec_yd: 61.5, rec: 4.1 }, "3": { rec_yd: 88.2, pass_yd: 240 } }) } };
     state.me = "a"; V.render();
+    res.projRows = [...document.querySelectorAll(".srow")].map(r => [r.querySelector(".s-lab").textContent, r.querySelector("b").firstChild.textContent, !!r.querySelector("b.proj"), r.classList.contains("lead")]);
+    res.projNote = (document.querySelector(".proj-note") || {}).textContent || "";
+    // once something has been played, actuals take over and the projection sits beside them
+    pot.stats.rows[0].values = { rec_yd: 12 }; V.render();
+    res.playedRows = [...document.querySelectorAll(".srow")].map(r => [r.querySelector(".s-lab").textContent, r.querySelector("b").firstChild.textContent, (r.querySelector("b small.proj-was") || {}).textContent || "", r.classList.contains("lead")]);
+    res.ticks = [...document.querySelectorAll(".srow .ptick")].map(t => [t.style.left, getComputedStyle(t).position]);
+    res.barWidths = [...document.querySelectorAll(".srow .sbar i")].map(i => i.style.width);
+    res.playedNote = !!document.querySelector(".proj-note");
+    pot.stats.rows[0].values = {}; state.proj = null; V.render();
     res.byeTags = [...document.querySelectorAll(".srow")].map(r => [r.querySelector(".s-lab").textContent, !!r.querySelector(".s-bye")]);
     res.statusTags = [...document.querySelectorAll(".srow")].map(r => [r.querySelector(".s-lab").textContent, [...r.querySelectorAll(".st-tag")].map(t => t.textContent + ":" + t.title + ":" + (getComputedStyle(t).display !== "none"))]);
     res.proposerTake = document.querySelectorAll('[data-act="take"]').length;
@@ -85,6 +96,12 @@ test("a proposer sees the open seat, not a Take it button; anyone else gets the 
   assert.equal(out.otherTake, 1, "another manager can take the seat");
   assert.deepEqual(Object.fromEntries(out.seeking), { "NE @ SEA": true, Done: false, Pot: true }, "open and joinable glow, settled doesn't");
   assert.deepEqual(out.byeTags, [["Ja'Marr Chase", true], ["Drake Maye", false]], "the CIN row wears a bye tag in week 5");
+  assert.deepEqual(out.projRows, [["Ja'Marr Chase", "61.5", true, false], ["Drake Maye", "88.2", true, true]], "projections for the bet's stat, projected leader marked");
+  assert.match(out.projNote, /Projected by Sleeper/);
+  assert.deepEqual(out.playedRows, [["Ja'Marr Chase", "12", "p 61.5", true], ["Drake Maye", "0", "p 88.2", false]], "actuals lead once played; projection beside them");
+  assert.equal(out.playedNote, false);
+  assert.deepEqual(out.ticks, [["70%", "absolute"], ["100%", "absolute"]], "a tick at each projection, bars scaled to the larger of actual and projected");
+  assert.deepEqual(out.barWidths, ["14%", "0%"], "12 of 88.2");
   assert.deepEqual(out.statusTags, [["Ja'Marr Chase", ["Q:Questionable:true"]], ["Drake Maye", []]], "the questionable player is tagged on the ticket, from the roster");
   assert.equal(out.glowDiffers, true, "and the glow is real computed style");
   assert.deepEqual(errors, []);
@@ -129,7 +146,8 @@ test("bye week: off teams are greyed in the picker and refused on post or join",
   const out = await p.evaluate(async () => {
     const { state } = await import("./state.js?v=dev"); const F = await import("./forms.js?v=dev");
     const wk = document.getElementById("bWeek"); wk.innerHTML = '<option value="0">Season long</option><option value="5">Week 5</option>';
-    const sugg = () => [...document.querySelectorAll("#sugg0 button")].map(x => [x.textContent, x.disabled, getComputedStyle(x).opacity, !!x.querySelector(".tag.bye"), [...x.querySelectorAll(".st-tag")].map(t => t.textContent)]);
+    const sugg = () => [...document.querySelectorAll("#sugg0 button")].map(x => [x.textContent, x.disabled, getComputedStyle(x).opacity, !!x.querySelector(".tag.bye"), [...x.querySelectorAll(".st-tag")].map(t => t.textContent), (x.querySelector(".proj") || {}).textContent || ""]);
+    state.proj = { weeks: { "5": JSON.stringify({ "2": { rec_yd: 61.5, rec: 4.1 }, "3": { pass_yd: 240 } }) } };
     state.draftScope = "player"; state.draftStats = ["rec_yd"]; state.draft = [{ memberId: "a", pick: "", picks: [] }]; F.drawEntries();
     wk.value = "5"; F.drawSugg(0, "chase"); const w5chase = sugg(); F.drawSugg(0, "maye"); const w5maye = sugg();
     state.draftScope = "team"; F.drawEntries(); F.drawSugg(0, "ch"); const w5def = sugg();
@@ -146,7 +164,9 @@ test("bye week: off teams are greyed in the picker and refused on post or join",
   });
   assert.deepEqual(out.w5chase.map(r => r[1]), [true, true], "both CIN rows disabled");
   assert.equal(out.w5chase[0][2], "0.45"); assert.equal(out.w5chase[0][3], true, "bye tag shown");
-  assert.deepEqual(out.w5maye, [["Drake MayeQBNE", false, "1", false, []]]);
+  assert.deepEqual(out.w5maye, [["Drake MayeQB0 rec ydsNE", false, "1", false, [], "0 rec yds"]]);
+  assert.deepEqual(out.w5chase.map(r => r[5]), ["0 rec yds", "61.5 rec yds"], "the picker shows the projection for the selected stat and week");
+  assert.deepEqual(out.w0chase.map(r => r[5]), ["", ""], "no projections on a season-long bet");
   assert.deepEqual(out.w5chase.map(r => r[4]), [[], ["Q"]], "the picker tags the questionable player");
   assert.equal(out.w5def[0][1], true, "KC's defense is off too");
   assert.deepEqual(out.w0chase.map(r => r[1]), [false, false], "season-long filters nobody");
