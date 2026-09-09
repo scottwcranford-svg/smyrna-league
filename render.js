@@ -17,7 +17,7 @@ const gameOf=function(b){ return R.gameOf(b,state.games); };
 const currentWeek=function(){ return R.currentWeek(state.config,state.games); };
 const computeLedger=function(){ return R.computeLedger(state.config,state.bets); };
 
-export function render(){ head(); ticker(); banner(); board(); settle(); filters(); tickets(); statsBar(); foot(); }
+export function render(){ head(); ticker(); banner(); board(); highLow(); settle(); filters(); tickets(); statsBar(); foot(); }
 
 var toastTimer=null;
 export function toast(msg){
@@ -148,6 +148,26 @@ function banner(){
   el.innerHTML=h;
 }
 
+// Week by week: who topped the league on Sleeper and who finished last, and what moved.
+function highLow(){
+  var host=document.getElementById("highlow"), note=document.getElementById("hlNote");
+  var stake=R.hlStake(state.config), HL=R.hlTally(state.highlow,members(),stake);
+  if(!HL.weeks.length){
+    host.innerHTML='<div class="empty">Each week the top Sleeper score takes '+money(stake)+" from the bottom score. Runs all season, settles at the end.</div>";
+    note.textContent=""; return;
+  }
+  var who=function(list){ return list.map(function(r){ return (r.id?avatarHtml(r.id,20):"")+'<span class="hl-name">'+esc(r.id?mName(r.id):r.name)+"</span>"; }).join('<span class="hl-tie">·</span>'); };
+  var pts=function(list){ return list.length?String(list[0].pts):""; };
+  host.innerHTML='<div class="hl-table">'+HL.weeks.slice().reverse().map(function(w){
+    var e=state.highlow.weeks[String(w)];
+    return '<div class="hl-row"><span class="wk">'+esc(weekLabel(w))+"</span>"+
+      '<span class="hl-side high">'+who(e.high)+'<b>'+esc(pts(e.high))+"</b><i>"+signed(stake/e.high.length)+"</i></span>"+
+      '<span class="hl-side low">'+who(e.low)+'<b>'+esc(pts(e.low))+"</b><i>"+signed(-stake/e.low.length)+"</i></span></div>";
+  }).join("")+"</div>";
+  var lead=null; Object.keys(HL.byId).forEach(function(id){ if(!lead||HL.byId[id].net>HL.byId[lead].net) lead=id; });
+  note.textContent=HL.weeks.length+(HL.weeks.length===1?" week":" weeks")+" in · "+money(stake)+" a week · "+(lead&&HL.byId[lead].net>0?mName(lead)+" leads at "+signed(HL.byId[lead].net):"all square");
+}
+
 function board(){
   var L=computeLedger();
   var list=realMembers().filter(function(m){ return !m.test; });   // not even yourself: the board is the league's
@@ -162,8 +182,12 @@ function board(){
     var ra=(L.risk[b.id]||0)-(L.risk[a.id]||0); if(ra) return ra;
     return a.name.localeCompare(b.name);
   });
+  var HL=R.hlTally(state.highlow,members(),R.hlStake(state.config)), anyHL=HL.weeks.length>0;
   host.innerHTML=list.map(function(m){
     var p=L.pnl[m.id], played=p.w+p.l+p.p;
+    var h=HL.byId[m.id]||{ net:0, highs:0, lows:0 };
+    var hlLine=anyHL?'<div class="seat-hl"><span>High / low</span><b class="'+(h.net>0?"pos":h.net<0?"neg":"flat")+'">'+signed(h.net)+"</b>"+
+      '<span class="hl-count">'+h.highs+" high · "+h.lows+" low</span></div>":"";
     var cls=p.net>0?"pos":p.net<0?"neg":"flat";
     var inPlay=L.risk[m.id]||0, proposed=L.offered[m.id]||0, gone=L.cancelled[m.id]||0;
     var mine=L.picks[m.id]||[];
@@ -177,6 +201,7 @@ function board(){
         '<div class="fig net"><b class="'+cls+'">'+signed(p.net)+"</b><span>"+
           (played?p.w+"–"+p.l+(p.p?"–"+p.p:"")+" settled":"settled")+"</span></div>"+
       "</div>"+
+      hlLine+
       '<div class="seat-picks'+(mine.length?"":" none")+'">'+
         (mine.length?esc(mine.join(" · ")):"no action yet")+"</div>"+
     "</div>";

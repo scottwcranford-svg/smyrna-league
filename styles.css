@@ -325,3 +325,20 @@ h1,h2,h3,.terms,.login-brand h1{font-family:"Poppins","Inter",system-ui,sans-ser
 .chip:hover{color:var(--ink)}
 .chip .n{background:rgba(0,0,0,.18)}
 .tag.pos-QB{color:#FF2B6D} .tag.pos-RB{color:#00CEB8} .tag.pos-WR{color:#58A7FF} .tag.pos-TE{color:#FFAE58} .tag.pos-K{color:#BD66FF}
+
+/* ---- weekly high / low ---- */
+.seat-hl{display:flex;align-items:baseline;gap:7px;font-size:11px;color:var(--ink-3);font-weight:700;letter-spacing:.04em;text-transform:uppercase;margin-top:2px}
+.seat-hl b{font-size:13px;letter-spacing:0;font-variant-numeric:tabular-nums}
+.seat-hl b.pos{color:var(--win)} .seat-hl b.neg{color:var(--loss)} .seat-hl b.flat{color:var(--ink-3)}
+.seat-hl .hl-count{margin-left:auto;font-weight:600;letter-spacing:0;text-transform:none}
+.hl-table{display:flex;flex-direction:column;gap:6px}
+.hl-row{display:grid;grid-template-columns:auto 1fr 1fr;gap:12px;align-items:center;background:var(--surface);border:1px solid var(--rule);border-radius:12px;padding:9px 13px}
+.hl-side{display:flex;align-items:center;gap:8px;min-width:0;font-size:13px}
+.hl-side::before{font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);flex:none}
+.hl-side.high::before{content:"High"} .hl-side.low::before{content:"Low"}
+.hl-side .hl-name{font-weight:700;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hl-side .hl-tie{color:var(--ink-3)}
+.hl-side b{margin-left:auto;font-variant-numeric:tabular-nums;color:var(--ink-2)}
+.hl-side i{font-style:normal;font-weight:800;font-variant-numeric:tabular-nums;flex:none}
+.hl-side.high i{color:var(--win)} .hl-side.low i{color:var(--loss)}
+@media (max-width:640px){ .hl-row{grid-template-columns:auto 1fr} .hl-row .hl-side.low{grid-column:2} }

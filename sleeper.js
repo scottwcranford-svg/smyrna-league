@@ -117,6 +117,28 @@ export function runRefresh(db,by,forced,ctx){
           if(!ctx.mobile&&ageMin(roster.updatedAt)>6*60) writes.push(sj(SLEEPER+"/v1/players/nfl").then(function(players){
             var rows=parseRoster(players);
             return db.doc("league/roster").set({ updatedAt:now, count:rows.length, players:rows }); }).catch(function(){}));
+          // Weekly high / low from the Sleeper league's matchup scores, for every finished
+          // week the book doesn't have yet. Owners map to managers by Sleeper display name.
+          var hlDoc=ctx.highlow||{}, hlWeeks=(hlDoc.weeks)||{}, hlMem=cfg.members||[];
+          var need=R.finalWeeks(ctx.games).filter(function(w){ return !hlWeeks[String(w)]; });
+          if(need.length&&hlMem.length){
+            var lid2=leagueIdOf(cfg);
+            writes.push(Promise.all([sj(SLEEPER+"/v1/league/"+lid2+"/rosters"), sj(SLEEPER+"/v1/league/"+lid2+"/users")]).then(function(rs){
+              var owner={}; (rs[0]||[]).forEach(function(r){ owner[r.roster_id]=r.owner_id; });
+              var uname={}; (rs[1]||[]).forEach(function(u){ uname[u.user_id]=u.display_name||u.username||""; });
+              var memByName={}; hlMem.forEach(function(m){ memByName[String(m.name).toLowerCase()]=m.id; });
+              return Promise.all(need.map(function(w){
+                return sj(SLEEPER+"/v1/league/"+lid2+"/matchups/"+w).then(function(ms){
+                  var rows=(ms||[]).map(function(m){ var nm=uname[owner[m.roster_id]]||""; return { id:memByName[nm.toLowerCase()]||null, name:nm, pts:Number(m.points) }; });
+                  return [w,R.highLow(rows)];
+                }).catch(function(){ return [w,null]; });
+              }));
+            }).then(function(pairs){
+              var out=Object.assign({},hlWeeks), any=false;
+              pairs.forEach(function(pr){ if(pr[1]){ out[String(pr[0])]=pr[1]; any=true; } });
+              if(any) return db.doc("league/highlow").set({ updatedAt:now, leagueId:lid2, weeks:out });
+            }).catch(function(){}));
+          }
           // The Sleeper league itself, daily or when a manager is new: every manager's team
           // name and avatar from one call. league/sleeper = { leagueId, byId: { memberId:
           // { avatar, team } } }. A manager Sleeper's league doesn't have (a test account)

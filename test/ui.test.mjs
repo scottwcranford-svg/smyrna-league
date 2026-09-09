@@ -260,6 +260,30 @@ test("Sleeper avatars and team names show where the book has them; initials and 
   await p.close();
 });
 
+test("weekly high / low: a running tally on the ledger cards and a week-by-week section", { skip }, async () => {
+  const { p, errors } = await page();
+  const out = await p.evaluate(async () => {
+    const { state } = await import("./state.js?v=dev"); const V = await import("./render.js?v=dev");
+    V.render();
+    const empty = document.getElementById("highlow").textContent;
+    state.highlow = { weeks: {
+      "1": { high: [{ id: "a", name: "Alice", pts: 148.4 }], low: [{ id: "c", name: "Cara", pts: 92.1 }] },
+      "2": { high: [{ id: "a", name: "Alice", pts: 131 }], low: [{ id: "b", name: "Bob", pts: 88.6 }] } } };
+    V.render();
+    return { empty, hasLine: document.querySelectorAll("#board .seat-hl").length,
+      cards: [...document.querySelectorAll("#board .seat")].map(s => [s.querySelector(".seat-name").textContent, s.querySelector(".seat-hl b").textContent, s.querySelector(".seat-hl b").className, s.querySelector(".hl-count").textContent]),
+      rows: [...document.querySelectorAll("#highlow .hl-row")].map(r => [r.querySelector(".wk").textContent, r.querySelector(".high .hl-name").textContent, r.querySelector(".high i").textContent, r.querySelector(".low .hl-name").textContent, r.querySelector(".low i").textContent]),
+      note: document.getElementById("hlNote").textContent };
+  });
+  assert.match(out.empty, /top Sleeper score takes \$5/, "explains itself before any week is final");
+  assert.equal(out.hasLine, 3, "every card carries the tally once a week is in");
+  assert.deepEqual(out.cards, [["Alice", "+$10", "pos", "2 high · 0 low"], ["Bob", "−$5", "neg", "0 high · 1 low"], ["Cara", "−$5", "neg", "0 high · 1 low"]]);
+  assert.deepEqual(out.rows, [["WK 2", "Alice", "+$5", "Bob", "−$5"], ["WK 1", "Alice", "+$5", "Cara", "−$5"]], "latest week first");
+  assert.equal(out.note, "2 weeks in · $5 a week · Alice leads at +$10");
+  assert.deepEqual(errors, []);
+  await p.close();
+});
+
 test("League dialog: when each manager was last in", { skip }, async () => {
   const { p, errors } = await page();
   const out = await p.evaluate(async () => {

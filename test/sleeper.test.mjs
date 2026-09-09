@@ -112,6 +112,38 @@ test("runRefresh: projections for this week, next, and live weekly bets; rewritt
   assert.equal(db2.writes.some((x) => x[1] === "league/proj"), false, "unchanged projections are not rewritten");
 });
 
+test("runRefresh: weekly high / low from the league's matchups, for finished weeks the book lacks", async () => {
+  const db = fakeDb();
+  const hits = [];
+  globalThis.fetch = async (u) => {
+    hits.push(u.replace(/^.*\/v1\//, ""));
+    const j = /state\/nfl/.test(u) ? { week: 3 }
+      : /league\/L1\/rosters$/.test(u) ? [{ roster_id: 1, owner_id: "u1" }, { roster_id: 2, owner_id: "u2" }, { roster_id: 3, owner_id: "u3" }]
+      : /league\/L1\/users$/.test(u) ? [{ user_id: "u1", display_name: "hobnailboot" }, { user_id: "u2", display_name: "testbot" }, { user_id: "u3", display_name: "ghost" }]
+      : /league\/L1\/matchups\/1$/.test(u) ? [{ roster_id: 1, points: 120.5 }, { roster_id: 2, points: 99.1 }, { roster_id: 3, points: 130.2 }]
+      : /league\/L1\/matchups\/2$/.test(u) ? [{ roster_id: 1, points: 101 }, { roster_id: 2, points: 140 }, { roster_id: 3, points: 90 }]
+      : /stats\/nfl\/regular\/2026/.test(u) ? {} : [];
+    return { ok: true, json: async () => j, text: async () => "" };
+  };
+  const games = { games: [{ week: 1, status: "final" }, { week: 1, status: "final" }, { week: 2, status: "final" }, { week: 3, status: "live" }] };
+  const cfg = { ...config, sleeperLeagueId: "L1", scheduleUpdatedAt: N.isoNow(), members: [{ id: "m0", name: "hobnailboot" }, { id: "m1", name: "testbot" }] };
+  const base = { config: cfg, refresh: {}, bets: [], roster: { updatedAt: N.isoNow() }, holder: "m0", mobile: true, games, sleeper: { updatedAt: N.isoNow(), leagueId: "L1", byId: { m0: {}, m1: {} } } };
+  await N.runRefresh(db, "m0", true, base);
+  const w = db.writes.find((x) => x[1] === "league/highlow");
+  assert.deepEqual(Object.keys(w[2].weeks), ["1", "2"], "weeks 1 and 2 are final; 3 is live");
+  assert.deepEqual(w[2].weeks["1"], { high: [{ id: null, name: "ghost", pts: 130.2 }], low: [{ id: "m1", name: "testbot", pts: 99.1 }] }, "an owner who isn't a manager keeps their Sleeper name");
+  assert.deepEqual(w[2].weeks["2"].high, [{ id: "m1", name: "testbot", pts: 140 }]);
+  // week 1 already in the book: only week 2 is fetched, and week 1 is kept
+  hits.length = 0; const db2 = fakeDb();
+  await N.runRefresh(db2, "m0", true, { ...base, highlow: { weeks: { "1": w[2].weeks["1"] } } });
+  assert.deepEqual(hits.filter((h) => /matchups/.test(h)), ["league/L1/matchups/2"]);
+  assert.deepEqual(Object.keys(db2.writes.find((x) => x[1] === "league/highlow")[2].weeks), ["1", "2"]);
+  // nothing new: no lookups, no write
+  hits.length = 0; const db3 = fakeDb();
+  await N.runRefresh(db3, "m0", true, { ...base, highlow: w[2] });
+  assert.equal(hits.some((h) => /rosters|matchups/.test(h)), false); assert.equal(db3.writes.some((x) => x[1] === "league/highlow"), false);
+});
+
 test("runRefresh: the Sleeper league's team names and avatars, one call for everyone", async () => {
   const db = fakeDb();
   const hits = [];

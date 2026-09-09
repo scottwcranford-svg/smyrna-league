@@ -128,6 +128,43 @@ export function currentWeek(config,games){
 
 /* ---- stats ---- */
 
+/* ---- weekly high / low ----
+   Each week the league's top Sleeper score collects the stake from the bottom score;
+   ties share it. It runs all season and settles at the end. league/highlow holds
+   { weeks: { "3": { high: [{ id, name, pts }], low: [...] } } }, one entry per week
+   whose games are all final. */
+export const HL_STAKE=5;
+export function hlStake(config){ var n=Number(config&&config.hlStake); return n>0?n:HL_STAKE; }
+// The week's high and low from [{ id, name, pts }] rows; ties are kept together.
+export function highLow(rows){
+  rows=(rows||[]).filter(function(r){ return typeof r.pts==="number"&&!isNaN(r.pts); });
+  if(rows.length<2) return null;
+  var max=-Infinity, min=Infinity;
+  rows.forEach(function(r){ if(r.pts>max) max=r.pts; if(r.pts<min) min=r.pts; });
+  if(max===min) return null;   // everyone tied: nothing changes hands
+  var pick=function(v){ return rows.filter(function(r){ return r.pts===v; }).map(function(r){ return { id:r.id||null, name:r.name||"", pts:r.pts }; }); };
+  return { high:pick(max), low:pick(min) };
+}
+// Running tally per manager: net dollars, weeks on top, weeks on the bottom.
+export function hlTally(hl,members,stake){
+  stake=stake||HL_STAKE;
+  var byId={}; (members||[]).forEach(function(m){ byId[m.id]={ net:0, highs:0, lows:0 }; });
+  var weeks=Object.keys((hl&&hl.weeks)||{}).map(Number).filter(function(w){ return w>0; }).sort(function(a,b){ return a-b; });
+  weeks.forEach(function(w){
+    var e=hl.weeks[String(w)]; if(!e||!e.high||!e.low||!e.high.length||!e.low.length) return;
+    e.high.forEach(function(r){ if(r.id&&byId[r.id]){ byId[r.id].net+=stake/e.high.length; byId[r.id].highs++; } });
+    e.low.forEach(function(r){ if(r.id&&byId[r.id]){ byId[r.id].net-=stake/e.low.length; byId[r.id].lows++; } });
+  });
+  Object.keys(byId).forEach(function(id){ byId[id].net=Math.round(byId[id].net*100)/100; });
+  return { byId:byId, weeks:weeks };
+}
+// Weeks whose games are all final (and that have games at all).
+export function finalWeeks(games){
+  var G=allGames(games), by={};
+  G.forEach(function(g){ var w=Number(g.week); if(!by[w]) by[w]={ n:0, done:0 }; by[w].n++; if(g.status==="final") by[w].done++; });
+  return Object.keys(by).map(Number).filter(function(w){ return by[w].n>0&&by[w].done===by[w].n; }).sort(function(a,b){ return a-b; });
+}
+
 /* ---- projections ----
    Sleeper's weekly projections, trimmed to the roster and to the stats the app tracks,
    ride in league/proj as { weeks: { "5": "<json>" } }. A projection is read with the

@@ -10,7 +10,8 @@ export const state = {
   refresh:null, roster:null, games:null,
   seen:null, seenStamped:null,
   proj:null,   // league/proj: Sleeper's weekly projections for the weeks in play
-  sleeper:null,   // league/sleeper: each manager's Sleeper avatar and team name, by member id   // league/seen: when each manager last opened the app
+  sleeper:null,   // league/sleeper: each manager's Sleeper avatar and team name, by member id
+  highlow:null,   // league/highlow: each finished week's top and bottom Sleeper scores   // league/seen: when each manager last opened the app
   // the propose / join forms' draft
   draftScope:"", draftStats:[], editId:null,
   draftGame:null, draftMarket:"ml", draftLine:"", draftFav:"", joinId:null,

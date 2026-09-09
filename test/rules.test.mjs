@@ -171,6 +171,23 @@ test("bye weeks: teams without a game that week can't be picked", () => {
   assert.equal(R.onBye("KC", R.teamsPlaying(5, null)), false, "no schedule loaded yet");
 });
 
+test("weekly high / low: top score takes the stake from the bottom, ties share, tallied all season", () => {
+  const rows = [{ id: "a", name: "A", pts: 148.4 }, { id: "b", name: "B", pts: 120 }, { id: "c", name: "C", pts: 92.1 }];
+  assert.deepEqual(R.highLow(rows), { high: [{ id: "a", name: "A", pts: 148.4 }], low: [{ id: "c", name: "C", pts: 92.1 }] });
+  const tied = R.highLow(rows.concat([{ id: "d", name: "D", pts: 148.4 }]));
+  assert.deepEqual(tied.high.map((r) => r.id), ["a", "d"], "a tie at the top is kept together");
+  assert.equal(R.highLow([{ id: "a", pts: 100 }, { id: "b", pts: 100 }]), null, "all tied: nothing moves");
+  assert.equal(R.highLow([{ id: "a", pts: 0 }, { id: "b", pts: null }]), null, "one real score isn't a week");
+  const hl = { weeks: { "1": R.highLow(rows), "2": tied, "3": { high: [{ id: "c", pts: 1 }], low: [{ id: "zz", name: "gone", pts: 0 }] } } };
+  const T = R.hlTally(hl, [{ id: "a" }, { id: "b" }, { id: "c" }, { id: "d" }], 5);
+  assert.deepEqual(T.weeks, [1, 2, 3]);
+  assert.deepEqual(T.byId.a, { net: 7.5, highs: 2, lows: 0 }, "5 for week 1, half of 5 for the shared week 2");
+  assert.deepEqual(T.byId.c, { net: -5, highs: 1, lows: 2 }, "bottom in weeks 1 and 2, top in week 3");
+  assert.deepEqual(T.byId.d, { net: 2.5, highs: 1, lows: 0 });
+  assert.equal(R.hlStake({ hlStake: 10 }), 10); assert.equal(R.hlStake({}), 5);
+  assert.deepEqual(R.finalWeeks({ games: [{ week: 1, status: "final" }, { week: 1, status: "final" }, { week: 2, status: "final" }, { week: 2, status: "live" }, { week: 3, status: "pre" }] }), [1], "only weeks with every game final");
+});
+
 test("projections: trimmed to the roster and the tracked stats, read with valueFor", () => {
   const raw = {
     "2": { rec_yd: 82.46, rec: 5.2, pts_ppr: 17.1, adp_dd_ppr: 12, pass_yd: 0 },
