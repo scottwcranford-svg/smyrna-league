@@ -340,8 +340,10 @@ function actionsHtml(b,ents,live,mine,unpaid){
   else if((b.status==="open"||b.status==="active")&&state.admin) acts.push('<button class="btn" data-act="edit" data-id="'+esc(b.id)+'" title="Admin: fix this bet">Update</button>');
   // Still waiting on takers: the proposer can pull it. Live: only people in it can void it.
   var proposer=!b.createdBy||b.createdBy===state.me;
+  // Only the proposer can cancel, and only while it's still waiting on takers. Once
+  // both sides are in it stands; an admin can void a live bet to undo a mistake.
   if(b.status==="open"&&proposer) acts.push('<button class="btn danger" data-act="void" data-id="'+esc(b.id)+'">Cancel</button>');
-  else if(b.status==="active"&&(mine||proposer)) acts.push('<button class="btn danger" data-act="void" data-id="'+esc(b.id)+'">Void</button>');
+  else if(b.status==="active"&&state.admin) acts.push('<button class="btn danger" data-act="void" data-id="'+esc(b.id)+'" title="Admin: void this bet">Void</button>');
   // a voided bet can come back only while its week is still open; after lock it would just cancel again
   if(b.status==="void"&&Date.now()<betLock(b)) acts.push('<button class="btn" data-act="restore" data-id="'+esc(b.id)+'">Restore</button>');
   if(b.status==="void") acts.push('<button class="btn danger" data-act="del" data-id="'+esc(b.id)+'">Delete</button>');

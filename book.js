@@ -142,7 +142,9 @@ export function reopenBet(id){
 export function voidBet(id){
   if(!guard()) return;
   var b=findBet(id); if(!b) return;
-  var wasOpen=b.status==="open";
+  var wasOpen=b.status==="open", proposer=!b.createdBy||b.createdBy===state.me;
+  if(wasOpen&&!proposer&&!state.admin) return toast("Only "+mName(b.createdBy)+" can cancel this one");
+  if(!wasOpen&&!state.admin) return toast("Both sides are in — this bet stands");
   b.status="void"; b.winner=null; b.voidedAt=new Date().toISOString(); b.voidedBy=state.me;
   if(wasOpen){ b.cancelled=true; b.voidedReason="Cancelled by "+mName(state.me); }
   saveBet(b);
