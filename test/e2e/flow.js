@@ -56,8 +56,13 @@ let browser; const errors = [], checks = {};
     forcedPw: document.getElementById("pwDlg").open,
     // a non-admin never sees the switch; an admin sees it, off by default on a fresh browser,
     // so everything below still renders the way it does for everyone else
-    adminSwitchHidden: getComputedStyle(document.getElementById("adminBtn")).display === "none",
+    adminSwitchHidden: document.getElementById("adminBtn").hidden,   // in the menu behind your name; checked on screen below
     adminSwitchOff: document.getElementById("adminBtn").getAttribute("aria-pressed") === "false",
+    // the tab row: Book open, the others hidden, badges where something needs a look
+    tabOn: (document.querySelector("#tabs .tab.on") || {}).textContent,
+    panelsShown: [...document.querySelectorAll("section[data-panel]")].filter(s => getComputedStyle(s).display !== "none").map(s => s.getAttribute("data-panel")),
+    glance: document.getElementById("glanceTxt").textContent,
+    leagueLine: document.getElementById("leagueSub").textContent,
     // tickets still looking for people carry a glow (computed shadow, not just the class)
     seeking: document.querySelectorAll("article.ticket.seeking").length,
     seekingGlow: (a => a ? getComputedStyle(a).boxShadow !== getComputedStyle(document.querySelector("article.ticket:not(.seeking)") || a).boxShadow : false)(document.querySelector("article.ticket.seeking")),
@@ -79,6 +84,10 @@ let browser; const errors = [], checks = {};
   await page.waitForFunction((n) => document.querySelectorAll("article.ticket").length === n, {}, checks.tickets);
 
   // the League dialog opens read-only for a non-admin and closes
+  // the menu behind your name: open it, check the admin switch on screen, then League
+  await page.click("#meBtn");
+  await page.waitForFunction(() => !document.getElementById("meDrop").hidden);
+  checks.adminSwitchShown = await page.evaluate(() => getComputedStyle(document.getElementById("adminBtn")).display !== "none");
   await page.click("#rosterBtn");
   await page.waitForFunction(() => document.getElementById("rosterDlg").open);
   checks.rosterRows = await page.evaluate(() => document.querySelectorAll("#rosterList .rrow").length);
@@ -115,6 +124,11 @@ let browser; const errors = [], checks = {};
   await page.evaluate(() => document.getElementById("betDlg").close());
 
   // change-password dialog opens and closes
+  // the Ledger tab shows the board and hides the book; a reload remembers it
+  await page.click('#tabs .tab[data-tab="ledger"]');
+  checks.ledgerTab = await page.evaluate(() => ({ board: getComputedStyle(document.getElementById("board")).display !== "none", book: getComputedStyle(document.getElementById("tickets")).display === "none", saved: localStorage.getItem("smyrna.tab") }));
+  await page.click('#tabs .tab[data-tab="book"]');
+  await page.click("#meBtn"); await page.waitForFunction(() => !document.getElementById("meDrop").hidden);
   await page.click("#pwBtn");
   await page.waitForFunction(() => document.getElementById("pwDlg").open);
   await page.evaluate(() => document.getElementById("pwDlg").close());
@@ -123,7 +137,9 @@ let browser; const errors = [], checks = {};
   await browser.close();
 
   const ok = checks.appDisplay !== "none" && checks.me === USER && checks.tickets >= 1 && checks.seats >= 1 && checks.liveOnly === true
-    && checks.joinOn.length >= 1 && !checks.joinOn.some(t => /White Men Can Catch|NE @ SEA/.test(t)) && (process.env.E2E_ADMIN ? checks.adminSwitchHidden === false && checks.adminSwitchOff === true : checks.adminSwitchHidden === true) && checks.seeking >= 1 && checks.seekingGlow === true
+    && checks.joinOn.length >= 1 && !checks.joinOn.some(t => /White Men Can Catch|NE @ SEA/.test(t)) && (process.env.E2E_ADMIN ? checks.adminSwitchShown === true && checks.adminSwitchOff === true : checks.adminSwitchHidden === true && checks.adminSwitchShown === false)
+    && /Book/.test(checks.tabOn) && checks.panelsShown.join() === "book" && /bets running/.test(checks.glance) && /side bets/.test(checks.leagueLine)
+    && checks.ledgerTab.board === true && checks.ledgerTab.book === true && checks.ledgerTab.saved === "ledger" && checks.seeking >= 1 && checks.seekingGlow === true
     && checks.rosterRows >= 1 && checks.rosterReadOnly === true && /Last in/.test(checks.seenSelf) && checks.onBoard === !checks.selfIsTest
     && checks.title === "Propose a bet" && checks.scopeChips === 3 && checks.statChips >= 10 && checks.entryRows === 1 && checks.rowOneLocked === true && checks.twoStats === 2
     && /Chase/.test(checks.pickChip) && checks.gameOptions >= 1 && checks.sideTaken === 1 && errors.length === 0;

@@ -80,6 +80,12 @@ export const ACTIONS = {
     var pwIn=document.querySelector('input[data-pw="'+id+'"]');
     D.setPassword(id,pwIn?pwIn.value:"").then(function(msg){ if(pwIn) pwIn.value=""; toast(msg); }).catch(function(e){ toast(A.authMsg(e)); });
   },
+  // which panel is open; remembered per device
+  tab:function(t){
+    state.tab=attr(t,"data-tab")||"book";
+    try{ localStorage.setItem("smyrna.tab",state.tab); }catch(e){}
+    touch();
+  },
   // the season table in Settle Up: drill through to the bets behind a cell, and jump to one
   drill:function(t){ D.openDrill(attr(t,"data-m"),attr(t,"data-row")); },
   goBet:function(t,id){ document.getElementById("drillDlg").close(); showBet(id); },
@@ -175,6 +181,13 @@ export function bindEvents(hooks){
   });
 
   on("newBetBtn","click",function(){ F.openBetDlg(); });
+  // the menu behind your name: open on the button, close on anything else
+  var drop=document.getElementById("meDrop"), meBtn=document.getElementById("meBtn");
+  var closeMenu=function(){ drop.hidden=true; meBtn.setAttribute("aria-expanded","false"); };
+  on("meBtn","click",function(ev){ ev.stopPropagation(); drop.hidden=!drop.hidden; meBtn.setAttribute("aria-expanded",String(!drop.hidden)); });
+  document.addEventListener("click",function(ev){ if(!drop.hidden&&!ev.target.closest("#meDrop")) closeMenu(); });
+  drop.addEventListener("click",function(ev){ if(ev.target.closest("button")) closeMenu(); });
+  document.addEventListener("keydown",function(ev){ if(ev.key==="Escape"&&!drop.hidden) closeMenu(); });
   on("betDlg","close",function(){ state.editId=null; });
   on("refreshBtn","click",B.requestRefresh);
   on("rosterBtn","click",D.openRoster);

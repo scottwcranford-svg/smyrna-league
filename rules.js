@@ -128,6 +128,21 @@ export function currentWeek(config,games){
 
 /* ---- stats ---- */
 
+// "2026 · 10-Team Keeper SF PPR", from the Sleeper league's settings; the season alone without them.
+export function leagueLine(league,season){
+  var parts=[];
+  var yr=(league&&league.season)||season; if(yr) parts.push(String(yr));
+  if(league&&league.teams){
+    var d=[league.teams+"-Team"];
+    if(league.dynasty) d.push("Dynasty"); else if(league.keeper) d.push("Keeper");
+    if(league.sf) d.push("SF");
+    if(league.scoring) d.push(league.scoring);
+    parts.push(d.join(" "));
+  }
+  return parts.join(" · ");
+}
+export function scoringName(rec){ var r=Number(rec); return isNaN(r)?"":r>=1?"PPR":r>0?"Half PPR":"Standard"; }
+
 /* ---- weekly high / low ----
    Each week the league's top Sleeper score collects the stake from the bottom score;
    ties share it. It runs all season and settles at the end. league/highlow holds

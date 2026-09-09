@@ -147,7 +147,14 @@ export function runRefresh(db,by,forced,ctx){
           var newFace=mem.some(function(m){ return !(sl.byId&&(m.id in sl.byId)); });
           if(mem.length&&(newFace||ageMin(sl.updatedAt)>24*60)){
             writes.push(Promise.resolve(leagueIdOf(cfg)).then(function(lid){
-              return (lid?sj(SLEEPER+"/v1/league/"+lid+"/users").catch(function(){ return []; }):Promise.resolve([])).then(function(users){
+              var leagueP=lid?sj(SLEEPER+"/v1/league/"+lid).then(function(L){
+                if(!L||typeof L!=="object") return null;
+                var st=L.settings||{}, pos=Array.isArray(L.roster_positions)?L.roster_positions:[];
+                return { name:L.name||"", season:String(L.season||""), teams:Number(L.total_rosters)||0, keeper:Number(st.type)===1, dynasty:Number(st.type)===2,
+                         sf:pos.indexOf("SUPER_FLEX")>=0, scoring:R.scoringName((L.scoring_settings||{}).rec), avatar:(typeof L.avatar==="string")?L.avatar:"" };
+              }).catch(function(){ return null; }):Promise.resolve(null);
+              return Promise.all([lid?sj(SLEEPER+"/v1/league/"+lid+"/users").catch(function(){ return []; }):Promise.resolve([]), leagueP]).then(function(both){
+                var users=both[0], league=both[1];
                 var byName={}; (users||[]).forEach(function(u){ byName[String(u.display_name||u.username||"").toLowerCase()]=u; });
                 return Promise.all(mem.map(function(m){
                   var u=byName[String(m.name).toLowerCase()];
@@ -155,7 +162,9 @@ export function runRefresh(db,by,forced,ctx){
                   return sj(SLEEPER+"/v1/user/"+encodeURIComponent(m.name)).then(function(p){ return { id:m.id, avatar:(p&&typeof p.avatar==="string")?p.avatar:"", team:"" }; }).catch(function(){ return { id:m.id, avatar:"", team:"" }; });
                 })).then(function(rows){
                   var byId={}; rows.forEach(function(r){ byId[r.id]={ avatar:r.avatar, team:r.team }; });
-                  return db.doc("league/sleeper").set({ updatedAt:now, leagueId:lid||"", byId:byId });
+                  var doc={ updatedAt:now, leagueId:lid||"", byId:byId };
+                  if(league) doc.league=league; else if(ctx.sleeper&&ctx.sleeper.league) doc.league=ctx.sleeper.league;
+                  return db.doc("league/sleeper").set(doc);
                 });
               });
             }).catch(function(){}));

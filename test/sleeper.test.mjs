@@ -154,6 +154,7 @@ test("runRefresh: the Sleeper league's team names and avatars, one call for ever
       : /\/v1\/user\/testbot$/.test(u) ? { user_id: "999", avatar: "t3st" }
       : /\/v1\/user\/466\/leagues\/nfl\/2026$/.test(u) ? [{ league_id: "L9", name: "Other League", total_rosters: 12 }, { league_id: "L1", name: "Smyrna League", total_rosters: 10 }]
       : /\/v1\/league\/L1\/users$/.test(u) ? [{ display_name: "hobnailboot", avatar: "6dcbee5f", metadata: { team_name: "Cheat 2 Win" } }, { display_name: "someoneelse", avatar: "x" }]
+      : /\/v1\/league\/L1$/.test(u) ? { name: "Smyrna League", season: "2026", total_rosters: 10, avatar: null, settings: { type: 1 }, roster_positions: ["QB", "SUPER_FLEX", "BN"], scoring_settings: { rec: 1 } }
       : /stats\/nfl\/regular\/2026/.test(u) ? {} : [];
     return { ok: true, json: async () => j, text: async () => "" };
   };
@@ -162,7 +163,8 @@ test("runRefresh: the Sleeper league's team names and avatars, one call for ever
   const w = db.writes.find((x) => x[1] === "league/sleeper");
   assert.equal(w[2].leagueId, "L1");
   assert.deepEqual(w[2].byId, { m0: { avatar: "6dcbee5f", team: "Cheat 2 Win" }, m1: { avatar: "t3st", team: "" } }, "league members get team names; others their public avatar");
-  assert.equal(hits.filter((h) => /^league\//.test(h)).length, 1, "one league call for everyone");
+  assert.deepEqual(w[2].league, { name: "Smyrna League", season: "2026", teams: 10, keeper: true, dynasty: false, sf: true, scoring: "PPR", avatar: "" }, "and the league's own settings ride along");
+  assert.equal(hits.filter((h) => /^league\//.test(h)).length, 2, "two league calls for everyone: the users and the settings");
   // all known, fresh, league cached: no lookups at all
   hits.length = 0; const db2 = fakeDb();
   await N.runRefresh(db2, "m0", true, { config: cfg, refresh: {}, bets: [], roster: { updatedAt: N.isoNow() }, holder: "m0", mobile: true, sleeper: { updatedAt: N.isoNow(), leagueId: "L1", byId: w[2].byId } });

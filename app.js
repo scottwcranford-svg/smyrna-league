@@ -27,6 +27,7 @@ function makeDb(key){ return S.makeDb(key,{ refresh:runRefresh }); }
 // looks and behaves as it does for everyone else. The switch is remembered per device.
 const ADMIN_LS="smyrna.adminMode";
 try{ state.adminMode=localStorage.getItem(ADMIN_LS)==="on"; }catch(e){}
+try{ var savedTab=localStorage.getItem("smyrna.tab"); if(["book","ledger","hl","settle"].indexOf(savedTab)>=0) state.tab=savedTab; }catch(e){}
 function applyAuth(user){ var w=A.whoAmI(user,state.config); state.me=w.me; state.isAdmin=w.admin; state.admin=w.admin&&state.adminMode; stampSeen(); }
 // Once per visit, note that this manager opened the app: league/seen is { memberId: iso }.
 function stampSeen(){

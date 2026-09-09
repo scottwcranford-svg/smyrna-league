@@ -17,7 +17,7 @@ const gameOf=function(b){ return R.gameOf(b,state.games); };
 const currentWeek=function(){ return R.currentWeek(state.config,state.games); };
 const computeLedger=function(){ return R.computeLedger(state.config,state.bets); };
 
-export function render(){ head(); ticker(); banner(); board(); highLow(); settle(); filters(); tickets(); statsBar(); foot(); }
+export function render(){ head(); ticker(); banner(); tabs(); glance(); board(); highLow(); settle(); filters(); tickets(); statsBar(); foot(); }
 
 var toastTimer=null;
 export function toast(msg){
@@ -110,26 +110,55 @@ export function ticker(){
 }
 
 function head(){
-  var c=state.config;
+  var c=state.config, league=state.sleeper&&state.sleeper.league;
   document.getElementById("leagueName").textContent=c?c.leagueName:"Smyrna League";
-  document.getElementById("leagueBadge").textContent=initials(c?c.leagueName:"SB");
-  document.getElementById("kicker").textContent=((c&&c.season)?c.season+" season":"Fantasy")+" · side bets";
-  var live=0, n=state.bets.length;
-  state.bets.forEach(function(b){ if(b.status==="active"||b.status==="open") live++; });
-  document.getElementById("leagueSub").textContent = n
-    ? n+(n===1?" wager":" wagers")+" on the side — "+live+" still running."
-    : "Every wager on the side, and who ends up paying.";
+  // the league's settings line, Sleeper's way: "2026 · 10-Team Keeper SF PPR · side bets"
+  var line=R.leagueLine(league,c&&c.season);
+  document.getElementById("leagueSub").textContent=(line?line+" · ":"")+"side bets";
+  // the league's own Sleeper avatar when it has one; our football mark otherwise
+  var mark=document.getElementById("leagueBadge");
+  if(league&&league.avatar&&!mark.querySelector("img")) mark.innerHTML='<img src="https://sleepercdn.com/avatars/thumbs/'+esc(league.avatar)+'" alt="">';
 
-  // who's signed in (identity comes from Firebase Auth, never a dropdown)
+  // who's signed in (identity comes from Firebase Auth, never a dropdown): one button, a menu behind it
   var signed=!!state.me;
-  document.getElementById("meLbl").textContent=signed?(state.admin?"Admin":"Signed in as"):"Not signed in";
-  var nm=document.getElementById("meName"); nm.hidden=!signed; nm.textContent=signed?mName(state.me):"";
+  var nm=document.getElementById("meName"); nm.textContent=signed?mName(state.me):"Not signed in";
+  document.getElementById("meAvatar").innerHTML=signed?avatarHtml(state.me,26):"";
+  document.getElementById("meBtn").classList.toggle("admin-on",!!state.admin);
   document.getElementById("signOutBtn").hidden=!signed;
   document.getElementById("pwBtn").hidden=!signed;
   var adm=document.getElementById("adminBtn");
   adm.hidden=!(signed&&state.isAdmin);
   adm.setAttribute("aria-pressed",String(!!state.admin));
   adm.textContent=state.admin?"Admin on":"Admin off";
+}
+
+// The tab row: which panel is open, and a badge where something needs a look.
+function tabs(){
+  var L=computeLedger(), HL=R.hlTally(state.highlow,members(),R.hlStake(state.config));
+  var seats=0;
+  state.bets.forEach(function(b){ if(b.status==="open"&&!isLocked(b)) entriesOf(b).forEach(function(e){ if(!e.memberId&&(!e.invite||e.declined)) seats++; }); });
+  var badge={ book:seats, ledger:0, hl:HL.weeks.length, settle:L.debts.length };
+  Object.keys(badge).forEach(function(k){ var n=document.getElementById("tabN-"+k); if(!n) return; n.hidden=!badge[k]; n.textContent=badge[k]; });
+  var cur=state.tab||"book";
+  document.querySelectorAll("#tabs .tab").forEach(function(t){ var on=t.getAttribute("data-tab")===cur; t.classList.toggle("on",on); t.setAttribute("aria-selected",String(on)); });
+  document.querySelectorAll("section[data-panel]").forEach(function(s){ s.hidden=s.getAttribute("data-panel")!==cur; });
+}
+
+// The Book's one-line strip: the league and you, at a glance.
+function glance(){
+  var L=computeLedger(), live=0, pot=0, mineOpen=0;
+  state.bets.forEach(function(b){
+    if(b.status!=="active"&&b.status!=="open") return;
+    live++; pot+=(Number(b.amount)||0)*entriesOf(b).filter(function(e){ return e.memberId; }).length;
+    if(b.status==="open"&&state.me&&b.createdBy===state.me&&!isLocked(b)) entriesOf(b).forEach(function(e){ if(!e.memberId) mineOpen++; });
+  });
+  var parts=['<span><b>'+live+"</b> "+(live===1?"bet":"bets")+" running</span>",'<span><b>'+esc(money(pot))+"</b> on the table</span>"];
+  if(state.me){
+    var net=(L.pnl[state.me]||{}).net||0;
+    parts.push('<span>you <b class="'+(net>0?"pos":net<0?"neg":"")+'">'+esc(signed(net))+"</b> settled"+
+      (mineOpen?' · <b class="warn">'+mineOpen+(mineOpen===1?" seat":" seats")+"</b> waiting on takers":"")+"</span>");
+  }
+  document.getElementById("glanceTxt").innerHTML=parts.join("");
 }
 
 function banner(){

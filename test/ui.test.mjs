@@ -325,6 +325,39 @@ test("Settle Up opens with the season table: managers across, hi/low, weekly, se
   await p.close();
 });
 
+test("tabs: Book open by default, the others behind their tabs, badges and the glance strip; the menu behind your name", { skip }, async () => {
+  const { p, errors } = await page();
+  const out = await p.evaluate(async () => {
+    const { state } = await import("./state.js?v=dev"); const V = await import("./render.js?v=dev");
+    state.bets = [
+      { id: "o1", status: "open", createdBy: "a", week: 5, kind: "prop", amount: 10, name: "Open one", terms: "t", entries: [{ memberId: "a", pick: "x" }, { memberId: null }], paid: [] },
+      { id: "s1", status: "settled", week: 0, amount: 25, winner: "b", entries: [{ memberId: "a", pick: "x" }, { memberId: "b", pick: "y" }], paid: [] },
+    ];
+    state.highlow = { weeks: { "1": { high: [{ id: "b", pts: 140 }], low: [{ id: "c", pts: 90 }] } } };
+    state.sleeper = { byId: {}, league: { season: "2026", teams: 10, keeper: true, sf: true, scoring: "PPR" } };
+    state.tab = "book"; V.render();
+    const shown = () => [...document.querySelectorAll("section[data-panel]")].filter(s => getComputedStyle(s).display !== "none").map(s => s.getAttribute("data-panel"));
+    const badges = () => [...document.querySelectorAll("#tabs .tab")].map(t => [t.getAttribute("data-tab"), t.classList.contains("on"), t.querySelector(".n").hidden ? "" : t.querySelector(".n").textContent]);
+    const res = { line: document.getElementById("leagueSub").textContent, glance: document.getElementById("glanceTxt").textContent, shown: shown(), badges: badges(),
+      me: document.getElementById("meName").textContent, dropHidden: document.getElementById("meDrop").hidden };
+    document.querySelector('#tabs .tab[data-tab="settle"]').click();
+    await new Promise(r => setTimeout(r, 30));
+    res.afterClick = { shown: shown(), on: badges().filter(b => b[1]).map(b => b[0]), saved: localStorage.getItem("smyrna.tab") };
+    document.getElementById("meBtn").click(); res.dropOpen = !document.getElementById("meDrop").hidden;
+    document.body.click(); res.dropClosed = document.getElementById("meDrop").hidden;
+    return res;
+  });
+  assert.equal(out.line, "2026 · 10-Team Keeper SF PPR · side bets", "the league's settings from Sleeper");
+  assert.equal(out.glance, "1 bet running$10 on the tableyou −$25 settled · 1 seat waiting on takers");
+  assert.deepEqual(out.shown, ["book"]);
+  assert.deepEqual(out.badges, [["book", true, "1"], ["ledger", false, ""], ["hl", false, "1"], ["settle", false, "1"]], "a seat open, a week in, a debt unpaid");
+  assert.equal(out.me, "Alice"); assert.equal(out.dropHidden, true);
+  assert.deepEqual(out.afterClick, { shown: ["settle"], on: ["settle"], saved: "settle" }, "the tab switches through the real click wiring and is remembered");
+  assert.equal(out.dropOpen, true); assert.equal(out.dropClosed, true, "the menu opens on its button and closes on a click elsewhere");
+  assert.deepEqual(errors, []);
+  await p.close();
+});
+
 test("League dialog: when each manager was last in", { skip }, async () => {
   const { p, errors } = await page();
   const out = await p.evaluate(async () => {

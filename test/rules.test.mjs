@@ -237,6 +237,14 @@ test("projections: trimmed to the roster and the tracked stats, read with valueF
   assert.deepEqual(R.trimProjections([1, 2], ["2"]), {}, "a bad payload is an empty set");
 });
 
+test("leagueLine: the Sleeper league's settings in one line", () => {
+  assert.equal(R.leagueLine({ season: "2026", teams: 10, keeper: true, sf: true, scoring: "PPR" }), "2026 · 10-Team Keeper SF PPR");
+  assert.equal(R.leagueLine({ season: "2026", teams: 12, dynasty: true, scoring: "Half PPR" }), "2026 · 12-Team Dynasty Half PPR");
+  assert.equal(R.leagueLine(null, "2026"), "2026", "no league yet: the season alone");
+  assert.equal(R.leagueLine(null, ""), "");
+  assert.equal(R.scoringName(1), "PPR"); assert.equal(R.scoringName(0.5), "Half PPR"); assert.equal(R.scoringName(0), "Standard"); assert.equal(R.scoringName(undefined), "");
+});
+
 test("small helpers", () => {
   assert.equal(R.shortName(["1", "Amon-Ra St. Brown", "WR", "DET"]), "St. Brown");
   assert.equal(R.shortName(["HOU", "Houston Texans", "DEF", "HOU"]), "Texans");

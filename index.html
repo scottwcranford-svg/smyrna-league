@@ -28,20 +28,23 @@
 <div class="wrap" id="app" hidden>
   <header class="top">
     <div class="brand">
-      <span class="league-badge" id="leagueBadge"></span>
+      <span class="league-mark" id="leagueBadge" aria-hidden="true"><svg viewBox="0 0 24 24"><ellipse cx="12" cy="12" rx="10" ry="6.5" transform="rotate(-35 12 12)"/><path d="M8.5 15.5l7-7M10 10.5l1.2 1.2M11.8 8.7l1.2 1.2M13.5 6.9l1.2 1.2M9 13.2l1.2 1.2M7.3 15l1.2 1.2"/></svg></span>
       <div class="brand-text">
-        <div class="kicker" id="kicker">2026 season · side bets</div>
         <h1 id="leagueName">Smyrna League</h1>
-        <div class="sub" id="leagueSub"></div>
+        <div class="sub gold" id="leagueSub"></div>
       </div>
     </div>
-    <div class="whoami">
-      <span class="lbl" id="meLbl">Not signed in</span>
-      <span class="me-name" id="meName" hidden></span>
-      <button class="btn adm" id="adminBtn" hidden aria-pressed="false" title="Show the admin controls, or see the app as everyone else does">Admin off</button>
-      <button class="btn" id="pwBtn" hidden>Change password</button>
-      <button class="btn" id="signOutBtn" hidden>Sign out</button>
-      <button class="btn" id="rosterBtn">League</button>
+    <!-- who's signed in, and everything about them, behind one button -->
+    <div class="me-menu" id="meMenu">
+      <button class="me-btn" id="meBtn" type="button" aria-haspopup="true" aria-expanded="false">
+        <span class="me-avatar" id="meAvatar"></span><b id="meName">Not signed in</b><i aria-hidden="true">▾</i>
+      </button>
+      <div class="me-drop" id="meDrop" hidden>
+        <button class="btn adm" id="adminBtn" hidden aria-pressed="false" title="Show the admin controls, or see the app as everyone else does">Admin off</button>
+        <button class="btn" id="pwBtn" hidden>Change password</button>
+        <button class="btn" id="rosterBtn">League</button>
+        <button class="btn" id="signOutBtn" hidden>Sign out</button>
+      </div>
     </div>
   </header>
 
@@ -49,42 +52,42 @@
 
   <div id="banner"></div>
 
-  <section>
-    <div class="sec-head">
-      <h2>Season ledger</h2>
-      <span class="note" id="boardNote"></span>
-    </div>
-    <div class="board" id="board"></div>
-  </section>
+  <div class="panel">
+    <nav class="tabs" id="tabs" role="tablist" aria-label="Sections">
+      <button class="tab" type="button" data-act="tab" data-tab="book" role="tab"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v5a2 2 0 0 0 0 4v5H4v-5a2 2 0 0 0 0-4z"/><path d="M9 5v14" stroke-dasharray="2 2"/></svg><span>Book</span><i class="n" id="tabN-book" hidden></i></button>
+      <button class="tab" type="button" data-act="tab" data-tab="ledger" role="tab"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 9h8M8 12h8M8 15h5"/></svg><span>Ledger</span><i class="n" id="tabN-ledger" hidden></i></button>
+      <button class="tab" type="button" data-act="tab" data-tab="hl" role="tab"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 20V8M7 8l-3 3M7 8l3 3M17 4v12M17 16l-3-3M17 16l3-3"/></svg><span>Hi / low</span><i class="n" id="tabN-hl" hidden></i></button>
+      <button class="tab" type="button" data-act="tab" data-tab="settle" role="tab"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 8v8M9.5 10.2c0-1 1-1.7 2.5-1.7s2.5.7 2.5 1.6c0 2.2-5 1.4-5 3.7 0 .9 1 1.6 2.5 1.6s2.5-.7 2.5-1.7"/></svg><span>Settle up</span><i class="n" id="tabN-settle" hidden></i></button>
+    </nav>
 
-  <section>
-    <div class="sec-head">
-      <h2>High / low</h2>
-      <span class="note" id="hlNote"></span>
-    </div>
-    <div id="highlow"></div>
-  </section>
-
-  <section>
-    <div class="sec-head">
-      <h2>Settle up</h2>
-      <span class="note">The season so far, paid or not · below it, what's still unpaid. Mark it paid once the money actually moves.</span>
-    </div>
-    <div id="settle"></div>
-  </section>
-
-  <section>
-    <div class="sec-head">
-      <h2>The book</h2>
-      <div class="sec-actions">
-        <span class="stats-bar" id="statsBar"></span>
-        <button class="btn" id="refreshBtn" hidden>Refresh stats</button>
-        <button class="btn gold lg" id="newBetBtn">+ Propose a bet</button>
+    <section data-panel="book">
+      <div class="glance" id="glance">
+        <span class="glance-txt" id="glanceTxt"></span>
+        <span class="glance-r">
+          <span class="stats-bar" id="statsBar"></span>
+          <button class="btn" id="refreshBtn" hidden>Refresh stats</button>
+          <button class="btn gold lg" id="newBetBtn">+ Propose a bet</button>
+        </span>
       </div>
-    </div>
-    <div class="filters" id="filters" style="margin-bottom:14px"></div>
-    <div class="tickets" id="tickets"></div>
-  </section>
+      <div class="filters" id="filters" style="margin-bottom:14px"></div>
+      <div class="tickets" id="tickets"></div>
+    </section>
+
+    <section data-panel="ledger" hidden>
+      <div class="sec-head"><span class="note" id="boardNote"></span></div>
+      <div class="board" id="board"></div>
+    </section>
+
+    <section data-panel="hl" hidden>
+      <div class="sec-head"><span class="note" id="hlNote"></span></div>
+      <div id="highlow"></div>
+    </section>
+
+    <section data-panel="settle" hidden>
+      <div class="sec-head"><span class="note">The season so far, paid or not · below it, what's still unpaid. Mark it paid once the money actually moves.</span></div>
+      <div id="settle"></div>
+    </section>
+  </div>
 
   <footer class="foot" id="foot"></footer>
 </div>
