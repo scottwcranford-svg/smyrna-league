@@ -6,7 +6,7 @@
 import * as R from "./rules.js?v=dev";
 import * as S from "./store.js?v=dev";
 import * as A from "./auth.js?v=dev";
-import { state, members, realMembers } from "./state.js?v=dev";
+import { state, members, realMembers, teamOf } from "./state.js?v=dev";
 import { toast, avatarHtml } from "./render.js?v=dev";
 import { guard, findBet } from "./book.js?v=dev";
 
@@ -72,7 +72,7 @@ export function drawRoster(){
       '<span class="r-name">'+esc(m.name)+"</span>"+
       (isAdminMember(m.id)?'<span class="r-adm">Admin</span>':"")+
       (m.test?'<span class="r-adm r-test" title="Left out of the ledger and the pickers">Test</span>':"")+
-      '<span class="r-team">'+esc(m.team||"—")+"</span>"+seenHtml(m.id)+
+      '<span class="r-team">'+esc(teamOf(m)||"—")+"</span>"+seenHtml(m.id)+
       (adm?'<input class="field r-pw" type="password" data-pw="'+esc(m.id)+'" autocomplete="new-password" placeholder="Set password">'+
            '<button class="btn" data-act="setPw" data-id="'+esc(m.id)+'">Set</button>'+
            '<button class="btn" data-act="pwDefault" data-id="'+esc(m.id)+'" title="'+esc(defaultPw(m))+'">Default</button>':"")+

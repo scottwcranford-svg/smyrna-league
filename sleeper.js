@@ -41,6 +41,9 @@ export function gamesFor(weeks,season){
     .then(function(lists){ return parseScores(lists,weeks); });
 }
 
+// Our Sleeper league: the id an admin put in league/config, else the Smyrna League.
+export function leagueIdOf(cfg){ return String((cfg&&cfg.sleeperLeagueId)||R.SLEEPER_LEAGUE_ID); }
+
 // Sleeper's player index → [id, name, pos, team] rows: fantasy positions on a team,
 // plus every defense; defenses last, otherwise by name.
 export function parseRoster(players){
@@ -114,16 +117,25 @@ export function runRefresh(db,by,forced,ctx){
           if(!ctx.mobile&&ageMin(roster.updatedAt)>6*60) writes.push(sj(SLEEPER+"/v1/players/nfl").then(function(players){
             var rows=parseRoster(players);
             return db.doc("league/roster").set({ updatedAt:now, count:rows.length, players:rows }); }).catch(function(){}));
-          // Sleeper avatars by username, daily or when a manager is new: league/avatars is
-          // { byId: { memberId: avatarId or "" } }. A name Sleeper doesn't know just keeps its initials.
-          var av=ctx.avatars||{}, mem=cfg.members||[];
-          var newFace=mem.some(function(m){ return !(av.byId&&(m.id in av.byId)); });
-          if(mem.length&&(newFace||ageMin(av.updatedAt)>24*60)){
-            writes.push(Promise.all(mem.map(function(m){
-              return sj(SLEEPER+"/v1/user/"+encodeURIComponent(m.name)).then(function(u){ return [m.id,(u&&typeof u.avatar==="string")?u.avatar:""]; }).catch(function(){ return [m.id,""]; });
-            })).then(function(pairs){
-              var byId={}; pairs.forEach(function(pr){ byId[pr[0]]=pr[1]; });
-              return db.doc("league/avatars").set({ updatedAt:now, byId:byId });
+          // The Sleeper league itself, daily or when a manager is new: every manager's team
+          // name and avatar from one call. league/sleeper = { leagueId, byId: { memberId:
+          // { avatar, team } } }. A manager Sleeper's league doesn't have (a test account)
+          // gets their public avatar and no team; a name Sleeper doesn't know keeps initials.
+          var sl=ctx.sleeper||{}, mem=cfg.members||[];
+          var newFace=mem.some(function(m){ return !(sl.byId&&(m.id in sl.byId)); });
+          if(mem.length&&(newFace||ageMin(sl.updatedAt)>24*60)){
+            writes.push(Promise.resolve(leagueIdOf(cfg)).then(function(lid){
+              return (lid?sj(SLEEPER+"/v1/league/"+lid+"/users").catch(function(){ return []; }):Promise.resolve([])).then(function(users){
+                var byName={}; (users||[]).forEach(function(u){ byName[String(u.display_name||u.username||"").toLowerCase()]=u; });
+                return Promise.all(mem.map(function(m){
+                  var u=byName[String(m.name).toLowerCase()];
+                  if(u) return { id:m.id, avatar:(typeof u.avatar==="string")?u.avatar:"", team:String((u.metadata&&u.metadata.team_name)||"").trim() };
+                  return sj(SLEEPER+"/v1/user/"+encodeURIComponent(m.name)).then(function(p){ return { id:m.id, avatar:(p&&typeof p.avatar==="string")?p.avatar:"", team:"" }; }).catch(function(){ return { id:m.id, avatar:"", team:"" }; });
+                })).then(function(rows){
+                  var byId={}; rows.forEach(function(r){ byId[r.id]={ avatar:r.avatar, team:r.team }; });
+                  return db.doc("league/sleeper").set({ updatedAt:now, leagueId:lid||"", byId:byId });
+                });
+              });
             }).catch(function(){}));
           }
           // Projections for the weeks in play: the season ("0"), this week, next, and any week

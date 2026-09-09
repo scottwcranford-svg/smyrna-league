@@ -241,16 +241,21 @@ test("Join dialog search works after the propose form has been drawn (shared ids
   await p.close();
 });
 
-test("Sleeper avatars show where the book has one; initials otherwise", { skip }, async () => {
+test("Sleeper avatars and team names show where the book has them; initials and the dialog's names otherwise", { skip }, async () => {
   const { p, errors } = await page();
   const out = await p.evaluate(async () => {
     const { state } = await import("./state.js?v=dev"); const V = await import("./render.js?v=dev");
-    state.avatars = { updatedAt: "2026-09-09T20:00:00Z", byId: { a: "6dcbee5f295974c3ea459f3aa1e3ba02", b: "" } };
-    V.render();
-    return [...document.querySelectorAll("#board .seat")].map(s => { const a = s.querySelector(".avatar"); return [s.querySelector(".seat-name").textContent, a.tagName, a.tagName === "IMG" ? a.getAttribute("src") : a.textContent, getComputedStyle(a).borderRadius]; });
+    const D = await import("./dialogs.js?v=dev");
+    state.config.members[1].team = "Bob's Dialog Name";
+    state.sleeper = { updatedAt: "2026-09-09T20:00:00Z", leagueId: "L1", byId: { a: { avatar: "6dcbee5f295974c3ea459f3aa1e3ba02", team: "Cheat 2 Win" }, b: { avatar: "", team: "" } } };
+    V.render(); D.drawRoster();
+    const board = [...document.querySelectorAll("#board .seat")].map(s => { const a = s.querySelector(".avatar"); return [s.querySelector(".seat-name").textContent, a.tagName, a.tagName === "IMG" ? a.getAttribute("src") : a.textContent, getComputedStyle(a).borderRadius, s.querySelector(".seat-team").textContent]; });
+    const roster = [...document.querySelectorAll("#rosterList .rrow")].map(r => r.querySelector(".r-team").textContent);
+    return { board, roster };
   });
-  assert.deepEqual(out.map(r => r.slice(0, 3)), [["Alice", "IMG", "https://sleepercdn.com/avatars/thumbs/6dcbee5f295974c3ea459f3aa1e3ba02"], ["Bob", "SPAN", "BO"], ["Cara", "SPAN", "CA"]]);
-  assert.equal(out[0][3], "50%", "round, like the initials");
+  assert.deepEqual(out.board.map(r => [r[0], r[1], r[2], r[4]]), [["Alice", "IMG", "https://sleepercdn.com/avatars/thumbs/6dcbee5f295974c3ea459f3aa1e3ba02", "Cheat 2 Win"], ["Bob", "SPAN", "BO", "Bob's Dialog Name"], ["Cara", "SPAN", "CA", ""]], "Sleeper's team name wins; the dialog's is the fallback");
+  assert.equal(out.board[0][3], "50%", "round, like the initials");
+  assert.deepEqual(out.roster, ["Cheat 2 Win", "Bob's Dialog Name", "—"]);
   assert.deepEqual(errors, []);
   await p.close();
 });

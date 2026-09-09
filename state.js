@@ -10,7 +10,7 @@ export const state = {
   refresh:null, roster:null, games:null,
   seen:null, seenStamped:null,
   proj:null,   // league/proj: Sleeper's weekly projections for the weeks in play
-  avatars:null,   // league/avatars: each manager's Sleeper avatar id, by member id   // league/seen: when each manager last opened the app
+  sleeper:null,   // league/sleeper: each manager's Sleeper avatar and team name, by member id   // league/seen: when each manager last opened the app
   // the propose / join forms' draft
   draftScope:"", draftStats:[], editId:null,
   draftGame:null, draftMarket:"ml", draftLine:"", draftFav:"", joinId:null,
@@ -22,6 +22,8 @@ export const state = {
 export function members(){ return (state.config&&state.config.members)||[]; }
 // The roster as the league sees it: test accounts (member.test) are left out of the
 // ledger board and the pickers, but never out of name lookups. You always see yourself.
+// A manager's team name: Sleeper's, if the league sync has one, else what the League dialog says.
+export function teamOf(m){ var s=m&&state.sleeper&&state.sleeper.byId?state.sleeper.byId[m.id]:null; return (s&&s.team)||(m&&m.team)||""; }
 export function realMembers(){ return members().filter(function(m){ return !m.test||m.id===state.me; }); }
 
 var renderFn=null, pending=false;

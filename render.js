@@ -3,7 +3,7 @@
 // DOM, never the book. forms.js and actions.js are the other DOM writers.
 
 import * as R from "./rules.js?v=dev";
-import { state, members, realMembers, touch } from "./state.js?v=dev";
+import { state, members, realMembers, teamOf, touch } from "./state.js?v=dev";
 
 const esc=R.esc, money=R.money, signed=R.signed, initials=R.initials, weekLabel=R.weekLabel, isPlayoff=R.isPlayoff,
       kindLabel=R.kindLabel, entriesOf=R.entriesOf, fmtWhen=R.fmtWhen, countdown=R.countdown, lineText=R.lineText,
@@ -34,7 +34,7 @@ export function avatarHtml(id,size){
   var fs=Math.round(size*0.38);
   if(!m) return '<span class="avatar" style="width:'+size+'px;height:'+size+'px;background:var(--ink-3);font-size:'+fs+'px">?</span>';
   // The manager's Sleeper avatar when the book has one; their initials otherwise.
-  var hash=state.avatars&&state.avatars.byId?state.avatars.byId[id]:"";
+  var hash=state.sleeper&&state.sleeper.byId&&state.sleeper.byId[id]?state.sleeper.byId[id].avatar:"";
   if(hash) return '<img class="avatar" src="https://sleepercdn.com/avatars/thumbs/'+esc(hash)+'" width="'+size+'" height="'+size+'" alt="" title="'+esc(m.name)+'" style="width:'+size+'px;height:'+size+'px">';
   return '<span class="avatar" style="width:'+size+'px;height:'+size+'px;background:'+esc(m.color)+';font-size:'+fs+'px">'+esc(initials(m.name))+"</span>";
 }
@@ -171,7 +171,7 @@ function board(){
     return '<div class="seat'+(m.id===state.me?" me":"")+((played||inPlay||proposed)?"":" idle")+'">'+
       '<div class="seat-top">'+avatarHtml(m.id,30)+
       '<span class="seat-name">'+esc(m.name)+"</span></div>"+
-      '<div class="seat-team">'+esc(m.team||"")+"</div>"+
+      '<div class="seat-team">'+esc(teamOf(m))+"</div>"+
       '<div class="figs">'+
         fig("stake",inPlay,"in play")+fig("prop",proposed,"proposed")+fig("gone",gone,"cancelled")+
         '<div class="fig net"><b class="'+cls+'">'+signed(p.net)+"</b><span>"+

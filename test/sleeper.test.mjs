@@ -112,26 +112,34 @@ test("runRefresh: projections for this week, next, and live weekly bets; rewritt
   assert.equal(db2.writes.some((x) => x[1] === "league/proj"), false, "unchanged projections are not rewritten");
 });
 
-test("runRefresh: Sleeper avatars by username, daily or when a manager is new", async () => {
+test("runRefresh: the Sleeper league's team names and avatars, one call for everyone", async () => {
   const db = fakeDb();
-  const users = [];
+  const hits = [];
   globalThis.fetch = async (u) => {
-    const m = /\/v1\/user\/([^/?]+)$/.exec(u); if (m) users.push(decodeURIComponent(m[1]));
-    return { ok: true, json: async () => (/state\/nfl/.test(u) ? { week: 1 } : m ? (m[1] === "hobnailboot" ? { username: "hobnailboot", avatar: "6dcbee5f" } : null) : /stats\/nfl\/regular\/2026/.test(u) ? {} : []), text: async () => "" };
+    hits.push(u.replace(/^.*\/v1\//, ""));
+    const j = /state\/nfl/.test(u) ? { week: 1 }
+      : /\/v1\/user\/hobnailboot$/.test(u) ? { user_id: "466", avatar: "6dcbee5f" }
+      : /\/v1\/user\/testbot$/.test(u) ? { user_id: "999", avatar: "t3st" }
+      : /\/v1\/user\/466\/leagues\/nfl\/2026$/.test(u) ? [{ league_id: "L9", name: "Other League", total_rosters: 12 }, { league_id: "L1", name: "Smyrna League", total_rosters: 10 }]
+      : /\/v1\/league\/L1\/users$/.test(u) ? [{ display_name: "hobnailboot", avatar: "6dcbee5f", metadata: { team_name: "Cheat 2 Win" } }, { display_name: "someoneelse", avatar: "x" }]
+      : /stats\/nfl\/regular\/2026/.test(u) ? {} : [];
+    return { ok: true, json: async () => j, text: async () => "" };
   };
-  const cfg = { ...config, scheduleUpdatedAt: N.isoNow(), members: [{ id: "m0", name: "hobnailboot" }, { id: "m1", name: "testbot" }] };
+  const cfg = { ...config, sleeperLeagueId: "L1", scheduleUpdatedAt: N.isoNow(), members: [{ id: "m0", name: "hobnailboot", team: "Old Name" }, { id: "m1", name: "testbot" }] };
   await N.runRefresh(db, "m0", true, { config: cfg, refresh: {}, bets: [], roster: { updatedAt: N.isoNow() }, holder: "m0", mobile: true });
-  assert.deepEqual(users.sort(), ["hobnailboot", "testbot"], "one lookup per manager");
-  const w = db.writes.find((x) => x[1] === "league/avatars");
-  assert.deepEqual(w[2].byId, { m0: "6dcbee5f", m1: "" }, "unknown names keep their initials");
-  // all known and fresh: no lookups
-  users.length = 0; const db2 = fakeDb();
-  await N.runRefresh(db2, "m0", true, { config: cfg, refresh: {}, bets: [], roster: { updatedAt: N.isoNow() }, holder: "m0", mobile: true, avatars: { updatedAt: N.isoNow(), byId: { m0: "6dcbee5f", m1: "" } } });
-  assert.equal(users.length, 0); assert.equal(db2.writes.some((x) => x[1] === "league/avatars"), false);
-  // a new manager on the roster: look everyone up again
-  const db3 = fakeDb();
-  await N.runRefresh(db3, "m0", true, { config: { ...cfg, members: cfg.members.concat([{ id: "m2", name: "newguy" }]) }, refresh: {}, bets: [], roster: { updatedAt: N.isoNow() }, holder: "m0", mobile: true, avatars: { updatedAt: N.isoNow(), byId: { m0: "6dcbee5f", m1: "" } } });
-  assert.equal(db3.writes.some((x) => x[1] === "league/avatars"), true);
+  const w = db.writes.find((x) => x[1] === "league/sleeper");
+  assert.equal(w[2].leagueId, "L1");
+  assert.deepEqual(w[2].byId, { m0: { avatar: "6dcbee5f", team: "Cheat 2 Win" }, m1: { avatar: "t3st", team: "" } }, "league members get team names; others their public avatar");
+  assert.equal(hits.filter((h) => /^league\//.test(h)).length, 1, "one league call for everyone");
+  // all known, fresh, league cached: no lookups at all
+  hits.length = 0; const db2 = fakeDb();
+  await N.runRefresh(db2, "m0", true, { config: cfg, refresh: {}, bets: [], roster: { updatedAt: N.isoNow() }, holder: "m0", mobile: true, sleeper: { updatedAt: N.isoNow(), leagueId: "L1", byId: w[2].byId } });
+  assert.equal(hits.some((h) => /^(user|league)\//.test(h)), false); assert.equal(db2.writes.some((x) => x[1] === "league/sleeper"), false);
+  // a new manager: sync again
+  hits.length = 0; const db3 = fakeDb();
+  await N.runRefresh(db3, "m0", true, { config: { ...cfg, members: cfg.members.concat([{ id: "m2", name: "newguy" }]) }, refresh: {}, bets: [], roster: { updatedAt: N.isoNow() }, holder: "m0", mobile: true, sleeper: { updatedAt: N.isoNow(), leagueId: "L1", byId: w[2].byId } });
+  assert.equal(db3.writes.some((x) => x[1] === "league/sleeper"), true);
+  assert.equal(hits.some((h) => /leagues\/nfl/.test(h)), false, "league id was cached");
 });
 
 test("runRefresh honours the hourly rule, then writes stats, games and the refresh stamp", async () => {

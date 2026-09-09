@@ -17,7 +17,7 @@ const memberForEmail=function(email){ return R.memberForEmail(email,members()); 
 
 /* ---- keeping the book current ----
    The loops need a snapshot of what this page knows; nothing in sleeper.js reads state. */
-function refreshCtx(){ return { config:state.config, games:state.games, refresh:state.refresh, bets:state.bets, roster:state.roster, proj:state.proj, avatars:state.avatars,
+function refreshCtx(){ return { config:state.config, games:state.games, refresh:state.refresh, bets:state.bets, roster:state.roster, proj:state.proj, sleeper:state.sleeper,
                                 holder:state.me, mobile:/Mobi|Android/i.test(navigator.userAgent) }; }
 function scoresTick(db){ if(!db||state.local) return; N.scoresTick(db,refreshCtx()); }
 function runRefresh(db,by,forced){ return N.runRefresh(db,by,forced,refreshCtx()); }
@@ -130,10 +130,11 @@ function subscribeBook(db){
     touch();   // tickets show each pick's current status
   },function(){ /* picker falls back to free text */ });
 
-  db.doc("league/avatars").onSnapshot(function(snap){
-    state.avatars=snap.exists?snap.data():null;   // read-only
+  db.doc("league/sleeper").onSnapshot(function(snap){
+    state.sleeper=snap.exists?snap.data():null;   // read-only
+    if(document.getElementById("rosterDlg").open) drawRoster();
     touch();
-  },function(){ /* initials it is */ });
+  },function(){ /* initials and the dialog's team names, then */ });
 
   db.doc("league/proj").onSnapshot(function(snap){
     state.proj=snap.exists?snap.data():null;   // read-only
