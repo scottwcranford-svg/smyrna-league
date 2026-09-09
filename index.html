@@ -74,6 +74,8 @@ header.top{display:flex;flex-wrap:wrap;gap:14px;align-items:center;padding-botto
 .login-brand h1{margin:0;font-size:22px;font-weight:800;letter-spacing:-.01em}
 .login-brand .kicker{font-weight:700;text-transform:uppercase;letter-spacing:.14em;font-size:10px;color:var(--accent)}
 .login .btn{margin-top:4px}
+.login-help{color:var(--accent);text-decoration:none;font-weight:600}
+.login-help:hover{text-decoration:underline}
 .rrow .r-pw{flex:1 1 150px;width:auto;min-height:34px;font-size:13px}
 .rrow .r-adm{font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);background:var(--accent-bg);padding:2px 7px;border-radius:99px}
 .rrow .r-chk{margin:0;flex:none;font-size:12px}
@@ -297,6 +299,7 @@ footer.foot{margin-top:36px;padding-top:16px;border-top:1px solid var(--rule);fo
     <button class="btn pri lg" id="siGo" type="submit">Sign in</button>
     </form>
     <div class="hint" id="siHint"></div>
+    <a class="hint login-help" href="help-login.png" target="_blank" rel="noopener">Need help signing in?</a>
     <button type="button" class="btn" id="siReset" hidden>Start over on this device</button>
     <div class="hint" id="siVer" style="font-size:10px;opacity:.6">build 12</div>
   </div>
