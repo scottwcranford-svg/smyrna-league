@@ -206,7 +206,7 @@ function filters(){
       var c=counts[s[0]];
       if(s[0]==="void"&&!c) return "";
       return '<button class="chip" data-act="filter" data-status="'+s[0]+'" aria-pressed="'+(f.status===s[0])+'">'+
-        esc(s[1])+(c?" "+c:"")+"</button>";
+        esc(s[1])+(c?'<i class="n">'+c+"</i>":"")+"</button>";
     }).join("");
 
   h+='<span style="width:8px"></span>'+
