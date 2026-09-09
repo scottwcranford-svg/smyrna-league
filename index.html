@@ -67,6 +67,12 @@ header.top{display:flex;flex-wrap:wrap;gap:14px;align-items:center;padding-botto
 .brand .sub{font-size:12.5px;color:var(--ink-2)}
 .whoami{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .me-name{font-weight:800;font-size:14px;color:var(--ink)}
+.login{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px 16px;background:var(--bg)}
+.login-card{width:100%;max-width:380px;background:var(--surface);border:1px solid var(--rule);border-radius:18px;padding:22px;display:flex;flex-direction:column;gap:14px;box-shadow:var(--shadow)}
+.login-brand{display:flex;align-items:center;gap:12px;margin-bottom:4px}
+.login-brand h1{margin:0;font-size:22px;font-weight:800;letter-spacing:-.01em}
+.login-brand .kicker{font-weight:700;text-transform:uppercase;letter-spacing:.14em;font-size:10px;color:var(--accent)}
+.login .btn{margin-top:4px}
 .rrow .r-pw{flex:1 1 150px;width:auto;min-height:34px;font-size:13px}
 .rrow .r-adm{font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);background:var(--accent-bg);padding:2px 7px;border-radius:99px}
 .rrow .r-chk{margin:0;flex:none;font-size:12px}
@@ -280,7 +286,18 @@ dialog::backdrop{background:rgba(10,12,18,.6)}
 footer.foot{margin-top:36px;padding-top:16px;border-top:1px solid var(--rule);font-size:12.5px;color:var(--ink-3)}
 </style>
 
-<div class="wrap">
+<div class="login" id="login">
+  <div class="login-card">
+    <div class="login-brand"><span class="league-badge">SL</span><div><div class="kicker">2026 season · side bets</div><h1>Smyrna League</h1></div></div>
+    <label class="f"><span>Your name</span><input class="field" id="siName" autocomplete="username" autocapitalize="off" placeholder="Sleeper name, as it shows in the league"></label>
+    <label class="f"><span>Password</span><input class="field" id="siPw" type="password" autocomplete="current-password"></label>
+    <label class="f" id="siKeyRow" hidden><span>League passcode</span><input class="field" id="siKey" autocomplete="off" autocapitalize="off" placeholder="From the league chat"></label>
+    <button class="btn pri lg" id="siGo">Sign in</button>
+    <div class="hint" id="siHint"></div>
+  </div>
+</div>
+
+<div class="wrap" id="app" hidden>
   <header class="top">
     <div class="brand">
       <span class="league-badge" id="leagueBadge"></span>
@@ -293,7 +310,6 @@ footer.foot{margin-top:36px;padding-top:16px;border-top:1px solid var(--rule);fo
     <div class="whoami">
       <span class="lbl" id="meLbl">Not signed in</span>
       <span class="me-name" id="meName" hidden></span>
-      <button class="btn pri" id="signInBtn" hidden>Sign in</button>
       <button class="btn" id="pwBtn" hidden>Change password</button>
       <button class="btn" id="signOutBtn" hidden>Sign out</button>
       <button class="btn" id="rosterBtn">League</button>
@@ -396,33 +412,6 @@ footer.foot{margin-top:36px;padding-top:16px;border-top:1px solid var(--rule);fo
   </div>
 </dialog>
 
-<dialog id="keyDlg">
-  <div class="dlg-head"><h3>League passcode</h3></div>
-  <div class="dlg-body">
-    <p class="bet-desc" style="margin:0 0 12px">This book is for the Smyrna League. Enter the passcode once and this device remembers it.</p>
-    <input class="field" id="keyIn" type="password" autocomplete="off" placeholder="Passcode">
-    <div class="form-foot">
-      <button class="btn pri lg" id="keySave">Open the book</button>
-      <span class="hint" id="keyHint"></span>
-    </div>
-  </div>
-</dialog>
-
-<dialog id="signDlg">
-  <form method="dialog" class="dlg-head"><h3>Smyrna League · sign in</h3><button class="btn" value="cancel" id="siClose">Close</button></form>
-  <div class="dlg-body">
-    <p class="bet-desc" style="margin:0 0 12px">Pick your name and enter your password. This device remembers you.</p>
-    <div class="grid c2">
-      <label class="f"><span>Who are you</span><select class="field" id="siName"></select></label>
-      <label class="f"><span>Password</span><input class="field" id="siPw" type="password" autocomplete="current-password"></label>
-    </div>
-    <div class="form-foot">
-      <button class="btn pri lg" id="siGo">Sign in</button>
-      <span class="hint" id="siHint"></span>
-    </div>
-  </div>
-</dialog>
-
 <dialog id="pwDlg">
   <form method="dialog" class="dlg-head"><h3>Change your password</h3><button class="btn" value="cancel">Close</button></form>
   <div class="dlg-body">
@@ -505,34 +494,8 @@ var state = {
 };
 
 /* ---- the real league, used until the shared book answers ---- */
-function defaultLeague(){
-  var m = [
-    ["gmelan1",""],["JPorch",""],["RTownsend",""],["mscag",""],["hobnailboot",""],
-    ["BrantleyA123",""],["Air8orn","Thielen Baaaaaad"],["FloDiggity","Uni-Ballers"],
-    ["scottykacz23","The Mafia vs the world!"],["mwong22",""]
-  ];
-  return {
-    leagueName:"Smyrna League", season:"2026", stake:25, kickoff:DEFAULT_KICKOFF,
-    members: m.map(function(x,i){ return { id:"m"+i, name:x[0], team:x[1], color:COLORS[i%COLORS.length] }; })
-  };
-}
-function defaultBets(){
-  var id = function(n){ var c = state.config || defaultLeague();
-    for(var i=0;i<c.members.length;i++){ if(c.members[i].name.toLowerCase()===n.toLowerCase()) return c.members[i].id; }
-    return null; };
-  return [
-    { id:"seed1", createdAt:"2026-09-08T12:00:00.000Z", createdBy:id("JPorch"),
-      week:0, kind:"prop", amount:25,
-      name:"The Takeaway", terms:"Most defensive turnovers on the season.",
-      entries:[ {memberId:id("JPorch"),pick:"Texans"}, {memberId:id("gmelan1"),pick:"Vikings"}, {memberId:id("RTownsend"),pick:"Broncos"} ],
-      status:"active", winner:null, paid:[] },
-    { id:"seed2", createdAt:"2026-09-08T12:05:00.000Z", createdBy:id("gmelan1"),
-      week:0, kind:"prop", amount:25,
-      name:"WR University", terms:"Which program turns out the better NFL receivers this season.",
-      entries:[ {memberId:id("gmelan1"),pick:"LSU"}, {memberId:id("RTownsend"),pick:"USC"} ],
-      status:"active", winner:null, paid:[] }
-  ];
-}
+function defaultLeague(){ return { leagueName:"Smyrna League", season:"2026", stake:25, kickoff:DEFAULT_KICKOFF, members:[] }; }
+function defaultBets(){ return []; }
 
 /* ---- utils ---- */
 function esc(s){ return String(s==null?"":s).replace(/[&<>"']/g,function(c){
@@ -798,7 +761,6 @@ function head(){
   var signed=!!state.me, canSign=state.connected&&!state.local;
   document.getElementById("meLbl").textContent=signed?(state.admin?"Admin":"Signed in as"):"Not signed in";
   var nm=document.getElementById("meName"); nm.hidden=!signed; nm.textContent=signed?mName(state.me):"";
-  document.getElementById("signInBtn").hidden=signed||!canSign;
   document.getElementById("signOutBtn").hidden=!signed;
   document.getElementById("pwBtn").hidden=!signed;
 }
@@ -1757,40 +1719,19 @@ function makeDb(key){
     refresh:function(by){ return runRefresh(this,by,true); }
   };
 }
-// Ask for the passcode until the book opens with it; remembered per device.
-function askKey(msg){
-  return new Promise(function(resolve){
-    var dlg=document.getElementById("keyDlg"), inp=document.getElementById("keyIn"), hint=document.getElementById("keyHint");
-    hint.textContent=msg||""; inp.value="";
-    dlg.addEventListener("cancel",function(e){ e.preventDefault(); });
-    if(!dlg.open) dlg.showModal(); inp.focus();
-    document.getElementById("keySave").onclick=function(e){
-      e.preventDefault(); var k=inp.value.trim(); if(!k) return;
-      hint.textContent="Checking…";
-      tryKey(k).then(function(ok){
-        if(ok){ try{ localStorage.setItem(KEY_LS,k); }catch(x){} dlg.close(); resolve(k); }
-        else hint.textContent="That's not it — ask whoever runs the book.";
-      });
-    };
-  });
+// The league passcode: from the link (?key=…), else remembered on this device.
+// It's checked against a tiny "gate" document the rules let anyone read with the
+// right passcode — nothing else in the book is readable before sign-in.
+function storedKey(){
+  var k=""; try{ k=new URLSearchParams(location.search).get("key")||""; }catch(e){}
+  if(k){ try{ localStorage.setItem(KEY_LS,k); history.replaceState(null,"",location.pathname); }catch(e){} return k; }
+  try{ return localStorage.getItem(KEY_LS)||""; }catch(e){ return ""; }
 }
 function tryKey(k){
   if(!/^[A-Za-z0-9_\-]{3,80}$/.test(k)) return Promise.resolve(false);
   if(!firebase.apps.length) firebase.initializeApp(window.FIREBASE_CONFIG);
-  return firebase.firestore().collection("books").doc(k).collection("league").doc("config").get()
+  return firebase.firestore().collection("books").doc(k).collection("league").doc("gate").get()
     .then(function(){ return true; }).catch(function(e){ return !(e&&e.code==="permission-denied"); });
-}
-function connectDb(){
-  if(!window.FIREBASE_CONFIG||!window.FIREBASE_CONFIG.projectId||!window.firebase) return Promise.reject(new Error("no firebase config"));
-  var saved=""; try{ saved=localStorage.getItem(KEY_LS)||""; }catch(e){}
-  // A link can carry the passcode (…/?key=…): it's remembered and scrubbed from the address bar.
-  var fromLink=""; try{ fromLink=new URLSearchParams(location.search).get("key")||""; }catch(e){}
-  if(fromLink){ saved=fromLink; try{ history.replaceState(null,"",location.pathname); }catch(e){} }
-  var p=saved?tryKey(saved):Promise.resolve(false);
-  return p.then(function(ok){
-    if(ok){ try{ localStorage.setItem(KEY_LS,saved); }catch(e){} return makeDb(saved); }
-    return askKey(saved?"That passcode doesn't work any more.":"").then(makeDb);
-  });
 }
 
 /* ---- keeping the book current, from the browser ----
@@ -1911,9 +1852,11 @@ function etToUtc(dateStr,timeStr){ var a=dateStr.split("-").map(Number), b=timeS
 /* ---- who you are: Firebase Auth ----
    Accounts are handle@smyrna.league with a password the admin sets; no real
    email involved. Identity is the signed-in account, so "acting as" can't be faked.
-   Admins are the accounts listed in league/config.adminEmails; any admin can flag others. */
+   Admins are the accounts listed in league/config.adminEmails; any admin can flag others.
+   Nothing renders until someone is signed in: the login screen is the whole page. */
 var AUTH_DOMAIN="smyrna.league";
-function emailFor(m){ return String(m.name||"").toLowerCase().replace(/[^a-z0-9]/g,"")+"@"+AUTH_DOMAIN; }
+function slugName(n){ return String(n||"").toLowerCase().replace(/[^a-z0-9]/g,""); }
+function emailFor(m){ return slugName(m.name)+"@"+AUTH_DOMAIN; }
 function defaultPw(m){ return String(m.name||"")+"123!"; }   // the league's starting password: name + 123!
 function memberForEmail(email){
   email=String(email||"").toLowerCase();
@@ -1930,46 +1873,46 @@ function applyAuth(user){
 }
 function authMsg(e){
   var c=e&&e.code||"";
-  if(c==="auth/wrong-password"||c==="auth/invalid-credential"||c==="auth/invalid-login-credentials") return "Wrong password";
-  if(c==="auth/user-not-found") return "No account yet — ask the admin to set your password";
+  if(c==="auth/wrong-password"||c==="auth/invalid-credential"||c==="auth/invalid-login-credentials"||c==="auth/user-not-found") return "Name or password isn't right";
   if(c==="auth/too-many-requests") return "Too many tries — wait a minute";
   if(c==="auth/weak-password") return "Password needs at least 6 characters";
   if(c==="auth/email-already-in-use") return "That account exists — enter its current password to change it";
-  if(c==="auth/operation-not-allowed") return "Sign-in isn't enabled in Firebase yet (Authentication → Sign-in method → Email/Password)";
+  if(c==="auth/operation-not-allowed") return "Sign-in isn't enabled in Firebase yet";
+  if(c==="auth/admin-restricted-operation") return "New accounts are closed — ask the admin";
   if(c==="auth/network-request-failed") return "Offline — try again";
   return (e&&e.message)||"Couldn't sign in";
 }
-function openSignIn(required){
-  if(!state.connected) return toast("Not connected");   // the book may still be loading; names come from the roster we have
-  var dlg=document.getElementById("signDlg"), sel=document.getElementById("siName");
-  var keep=sel.value;
-  sel.innerHTML=(state.config?state.config.members:[]).map(function(m){ return '<option value="'+esc(m.id)+'">'+esc(m.name)+"</option>"; }).join("");
-  if(keep) sel.value=keep;
-  state.signRequired=!!required;
-  document.getElementById("siClose").hidden=!!required;
-  if(!dlg.open){ document.getElementById("siPw").value=""; document.getElementById("siHint").textContent=""; dlg.showModal(); }
-  document.getElementById("siPw").focus();
+// The login screen: the whole page until you're in.
+function showLogin(msg){
+  document.getElementById("app").hidden=true;
+  var lg=document.getElementById("login"); lg.hidden=false;
+  document.getElementById("siKeyRow").hidden=!!storedKey();
+  document.getElementById("siHint").textContent=msg||"";
+  var nm=document.getElementById("siName"); (nm.value?document.getElementById("siPw"):nm).focus();
 }
-document.getElementById("signDlg").addEventListener("cancel",function(e){ if(state.signRequired) e.preventDefault(); });
-function submitSignIn(){
-  var id=document.getElementById("siName").value, pw=document.getElementById("siPw").value, hint=document.getElementById("siHint");
-  var m=member(id); if(!m) return; if(!pw) return toast("Enter your password");
+function submitLogin(){
+  var name=document.getElementById("siName").value.trim(), pw=document.getElementById("siPw").value, hint=document.getElementById("siHint");
+  var key=storedKey()||document.getElementById("siKey").value.trim();
+  if(!name) return toast("Enter your name");
+  if(!pw) return toast("Enter your password");
+  if(!key){ document.getElementById("siKeyRow").hidden=false; return toast("Enter the league passcode"); }
   hint.textContent="Signing in…";
-  firebase.auth().signInWithEmailAndPassword(emailFor(m),pw).then(function(){
-    state.signRequired=false; document.getElementById("signDlg").close(); toast("Signed in as "+m.name);
-  }).catch(function(e){
-    // First-ever sign-in by the admin creates their account with this password.
-    if((e.code==="auth/user-not-found"||e.code==="auth/invalid-credential"||e.code==="auth/invalid-login-credentials")&&adminIds().indexOf(id)>=0){
-      return firebase.auth().fetchSignInMethodsForEmail(emailFor(m)).then(function(methods){
-        if(methods&&methods.length) throw e;
-        return firebase.auth().createUserWithEmailAndPassword(emailFor(m),pw).then(function(){
-          state.signRequired=false; document.getElementById("signDlg").close(); toast("Admin account created — you're in");
-        });
-      }).catch(function(e2){ hint.textContent=authMsg(e2); });
-    }
-    hint.textContent=authMsg(e);
+  tryKey(key).then(function(ok){
+    if(!ok){ document.getElementById("siKeyRow").hidden=false; try{ localStorage.removeItem(KEY_LS); }catch(e){} hint.textContent="That passcode isn't right"; return; }
+    try{ localStorage.setItem(KEY_LS,key); }catch(e){}
+    return firebase.auth().signInWithEmailAndPassword(slugName(name)+"@"+AUTH_DOMAIN,pw)
+      .then(function(){ hint.textContent=""; /* onAuthStateChanged opens the book */ })
+      .catch(function(e){ hint.textContent=authMsg(e); });
   });
 }
+// Signed in and passcode known: open the book, subscribe once, show the app when it lands.
+function enterBook(user){
+  var key=storedKey();
+  if(!key){ showLogin("Signed in as "+user.email.split("@")[0]+" — now the league passcode."); return; }
+  if(!state.db){ state.db=makeDb(key); state.connected=true; subscribeBook(state.db); }
+  enforceFreshPassword(user);
+}
+
 // Still on the default password? Prove it (a silent re-sign-in with the default) and,
 // if so, require a new one before anything else. Runs at every sign-in and page load.
 function enforceFreshPassword(user){
@@ -2157,7 +2100,7 @@ document.addEventListener("click",function(ev){
     state.config.members=state.config.members.filter(function(m){ return m.id!==id; });
     drawRoster(); saveConfig();
   }
-  else if(act==="signin"){ openSignIn(); }
+  else if(act==="signin"){ showLogin(); }
   else if(act==="pwDefault"){
     var dm=member(id); if(!dm) return;
     setPassword(id,defaultPw(dm)).then(function(msg){ toast(msg+" · "+defaultPw(dm)); }).catch(function(e){ toast(authMsg(e)); });
@@ -2222,15 +2165,14 @@ document.getElementById("bAddSide").addEventListener("click",function(e){
   if(state.draft.length>=8) return toast("Eight sides is plenty");
   state.draft.push({memberId:null,pick:""}); drawEntries();
 });
-document.getElementById("signInBtn").addEventListener("click",openSignIn);
-document.getElementById("signOutBtn").addEventListener("click",function(){ firebase.auth().signOut(); toast("Signed out"); });
+document.getElementById("signOutBtn").addEventListener("click",function(){ firebase.auth().signOut().then(function(){ location.reload(); }); });
 document.getElementById("pwBtn").addEventListener("click",function(){
   document.getElementById("pwCur").value=""; document.getElementById("pwNew").value=""; document.getElementById("pwHint").textContent="";
   document.getElementById("pwDlg").showModal(); document.getElementById("pwCur").focus();
 });
 document.getElementById("pwGo").addEventListener("click",function(e){ e.preventDefault(); changeOwnPassword(); });
-document.getElementById("siGo").addEventListener("click",function(e){ e.preventDefault(); submitSignIn(); });
-document.getElementById("siPw").addEventListener("keydown",function(e){ if(e.key==="Enter"){ e.preventDefault(); submitSignIn(); } });
+document.getElementById("siGo").addEventListener("click",function(e){ e.preventDefault(); submitLogin(); });
+["siName","siPw","siKey"].forEach(function(id){ document.getElementById(id).addEventListener("keydown",function(e){ if(e.key==="Enter"){ e.preventDefault(); submitLogin(); } }); });
 document.getElementById("rAdd").addEventListener("click",function(e){
   e.preventDefault();
   if(!state.admin) return toast("Only the admin can do that");
@@ -2262,75 +2204,83 @@ state.config=defaultLeague();
 state.bets=defaultBets();
 render();
 
-connectDb().then(function(db){
-    state.ready=true;
-    if(!db){ render(); return; }
-    state.db=db; state.connected=true;
-    firebase.auth().onAuthStateChanged(function(user){
-      applyAuth(user); render();
-      if(user) enforceFreshPassword(user);
-      else openSignIn(true);   // the sign-in screen is the front door
-    });
+state.ready=true;
+if(!window.FIREBASE_CONFIG||!window.FIREBASE_CONFIG.projectId||!window.firebase){
+  showLogin("This copy isn't connected to the league's book.");
+} else {
+  if(!firebase.apps.length) firebase.initializeApp(window.FIREBASE_CONFIG);
+  storedKey();   // scrub a ?key= link into device memory right away
+  firebase.auth().onAuthStateChanged(function(user){
+    applyAuth(user);
+    if(user) enterBook(user);
+    else { if(state.db){ location.reload(); return; } showLogin(); }
+    render();
+  });
+}
 
-    // Keep the book current from this browser: scores every minute during games,
-    // a full refresh hourly. Leases keep it to one writer across all open pages.
-    setTimeout(function(){ runRefresh(db,state.me,false).catch(function(){}); scoresTick(db); },4000);
-    setInterval(function(){ scoresTick(db); },60000);
-    setInterval(function(){ runRefresh(db,state.me,false).catch(function(){}); },15*60000);
+// Everything the page reads, started once, after sign-in. Rules refuse these reads
+// to anyone who isn't a signed-in member.
+function subscribeBook(db){
+  // Keep the book current from this browser: scores every minute during games,
+  // a full refresh hourly. Leases keep it to one writer across all open pages.
+  setTimeout(function(){ runRefresh(db,state.me,false).catch(function(){}); scoresTick(db); },4000);
+  setInterval(function(){ scoresTick(db); },60000);
+  setInterval(function(){ runRefresh(db,state.me,false).catch(function(){}); },15*60000);
 
-    // These two subscriptions race, and either can deliver first. Hold the
-    // latest bets snapshot so a bets-before-league ordering can't drop the
-    // book on the floor — the league handler adopts whatever already arrived.
-    var remoteBets=null;
+  // These two subscriptions race, and either can deliver first. Hold the
+  // latest bets snapshot so a bets-before-league ordering can't drop the
+  // book on the floor — the league handler adopts whatever already arrived.
+  var remoteBets=null;
 
-    db.doc("league/config").onSnapshot(function(snap){
-      if(snap.exists){
-        var d=clone(snap.data());
-        if(d&&Array.isArray(d.members)&&d.members.length){
-          state.config={ leagueName:d.leagueName||"Smyrna League", season:d.season||"",
-                         stake:Number(d.stake)||25, members:d.members,
-                         kickoff:d.kickoff||DEFAULT_KICKOFF,
-                         weekStarts:(d.weekStarts&&typeof d.weekStarts==="object")?d.weekStarts:null };
-          state.config.adminEmails=Array.isArray(d.adminEmails)?d.adminEmails:(d.adminEmail?[d.adminEmail]:[]);
-          if(state.local){
-            state.local=false;
-            state.bets=remoteBets||[];
-          }
-          applyAuth(firebase.auth().currentUser);   // the roster may have arrived after sign-in
-          if(document.getElementById("signDlg").open) openSignIn(state.signRequired);   // refresh its name list
-          else if(!firebase.auth().currentUser) openSignIn(true);                        // book loaded, nobody signed in: front door
+  db.doc("league/config").onSnapshot(function(snap){
+    if(snap.exists){
+      var d=clone(snap.data());
+      if(d&&Array.isArray(d.members)&&d.members.length){
+        state.config={ leagueName:d.leagueName||"Smyrna League", season:d.season||"",
+                       stake:Number(d.stake)||25, members:d.members,
+                       kickoff:d.kickoff||DEFAULT_KICKOFF,
+                       weekStarts:(d.weekStarts&&typeof d.weekStarts==="object")?d.weekStarts:null };
+        state.config.adminEmails=Array.isArray(d.adminEmails)?d.adminEmails:(d.adminEmail?[d.adminEmail]:[]);
+        if(state.local){
+          state.local=false;
+          state.bets=remoteBets||[];
         }
+        applyAuth(firebase.auth().currentUser);   // the roster may have arrived after sign-in
+        // the book is here and you're signed in: show the app
+        document.getElementById("login").hidden=true;
+        document.getElementById("app").hidden=false;
       }
-      render();
-    },function(e){ toast(dbMsg(e)); });
+    }
+    render();
+  },function(e){ toast(dbMsg(e)); });
 
-    db.doc("league/refresh").onSnapshot(function(snap){
-      state.refresh=snap.exists?clone(snap.data()):null;
-      statsBar();
-    },function(){ /* freshness strip is optional; stay quiet */ });
+  db.doc("league/refresh").onSnapshot(function(snap){
+    state.refresh=snap.exists?clone(snap.data()):null;
+    statsBar();
+  },function(){ /* freshness strip is optional; stay quiet */ });
 
-    db.doc("league/games").onSnapshot(function(snap){
-      state.games=snap.exists?snap.data():null;
-      ticker();
-    },function(){ /* no ticker without the games doc */ });
+  db.doc("league/games").onSnapshot(function(snap){
+    state.games=snap.exists?snap.data():null;
+    ticker();
+  },function(){ /* no ticker without the games doc */ });
 
-    db.doc("league/roster").onSnapshot(function(snap){
-      state.roster=snap.exists?snap.data():null;   // read-only; no clone needed
-      if(document.getElementById("betDlg").open){ drawScope(); drawEntries(); }
-    },function(){ /* picker falls back to free text */ });
+  db.doc("league/roster").onSnapshot(function(snap){
+    state.roster=snap.exists?snap.data():null;   // read-only; no clone needed
+    if(document.getElementById("betDlg").open){ drawScope(); drawEntries(); }
+  },function(){ /* picker falls back to free text */ });
 
-    db.collection("bets").limit(1000).onSnapshot(function(snap){
-      remoteBets=snap.docs.map(function(d){
-        var v=clone(d.data())||{};
-        v.id=d.id;
-        if(!Array.isArray(v.entries)) v.entries=[];
-        if(!Array.isArray(v.paid)) v.paid=[];
-        return v;
-      });
-      if(state.local) return;
-      state.bets=remoteBets;
-      render();
-    },function(e){ toast(dbMsg(e)); });
-  }).catch(function(){ state.ready=true; render(); });
+  db.collection("bets").limit(1000).onSnapshot(function(snap){
+    remoteBets=snap.docs.map(function(d){
+      var v=clone(d.data())||{};
+      v.id=d.id;
+      if(!Array.isArray(v.entries)) v.entries=[];
+      if(!Array.isArray(v.paid)) v.paid=[];
+      return v;
+    });
+    if(state.local) return;
+    state.bets=remoteBets;
+    render();
+  },function(e){ toast(dbMsg(e)); });
+}
 })();
 </script>
