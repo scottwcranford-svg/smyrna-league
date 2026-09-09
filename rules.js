@@ -404,6 +404,21 @@ export function teamName(code,roster){
   return code;
 }
 
+// Teams with a game in a week, as a set. Empty when that week's schedule isn't
+// known — season-long bets, the playoffs, or before the schedule has loaded — and
+// an empty set filters nobody.
+export function teamsPlaying(week,games){
+  var w=Number(week)||0, out={};
+  if(!w) return out;
+  allGames(games).forEach(function(g){ if(Number(g.week)===w){ out[g.away]=1; out[g.home]=1; } });
+  return out;
+}
+// A roster row or a pick whose team sits out the week. `team` is the team code.
+export function onBye(team,playing){
+  var any=false; for(var k in playing){ any=true; break; }
+  return any&&!playing[team];
+}
+
 export function rosterSearch(q,scope,roster){
   q=String(q||"").trim().toLowerCase(); if(q.length<2) return [];
   var out=[], rows=rosterRows(roster);

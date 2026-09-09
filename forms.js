@@ -148,15 +148,30 @@ function gameSideText(side){
   if(side==="over"||side==="under") return (side==="over"?"Over ":"Under ")+state.draftLine;
   return teamName(side);
 }
+// The week the picker is picking for: the bet being joined, or the form's week select.
+function draftWeek(){
+  if(document.getElementById("joinDlg").open){ var b=findBet(state.joinId); return b?Number(b.week)||0:0; }
+  return Number(document.getElementById("bWeek").value)||0;
+}
+// The first pick whose team is off in the week, or null.
+function byePick(entries,week){
+  var playing=R.teamsPlaying(week,state.games), hit=null;
+  entries.forEach(function(e){ (e.picks||[]).forEach(function(p){ if(!hit&&R.onBye(p.team,playing)) hit=p; }); });
+  return hit;
+}
+
 export function drawSugg(i,q){
   var box=document.getElementById("sugg"+i); if(!box) return;
   // A player or defense can be on one side only — hide anything any side already holds.
   var taken={}; state.draft.forEach(function(e){ (e.picks||[]).forEach(function(p){ taken[p.id]=1; }); });
   var hits=rosterSearch(q,state.draftScope).filter(function(r){ return !taken[r[0]]; });
+  // On a weekly bet, anyone whose team is off that week is shown but can't be picked.
+  var playing=R.teamsPlaying(draftWeek(),state.games);
   box.hidden=!hits.length;
   box.innerHTML=hits.map(function(r){
-    return '<button type="button" data-act="dAdd" data-i="'+i+'" data-id="'+esc(r[0])+'">'+esc(r[1])+
-      (r[2]!=="DEF"?'<span class="tag">'+esc(r[2])+"</span>":"")+'<span class="team">'+esc(r[3])+"</span></button>";
+    var bye=R.onBye(r[3],playing);
+    return '<button type="button" data-act="dAdd" data-i="'+i+'" data-id="'+esc(r[0])+'"'+(bye?' disabled title="Off this week"':"")+'>'+esc(r[1])+
+      (r[2]!=="DEF"?'<span class="tag">'+esc(r[2])+"</span>":"")+(bye?'<span class="tag bye">bye</span>':"")+'<span class="team">'+esc(r[3])+"</span></button>";
   }).join("");
 }
 export function addPick(i,id){
@@ -305,6 +320,8 @@ export function submitBet(){
     var held={}, dup=null;
     state.draft.forEach(function(e){ (e.picks||[]).forEach(function(p){ if(held[p.id]) dup=p.name; held[p.id]=1; }); });
     if(dup) return toast(dup+" is on two sides");
+    var off=byePick(state.draft,wkPick);
+    if(off) return toast(off.name+" is off in week "+wkPick+" — pick someone who's playing");
   }
   var entries=state.draft.map(function(e){
     var out={ memberId:e.memberId||null, pick:(e.pick||"").trim() };
@@ -389,6 +406,8 @@ export function submitJoin(){
     var held={}; entriesOf(bet).forEach(function(e){ (e.picks||[]).forEach(function(p){ held[p.id]=1; }); });
     var dup=null; d.picks.forEach(function(p){ if(held[p.id]) dup=p.name; });
     if(dup) return toast(dup+" is already taken");
+    var off=byePick([d],bet.week);
+    if(off) return toast(off.name+" is off in week "+bet.week+" — pick someone who's playing");
   } else if(!(d.pick||"").trim()) return toast("Say what you're taking");
 
   var entry={ memberId:state.me, pick:(d.pick||"").trim() };

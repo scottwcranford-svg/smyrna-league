@@ -265,6 +265,9 @@ label.f > span{font-size:11px;font-weight:700;text-transform:uppercase;letter-sp
 .sugg button:hover,.sugg button:focus-visible{background:var(--surface-2);outline:none}
 .sugg .tag{font-size:10px;font-weight:800;color:var(--ink-3);background:var(--surface-2);padding:1px 6px;border-radius:4px}
 .sugg .team{margin-left:auto;font-size:11px;font-weight:800;color:var(--ink-2)}
+.sugg button:disabled{opacity:.45;cursor:not-allowed}
+.sugg button:disabled:hover{background:transparent}
+.sugg .tag.bye{color:var(--loss);background:transparent;border:1px solid currentColor}
 .entry-tag{font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);flex:0 0 46px}
 
 .roster{display:flex;flex-direction:column;gap:8px;margin-bottom:14px}

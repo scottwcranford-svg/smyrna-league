@@ -149,6 +149,20 @@ test("schedule CSV → first kickoff per week, Eastern → UTC across the clock 
   assert.equal(new Date(R.etToUtc("2026-07-04", "12:00")).toISOString(), "2026-07-04T16:00:00.000Z", "EDT is UTC-4");
 });
 
+test("bye weeks: teams without a game that week can't be picked", () => {
+  const games = { games: [
+    { id: "a", week: 5, away: "NE", home: "SEA", date: "2026-10-11T17:00:00Z" },
+    { id: "b", week: 5, away: "DET", home: "GB", date: "2026-10-11T17:00:00Z" },
+    { id: "c", week: 6, away: "KC", home: "NE", date: "2026-10-18T17:00:00Z" } ] };
+  const w5 = R.teamsPlaying(5, games);
+  assert.deepEqual(Object.keys(w5).sort(), ["DET", "GB", "NE", "SEA"]);
+  assert.equal(R.onBye("KC", w5), true, "KC sits out week 5");
+  assert.equal(R.onBye("NE", w5), false);
+  assert.equal(R.onBye("KC", R.teamsPlaying(0, games)), false, "season-long bets filter nobody");
+  assert.equal(R.onBye("KC", R.teamsPlaying(17, games)), false, "a week with no schedule filters nobody");
+  assert.equal(R.onBye("KC", R.teamsPlaying(5, null)), false, "no schedule loaded yet");
+});
+
 test("small helpers", () => {
   assert.equal(R.shortName(["1", "Amon-Ra St. Brown", "WR", "DET"]), "St. Brown");
   assert.equal(R.shortName(["HOU", "Houston Texans", "DEF", "HOU"]), "Texans");
