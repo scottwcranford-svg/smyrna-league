@@ -266,19 +266,19 @@ test("weekly high / low: a running tally on the ledger cards and a week-by-week 
     const { state } = await import("./state.js?v=dev"); const V = await import("./render.js?v=dev");
     V.render();
     const empty = document.getElementById("highlow").textContent;
-    const before = [...document.querySelectorAll("#board .fig.hl")].map(f => [f.querySelector("b").textContent, f.querySelector("span").textContent]);
+    const before = document.querySelectorAll("#board .fig").length;
     state.highlow = { weeks: {
       "1": { high: [{ id: "a", name: "Alice", pts: 148.4 }], low: [{ id: "c", name: "Cara", pts: 92.1 }] },
       "2": { high: [{ id: "a", name: "Alice", pts: 131 }], low: [{ id: "b", name: "Bob", pts: 88.6 }] } } };
     V.render();
-    return { empty, before,
-      cards: [...document.querySelectorAll("#board .seat")].map(s => [s.querySelector(".seat-name").textContent, s.querySelector(".fig.hl b").textContent, s.querySelector(".fig.hl b").className, s.querySelector(".fig.hl span").textContent]),
+    return { empty, before, after: document.querySelectorAll("#board .fig").length,
+      standings: [...document.querySelectorAll("#highlow .hl-stand")].map(s => [s.querySelector(".hl-name").textContent, s.querySelector("b").textContent, s.querySelector("b").className, s.querySelector("small").textContent, s.classList.contains("me")]),
       rows: [...document.querySelectorAll("#highlow .hl-row")].map(r => [r.querySelector(".wk").textContent, r.querySelector(".high .hl-name").textContent, r.querySelector(".high i").textContent, r.querySelector(".low .hl-name").textContent, r.querySelector(".low i").textContent]),
       note: document.getElementById("hlNote").textContent };
   });
   assert.match(out.empty, /top Sleeper score takes \$5/, "explains itself before any week is final");
-  assert.deepEqual(out.before, [["$0", "hi / low"], ["$0", "hi / low"], ["$0", "hi / low"]], "the figure is there from the start");
-  assert.deepEqual(out.cards, [["Alice", "+$10", "pos", "2 hi · 0 low"], ["Bob", "−$5", "neg", "0 hi · 1 low"], ["Cara", "−$5", "neg", "0 hi · 1 low"]]);
+  assert.equal(out.before, 12); assert.equal(out.after, 12, "the ledger cards keep their four figures; hi/low stays out of them");
+  assert.deepEqual(out.standings, [["Alice", "+$10", "pos", "2 hi · 0 low", true], ["Bob", "−$5", "neg", "0 hi · 1 low", false], ["Cara", "−$5", "neg", "0 hi · 1 low", false]], "its own standings, net first, you marked");
   assert.deepEqual(out.rows, [["WK 2", "Alice", "+$5", "Bob", "−$5"], ["WK 1", "Alice", "+$5", "Cara", "−$5"]], "latest week first");
   assert.equal(out.note, "2 weeks in · $5 a week · Alice leads at +$10");
   assert.deepEqual(errors, []);

@@ -327,7 +327,14 @@ h1,h2,h3,.terms,.login-brand h1{font-family:"Poppins","Inter",system-ui,sans-ser
 .tag.pos-QB{color:#FF2B6D} .tag.pos-RB{color:#00CEB8} .tag.pos-WR{color:#58A7FF} .tag.pos-TE{color:#FFAE58} .tag.pos-K{color:#BD66FF}
 
 /* ---- weekly high / low ---- */
-.fig.hl b.pos{color:var(--win)} .fig.hl b.neg{color:var(--loss)}
+.hl-standings{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin-bottom:10px}
+.hl-stand{display:grid;grid-template-columns:auto 1fr auto;grid-template-areas:"av name net" "av count net";column-gap:8px;align-items:center;background:var(--surface);border:1px solid var(--rule);border-radius:12px;padding:8px 11px}
+.hl-stand.me{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.hl-stand .avatar{grid-area:av}
+.hl-stand .hl-name{grid-area:name;font-weight:700;font-size:12.5px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hl-stand small{grid-area:count;font-size:10.5px;color:var(--ink-3)}
+.hl-stand b{grid-area:net;font-size:15px;font-weight:800;font-variant-numeric:tabular-nums}
+.hl-stand b.pos{color:var(--win)} .hl-stand b.neg{color:var(--loss)} .hl-stand b.flat{color:var(--ink-3)}
 .hl-table{display:flex;flex-direction:column;gap:6px}
 .hl-row{display:grid;grid-template-columns:auto 1fr 1fr;gap:12px;align-items:center;background:var(--surface);border:1px solid var(--rule);border-radius:12px;padding:9px 13px}
 .hl-side{display:flex;align-items:center;gap:8px;min-width:0;font-size:13px}

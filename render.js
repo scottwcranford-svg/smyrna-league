@@ -158,7 +158,15 @@ function highLow(){
   }
   var who=function(list){ return list.map(function(r){ return (r.id?avatarHtml(r.id,20):"")+'<span class="hl-name">'+esc(r.id?mName(r.id):r.name)+"</span>"; }).join('<span class="hl-tie">·</span>'); };
   var pts=function(list){ return list.length?String(list[0].pts):""; };
-  host.innerHTML='<div class="hl-table">'+HL.weeks.slice().reverse().map(function(w){
+  // Standings for this pool alone: every manager, net first, then the weeks under it.
+  var standing=realMembers().filter(function(m){ return !m.test; }).map(function(m){ return { m:m, t:HL.byId[m.id]||{ net:0, highs:0, lows:0 } }; })
+    .sort(function(a,b){ return (b.t.net-a.t.net)||(b.t.highs-a.t.highs)||a.m.name.localeCompare(b.m.name); });
+  var strip='<div class="hl-standings">'+standing.map(function(s){
+    return '<div class="hl-stand'+(s.m.id===state.me?" me":"")+'">'+avatarHtml(s.m.id,22)+'<span class="hl-name">'+esc(s.m.name)+"</span>"+
+      '<b class="'+(s.t.net>0?"pos":s.t.net<0?"neg":"flat")+'">'+signed(s.t.net)+"</b>"+
+      '<small>'+s.t.highs+" hi · "+s.t.lows+" low</small></div>";
+  }).join("")+"</div>";
+  host.innerHTML=strip+'<div class="hl-table">'+HL.weeks.slice().reverse().map(function(w){
     var e=state.highlow.weeks[String(w)];
     return '<div class="hl-row"><span class="wk">'+esc(weekLabel(w))+"</span>"+
       '<span class="hl-side high">'+who(e.high)+'<b>'+esc(pts(e.high))+"</b><i>"+signed(stake/e.high.length)+"</i></span>"+
@@ -182,13 +190,8 @@ function board(){
     var ra=(L.risk[b.id]||0)-(L.risk[a.id]||0); if(ra) return ra;
     return a.name.localeCompare(b.name);
   });
-  var HL=R.hlTally(state.highlow,members(),R.hlStake(state.config)), anyHL=HL.weeks.length>0;
   host.innerHTML=list.map(function(m){
     var p=L.pnl[m.id], played=p.w+p.l+p.p;
-    var h=HL.byId[m.id]||{ net:0, highs:0, lows:0 };
-    // the weekly high / low tally, a figure like the others; the label carries the week counts
-    var hlFig='<div class="fig hl"><b class="'+(h.net>0?"pos":h.net<0?"neg":"zero")+'">'+signed(h.net)+"</b><span>"+
-      ((h.highs||h.lows)?h.highs+" hi · "+h.lows+" low":"hi / low")+"</span></div>";
     var cls=p.net>0?"pos":p.net<0?"neg":"flat";
     var inPlay=L.risk[m.id]||0, proposed=L.offered[m.id]||0, gone=L.cancelled[m.id]||0;
     var mine=L.picks[m.id]||[];
@@ -201,7 +204,6 @@ function board(){
         fig("stake",inPlay,"in play")+fig("prop",proposed,"proposed")+fig("gone",gone,"cancelled")+
         '<div class="fig net"><b class="'+cls+'">'+signed(p.net)+"</b><span>"+
           (played?p.w+"–"+p.l+(p.p?"–"+p.p:"")+" settled":"settled")+"</span></div>"+
-        hlFig+
       "</div>"+
       '<div class="seat-picks'+(mine.length?"":" none")+'">'+
         (mine.length?esc(mine.join(" · ")):"no action yet")+"</div>"+
