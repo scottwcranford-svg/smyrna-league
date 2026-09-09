@@ -294,6 +294,7 @@ footer.foot{margin-top:36px;padding-top:16px;border-top:1px solid var(--rule);fo
       <span class="lbl" id="meLbl">Not signed in</span>
       <span class="me-name" id="meName" hidden></span>
       <button class="btn pri" id="signInBtn" hidden>Sign in</button>
+      <button class="btn" id="pwBtn" hidden>Change password</button>
       <button class="btn" id="signOutBtn" hidden>Sign out</button>
       <button class="btn" id="rosterBtn">League</button>
     </div>
@@ -418,6 +419,21 @@ footer.foot{margin-top:36px;padding-top:16px;border-top:1px solid var(--rule);fo
     <div class="form-foot">
       <button class="btn pri lg" id="siGo">Sign in</button>
       <span class="hint" id="siHint"></span>
+    </div>
+  </div>
+</dialog>
+
+<dialog id="pwDlg">
+  <form method="dialog" class="dlg-head"><h3>Change your password</h3><button class="btn" value="cancel">Close</button></form>
+  <div class="dlg-body">
+    <p class="bet-desc" style="margin:0 0 12px">Only yours. An admin can reset anyone's from the League screen.</p>
+    <div class="grid c2">
+      <label class="f"><span>Current password</span><input class="field" id="pwCur" type="password" autocomplete="current-password"></label>
+      <label class="f"><span>New password</span><input class="field" id="pwNew" type="password" autocomplete="new-password" placeholder="at least 6 characters"></label>
+    </div>
+    <div class="form-foot">
+      <button class="btn pri lg" id="pwGo">Change it</button>
+      <span class="hint" id="pwHint"></span>
     </div>
   </div>
 </dialog>
@@ -784,6 +800,7 @@ function head(){
   var nm=document.getElementById("meName"); nm.hidden=!signed; nm.textContent=signed?mName(state.me):"";
   document.getElementById("signInBtn").hidden=signed||!canSign;
   document.getElementById("signOutBtn").hidden=!signed;
+  document.getElementById("pwBtn").hidden=!signed;
 }
 
 function banner(){
@@ -1948,6 +1965,21 @@ function submitSignIn(){
     hint.textContent=authMsg(e);
   });
 }
+// A signed-in manager changes their own password — nobody else's. Firebase requires
+// a fresh sign-in first, which is what the current password is for.
+function changeOwnPassword(){
+  var user=firebase.auth().currentUser, hint=document.getElementById("pwHint");
+  if(!user) return toast("Sign in first");
+  var cur=document.getElementById("pwCur").value, nw=document.getElementById("pwNew").value;
+  if(!cur) return toast("Enter your current password");
+  if(!nw||nw.length<6) return toast("New password needs at least 6 characters");
+  hint.textContent="Changing…";
+  var cred=firebase.auth.EmailAuthProvider.credential(user.email,cur);
+  user.reauthenticateWithCredential(cred).then(function(){ return user.updatePassword(nw); }).then(function(){
+    document.getElementById("pwCur").value=""; document.getElementById("pwNew").value=""; hint.textContent="";
+    document.getElementById("pwDlg").close(); toast("Password changed");
+  }).catch(function(e){ hint.textContent=authMsg(e); });
+}
 // The admin sets or changes a manager's password. Account creation runs on a
 // second Firebase app instance so the admin's own session stays signed in.
 function setPassword(memberId,pw){
@@ -2167,6 +2199,11 @@ document.getElementById("bAddSide").addEventListener("click",function(e){
 });
 document.getElementById("signInBtn").addEventListener("click",openSignIn);
 document.getElementById("signOutBtn").addEventListener("click",function(){ firebase.auth().signOut(); toast("Signed out"); });
+document.getElementById("pwBtn").addEventListener("click",function(){
+  document.getElementById("pwCur").value=""; document.getElementById("pwNew").value=""; document.getElementById("pwHint").textContent="";
+  document.getElementById("pwDlg").showModal(); document.getElementById("pwCur").focus();
+});
+document.getElementById("pwGo").addEventListener("click",function(e){ e.preventDefault(); changeOwnPassword(); });
 document.getElementById("siGo").addEventListener("click",function(e){ e.preventDefault(); submitSignIn(); });
 document.getElementById("siPw").addEventListener("keydown",function(e){ if(e.key==="Enter"){ e.preventDefault(); submitSignIn(); } });
 document.getElementById("rAdd").addEventListener("click",function(e){

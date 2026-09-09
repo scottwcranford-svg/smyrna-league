@@ -122,6 +122,8 @@ Firebase just needs an email-shaped identifier.
 - **Setting a password** creates the manager's account (on a second Firebase app
   instance so the admin stays signed in). Changing one asks for the current password;
   if it's lost, delete the user in Firebase console → Authentication and set it again.
+- **Anyone signed in** can change their own password (header → Change password; asks
+  for the current one). Nobody can change anyone else's except an admin.
 - **First admin sign-in** creates the admin's own account with whatever password they
   type, as long as they're already listed in `adminEmails`.
 - Firebase console, once: Authentication → Sign-in method → **Email/Password → Enable**
