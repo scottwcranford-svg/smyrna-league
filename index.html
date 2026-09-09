@@ -297,7 +297,7 @@ footer.foot{margin-top:36px;padding-top:16px;border-top:1px solid var(--rule);fo
     </form>
     <div class="hint" id="siHint"></div>
     <button type="button" class="btn" id="siReset" hidden>Start over on this device</button>
-    <div class="hint" id="siVer" style="font-size:10px;opacity:.6">build 10</div>
+    <div class="hint" id="siVer" style="font-size:10px;opacity:.6">build 11</div>
   </div>
 </div>
 
@@ -1910,6 +1910,7 @@ function submitLogin(){
     return firebase.auth().signInWithEmailAndPassword(slugName(name)+"@"+AUTH_DOMAIN,pw)
       .then(function(cred){
         hint.textContent="Opening the book…";
+        state.typedPw=pw;
         // if this browser was already signed in, auth state won't "change" — open the book directly
         enterBook(cred.user||firebase.auth().currentUser);
       })
@@ -1923,7 +1924,7 @@ function enterBook(user){
   if(!key){ showLogin("Signed in — now the league passcode."); return; }
   if(!state.db){ state.db=makeDb(key); state.connected=true; subscribeBook(state.db); }
   else if(!state.local){ document.getElementById("login").hidden=true; document.getElementById("app").hidden=false; render(); }
-  enforceFreshPassword(user);
+  if(state.typedPw){ enforceFreshPassword(user,state.typedPw); state.typedPw=null; }
   // If the book hasn't opened shortly, say why on the login screen instead of sitting there.
   clearTimeout(state.bookTimer);
   var t0=Date.now();
@@ -1939,10 +1940,11 @@ function enterBook(user){
 
 // Still on the default password? Prove it (a silent re-sign-in with the default) and,
 // if so, require a new one before anything else. Runs at every sign-in and page load.
-function enforceFreshPassword(user){
-  var m=user?memberForEmail(user.email):null; if(!m) return;
-  var cred=firebase.auth.EmailAuthProvider.credential(user.email,defaultPw(m));
-  user.reauthenticateWithCredential(cred).then(function(){ forcePasswordChange(m); }).catch(function(){ /* not the default — fine */ });
+// Decided at sign-in from the password actually typed — never by probing Firebase,
+// which counts every probe as a failed login and eventually throttles the account.
+function enforceFreshPassword(user,typedPw){
+  var m=user?memberForEmail(user.email):null; if(!m||!typedPw) return;
+  if(typedPw===defaultPw(m)) forcePasswordChange(m);
 }
 function forcePasswordChange(m){
   var dlg=document.getElementById("pwDlg");
