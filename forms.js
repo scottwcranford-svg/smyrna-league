@@ -4,7 +4,7 @@
 
 import * as R from "./rules.js?v=dev";
 import { state, members, realMembers } from "./state.js?v=dev";
-import { toast, statusTagsHtml } from "./render.js?v=dev";
+import { toast, statusTagsHtml, logoHtml } from "./render.js?v=dev";
 import { guard, findBet, saveBet } from "./book.js?v=dev";
 import { dbMsg } from "./store.js?v=dev";
 
@@ -119,7 +119,7 @@ export function drawEntries(hostId){
       else choices=[[g.away,teamName(g.away)],[g.home,teamName(g.home)]];
       if(i===0){
         pickUi='<div class="side-chips">'+(choices.length?choices.map(function(c){
-          return '<button type="button" class="chip" data-act="dSide" data-i="'+i+'" data-side="'+esc(c[0])+'" aria-pressed="'+(e.side===c[0])+'">'+esc(c[1])+"</button>";
+          return '<button type="button" class="chip" data-act="dSide" data-i="'+i+'" data-side="'+esc(c[0])+'" aria-pressed="'+(e.side===c[0])+'">'+logoHtml(c[0],16)+esc(c[1])+"</button>";
         }).join(""):'<span class="hint">Pick a game above</span>')+"</div>";
       } else {
         // the opponent's side is whatever you didn't take
@@ -183,7 +183,7 @@ export function drawSugg(i,q){
     var bye=R.onBye(r[3],playing), pt=projText(r[0]);
     return '<button type="button" data-act="dAdd" data-i="'+i+'" data-id="'+esc(r[0])+'"'+(bye?' disabled title="Off this week"':"")+'>'+esc(r[1])+
       (r[2]!=="DEF"?'<span class="tag pos-'+esc(r[2])+'">'+esc(r[2])+"</span>":"")+statusTagsHtml(r[0])+(bye?'<span class="tag bye">bye</span>':"")+
-      (pt?'<span class="proj" title="Sleeper projection">'+esc(pt)+"</span>":"")+'<span class="team">'+esc(r[3])+"</span></button>";
+      (pt?'<span class="proj" title="Sleeper projection">'+esc(pt)+"</span>":"")+'<span class="team">'+logoHtml(r[3],14)+esc(r[3])+"</span></button>";
   }).join("");
 }
 export function addPick(i,id){

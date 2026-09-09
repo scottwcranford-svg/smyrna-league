@@ -75,6 +75,10 @@ test("a proposer sees the open seat, not a Take it button; anyone else gets the 
     state.me = "a"; V.render();
     res.projRows = [...document.querySelectorAll(".srow")].map(r => [r.querySelector(".s-lab").textContent, r.querySelector("b").firstChild.textContent, !!r.querySelector("b.proj"), r.classList.contains("lead")]);
     res.projNote = (document.querySelector(".proj-note") || {}).textContent || "";
+    const file = i => i.getAttribute("src").split("/").pop();
+    res.logos = { gameline: [...document.querySelectorAll(".gameline img.tlogo")].map(file), sides: [...document.querySelectorAll(".side-pick img.tlogo")].map(file),
+      rows: [...document.querySelectorAll(".srow .s-team img.tlogo")].map(file), ticker: [...document.querySelectorAll(".ticker .game")].every(g => g.querySelectorAll("img.tlogo").length === 2),
+      size: (i => i && getComputedStyle(i).width)(document.querySelector(".gameline img.tlogo")) };
     // once something has been played, actuals take over and the projection sits beside them
     pot.stats.rows[0].values = { rec_yd: 12 }; V.render();
     res.playedRows = [...document.querySelectorAll(".srow")].map(r => [r.querySelector(".s-lab").textContent, r.querySelector("b").firstChild.textContent, (r.querySelector("b small.proj-was") || {}).textContent || "", r.classList.contains("lead")]);
@@ -98,6 +102,10 @@ test("a proposer sees the open seat, not a Take it button; anyone else gets the 
   assert.deepEqual(out.byeTags, [["Ja'Marr Chase", true], ["Drake Maye", false]], "the CIN row wears a bye tag in week 5");
   assert.deepEqual(out.projRows, [["Ja'Marr Chase", "61.5", true, false], ["Drake Maye", "88.2", true, true]], "projections for the bet's stat, projected leader marked");
   assert.match(out.projNote, /Projected by Sleeper/);
+  assert.deepEqual(out.logos.gameline, ["ne.png", "sea.png"], "logos on the game line");
+  assert.deepEqual(out.logos.sides, ["ne.png", "sea.png"], "and on each side's pick");
+  assert.deepEqual(out.logos.rows, ["cin.png", "ne.png"], "and on standings rows");
+  assert.equal(out.logos.ticker, true, "and both teams in every ticker game"); assert.equal(out.logos.size, "18px");
   assert.deepEqual(out.playedRows, [["Ja'Marr Chase", "12", "p 61.5", true], ["Drake Maye", "0", "p 88.2", false]], "actuals lead once played; projection beside them");
   assert.equal(out.playedNote, false);
   assert.deepEqual(out.ticks, [["70%", "absolute"], ["100%", "absolute"]], "a tick at each projection, bars scaled to the larger of actual and projected");
@@ -160,7 +168,8 @@ test("bye week: off teams are greyed in the picker and refused on post or join",
       stats: { scope: "player", tracks: [{ stat: "rec_yd" }] }, entries: [{ memberId: "b", picks: [{ id: "3", name: "Drake Maye", pos: "QB", team: "NE" }] }] }];
     state.joinId = "j1"; state.draftScope = "player"; state.draft = [{ memberId: "a", pick: "", picks: [] }]; F.drawEntries("jEntries"); document.getElementById("joinDlg").showModal();
     F.drawSugg(0, "chase"); const joinChase = [...document.querySelectorAll("#jEntries #sugg0 button")].map(x => [x.textContent, x.disabled]);
-    return { w5chase, w5maye, w5def, w0chase, w5saved, w5toast, w0saved, joinChase };
+    const pickerLogos = document.querySelectorAll("#jEntries #sugg0 button .team img.tlogo").length;
+    return { w5chase, w5maye, w5def, w0chase, w5saved, w5toast, w0saved, joinChase, pickerLogos };
   });
   assert.deepEqual(out.w5chase.map(r => r[1]), [true, true], "both CIN rows disabled");
   assert.equal(out.w5chase[0][2], "0.45"); assert.equal(out.w5chase[0][3], true, "bye tag shown");
@@ -168,6 +177,7 @@ test("bye week: off teams are greyed in the picker and refused on post or join",
   assert.deepEqual(out.w5chase.map(r => r[5]), ["0 rec yds", "61.5 rec yds"], "the picker shows the projection for the selected stat and week");
   assert.deepEqual(out.w0chase.map(r => r[5]), ["0 rec yds", "1210 rec yds"], "a season-long bet shows the season projection");
   assert.deepEqual(out.w5chase.map(r => r[4]), [[], ["Q"]], "the picker tags the questionable player");
+  assert.equal(out.pickerLogos, 2, "a logo beside each team code in the picker");
   assert.equal(out.w5def[0][1], true, "KC's defense is off too");
   assert.deepEqual(out.w0chase.map(r => r[1]), [false, false], "season-long filters nobody");
   assert.equal(out.w5saved, 0); assert.match(out.w5toast, /off in week 5/);

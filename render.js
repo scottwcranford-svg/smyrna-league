@@ -38,6 +38,14 @@ export function avatarHtml(id,size){
   if(hash) return '<img class="avatar" src="https://sleepercdn.com/avatars/thumbs/'+esc(hash)+'" width="'+size+'" height="'+size+'" alt="" title="'+esc(m.name)+'" style="width:'+size+'px;height:'+size+'px">';
   return '<span class="avatar" style="width:'+size+'px;height:'+size+'px;background:'+esc(m.color)+';font-size:'+fs+'px">'+esc(initials(m.name))+"</span>";
 }
+// An NFL team's logo from Sleeper's CDN, by team code; nothing for over/under, free agents or blanks.
+export function logoHtml(code,size){
+  code=String(code||"").trim().toUpperCase(); if(!/^[A-Z]{2,3}$/.test(code)||code==="FA") return "";
+  size=size||16;
+  return '<img class="tlogo" src="https://sleepercdn.com/images/team_logos/nfl/'+code.toLowerCase()+'.png" width="'+size+'" height="'+size+'" alt="" loading="lazy">';
+}
+// Logos for a team tag that may hold several codes ("CIN · MIN" on a combined pick).
+function teamLogos(text,size){ return String(text||"").split(" · ").map(function(c){ return logoHtml(c,size); }).join(""); }
 // Status tags for a pick id: Q, OUT, IR… from the roster as it is now, not as it was when the bet was made.
 export function statusTagsHtml(id){
   return R.statusOf(id,state.roster).map(function(c){
@@ -80,19 +88,19 @@ export function ticker(){
     var st=g.status||(scored?"final":(now>=t?"live":"pre"));
     if(st==="final"&&scored){
       var aw=g.awayScore>g.homeScore, hw=g.homeScore>g.awayScore;
-      return '<span class="game"><span class="tm '+(aw?"win":"lose")+'">'+esc(g.away)+' <b class="sc">'+g.awayScore+"</b></span>"+
-        '<span class="at">·</span><span class="tm '+(hw?"win":"lose")+'">'+esc(g.home)+' <b class="sc">'+g.homeScore+"</b></span>"+
+      return '<span class="game"><span class="tm '+(aw?"win":"lose")+'">'+logoHtml(g.away,14)+esc(g.away)+' <b class="sc">'+g.awayScore+"</b></span>"+
+        '<span class="at">·</span><span class="tm '+(hw?"win":"lose")+'">'+logoHtml(g.home,14)+esc(g.home)+' <b class="sc">'+g.homeScore+"</b></span>"+
         '<span class="final">Final'+(g.ot?" · OT":"")+"</span></span>";
     }
     if(st==="live"){
       // score as of the last refresh, plus quarter, clock and who has the ball
       var qlabel=g.ot?"OT":(g.q?"Q"+g.q:(g.ql||""));
       var poss=function(team){ return g.pos===team?' <span class="ball'+(g.rz?" rz":"")+'">◀</span>':""; };
-      return '<span class="game"><span class="tm">'+esc(g.away)+(scored?' <b class="sc">'+g.awayScore+"</b>":"")+poss(g.away)+"</span>"+
-        '<span class="at">·</span><span class="tm">'+esc(g.home)+(scored?' <b class="sc">'+g.homeScore+"</b>":"")+poss(g.home)+"</span>"+
+      return '<span class="game"><span class="tm">'+logoHtml(g.away,14)+esc(g.away)+(scored?' <b class="sc">'+g.awayScore+"</b>":"")+poss(g.away)+"</span>"+
+        '<span class="at">·</span><span class="tm">'+logoHtml(g.home,14)+esc(g.home)+(scored?' <b class="sc">'+g.homeScore+"</b>":"")+poss(g.home)+"</span>"+
         '<span class="live">'+esc((qlabel+" "+(g.clock||"")).trim()||"Live")+"</span></span>";
     }
-    return '<span class="game"><span class="tm">'+esc(g.away)+'</span><span class="at">@</span><span class="tm">'+esc(g.home)+"</span>"+
+    return '<span class="game"><span class="tm">'+logoHtml(g.away,14)+esc(g.away)+'</span><span class="at">@</span><span class="tm">'+logoHtml(g.home,14)+esc(g.home)+"</span>"+
       '<span class="when">'+esc(fmtKick(t))+"</span></span>";
   }).join("");
   // two copies make the loop seamless; speed scales with how much is on the strip
@@ -268,7 +276,7 @@ function sideHtml(e,i,b){
   var canTake=vacant&&state.me&&!isLocked(b)&&!invited&&!onIt;
   return '<div class="'+cls+(invited?" invited":"")+'">'+
     (vacant?(invited?'<span class="avatar-wait">'+avatarHtml(invited,28)+"</span>":openAvatarHtml(28)):avatarHtml(e.memberId,28))+'<div>'+
-    '<div class="side-pick">'+esc(pick)+"</div>"+
+    '<div class="side-pick">'+(b.game?logoHtml(e.side,18):"")+esc(pick)+"</div>"+
     '<div class="side-who">'+esc(who)+"</div>"+
     (canTake?'<button class="btn" style="margin-top:5px" data-act="take" data-id="'+esc(b.id)+'" data-i="'+i+'">Take it</button>':"")+
   "</div></div>";
@@ -282,7 +290,7 @@ function gamelineHtml(b){
   var aw=scored&&g.awayScore>g.homeScore, hw=scored&&g.homeScore>g.awayScore;
   var ball=function(team){ return st==="live"&&g.pos===team?' <span class="ball'+(g.rz?" rz":"")+'">◀</span>':""; };
   var team=function(code,score,lost){
-    return '<span class="gl-team'+(st==="final"&&lost?" lose":"")+'"><span>'+esc(code)+"</span>"+
+    return '<span class="gl-team'+(st==="final"&&lost?" lose":"")+'">'+logoHtml(code,18)+'<span>'+esc(code)+"</span>"+
       (scored?'<span class="sc">'+score+"</span>":"")+ball(code)+"</span>";
   };
   var stateHtml;
@@ -333,7 +341,7 @@ function stripHtml(S,ents,week){
           '<span class="sname">'+
             (owner?'<span class="dot" style="background:'+esc(own)+'"></span>':"")+
             '<span class="s-lab">'+esc(r.label||(owner?mName(owner):"Open seat"))+"</span>"+
-            (r.team?'<span class="s-team">'+esc(r.team)+"</span>":"")+
+            (r.team?'<span class="s-team">'+teamLogos(r.team,12)+esc(r.team)+"</span>":"")+
             statusTagsHtml(r.id||r.key)+
             (onBye(r)?'<span class="s-bye" title="Off this week">bye</span>':"")+
             (owner&&r.label?'<span class="s-own">'+esc(mName(owner))+"</span>":"")+
