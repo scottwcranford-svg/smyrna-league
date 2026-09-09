@@ -146,6 +146,9 @@ if(!window.FIREBASE_CONFIG||!window.FIREBASE_CONFIG.projectId||!window.firebase)
   S.initFirebase();
   S.storedKey();   // scrub a ?key= link into device memory right away
   A.onAuthStateChanged(function(user){
+    // The login card is plain HTML and shows before Firebase is ready; a sign-in
+    // started before this first callback can hang. The button opens here.
+    document.getElementById("siGo").disabled=false;
     applyAuth(user);
     if(user) enterBook(user);
     else { if(state.db){ location.reload(); return; } showLogin(); }
