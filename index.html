@@ -426,7 +426,7 @@ footer.foot{margin-top:36px;padding-top:16px;border-top:1px solid var(--rule);fo
 <dialog id="pwDlg">
   <form method="dialog" class="dlg-head"><h3>Change your password</h3><button class="btn" value="cancel">Close</button></form>
   <div class="dlg-body">
-    <p class="bet-desc" style="margin:0 0 12px">Only yours. An admin can reset anyone's from the League screen.</p>
+    <p class="bet-desc" style="margin:0 0 12px">Only yours. An admin can reset anyone's from the League screen; a reset puts you back on the starting password and you'll be asked to pick a new one.</p>
     <div class="grid c2">
       <label class="f"><span>Current password</span><input class="field" id="pwCur" type="password" autocomplete="current-password"></label>
       <label class="f"><span>New password</span><input class="field" id="pwNew" type="password" autocomplete="new-password" placeholder="at least 6 characters"></label>
@@ -1965,6 +1965,23 @@ function submitSignIn(){
     hint.textContent=authMsg(e);
   });
 }
+// Still on the default password? Prove it (a silent re-sign-in with the default) and,
+// if so, require a new one before anything else. Runs at every sign-in and page load.
+function enforceFreshPassword(user){
+  var m=user?memberForEmail(user.email):null; if(!m) return;
+  var cred=firebase.auth.EmailAuthProvider.credential(user.email,defaultPw(m));
+  user.reauthenticateWithCredential(cred).then(function(){ forcePasswordChange(m); }).catch(function(){ /* not the default — fine */ });
+}
+function forcePasswordChange(m){
+  var dlg=document.getElementById("pwDlg");
+  state.mustChange=true;
+  document.getElementById("pwCur").value=defaultPw(m);
+  document.getElementById("pwNew").value="";
+  document.getElementById("pwHint").textContent="You're on the starting password. Pick your own to continue.";
+  if(!dlg.open) dlg.showModal();
+  document.getElementById("pwNew").focus();
+}
+document.getElementById("pwDlg").addEventListener("cancel",function(e){ if(state.mustChange) e.preventDefault(); });
 // A signed-in manager changes their own password — nobody else's. Firebase requires
 // a fresh sign-in first, which is what the current password is for.
 function changeOwnPassword(){
@@ -1973,10 +1990,13 @@ function changeOwnPassword(){
   var cur=document.getElementById("pwCur").value, nw=document.getElementById("pwNew").value;
   if(!cur) return toast("Enter your current password");
   if(!nw||nw.length<6) return toast("New password needs at least 6 characters");
+  var mm=memberForEmail(user.email);
+  if(mm&&nw===defaultPw(mm)) return toast("That's the starting password — pick a different one");
   hint.textContent="Changing…";
   var cred=firebase.auth.EmailAuthProvider.credential(user.email,cur);
   user.reauthenticateWithCredential(cred).then(function(){ return user.updatePassword(nw); }).then(function(){
     document.getElementById("pwCur").value=""; document.getElementById("pwNew").value=""; hint.textContent="";
+    state.mustChange=false;
     document.getElementById("pwDlg").close(); toast("Password changed");
   }).catch(function(e){ hint.textContent=authMsg(e); });
 }
@@ -2241,7 +2261,7 @@ connectDb().then(function(db){
     state.ready=true;
     if(!db){ render(); return; }
     state.db=db; state.connected=true;
-    firebase.auth().onAuthStateChanged(function(user){ applyAuth(user); render(); });
+    firebase.auth().onAuthStateChanged(function(user){ applyAuth(user); render(); if(user) enforceFreshPassword(user); });
 
     // Keep the book current from this browser: scores every minute during games,
     // a full refresh hourly. Leases keep it to one writer across all open pages.
