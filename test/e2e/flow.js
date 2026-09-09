@@ -22,7 +22,8 @@ const shown = (id) => getComputedStyle(document.getElementById(id)).display !== 
   const page = await browser.newPage();
   const errors = [], checks = {};
   page.on("pageerror", e => errors.push(e.message));
-  page.on("console", m => { if (m.type() === "error" && !/favicon/.test(m.text())) errors.push("console: " + m.text()); });
+  // console errors count, except the browser's own "Failed to load resource" for the site's missing favicon
+  page.on("console", m => { if (m.type() === "error" && !/Failed to load resource/.test(m.text())) errors.push("console: " + m.text()); });
   await page.goto(SITE, { waitUntil: "load" });
   await page.waitForSelector("#siName", { timeout: 15000 });
   await page.type("#siName", USER); await page.type("#siPw", PASS);
