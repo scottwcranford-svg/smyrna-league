@@ -346,3 +346,18 @@ h1,h2,h3,.terms,.login-brand h1{font-family:"Poppins","Inter",system-ui,sans-ser
 .hl-side i{font-style:normal;font-weight:800;font-variant-numeric:tabular-nums;flex:none}
 .hl-side.high i{color:var(--win)} .hl-side.low i{color:var(--loss)}
 @media (max-width:640px){ .hl-row{grid-template-columns:auto 1fr} .hl-row .hl-side.low{grid-column:2} }
+
+/* ---- the season table in Settle Up: managers across, pools down ---- */
+.pivot-wrap{overflow-x:auto;margin-bottom:10px;background:var(--surface);border:1px solid var(--rule);border-radius:14px}
+.pivot{border-collapse:collapse;width:100%;min-width:640px;font-size:13px}
+.pivot th,.pivot td{padding:8px 10px;border-bottom:1px solid var(--rule);white-space:nowrap}
+.pivot thead th{font-size:11px;font-weight:800;letter-spacing:.04em;color:var(--ink-2);text-align:left;vertical-align:bottom}
+.pivot thead th.me{color:var(--accent)}
+.pivot thead th.me .pv-head{box-shadow:0 0 0 1px var(--accent);border-radius:99px}
+.pivot .pv-head{display:inline-flex;align-items:center;gap:6px;padding:2px 8px 2px 2px;max-width:150px}
+.pivot .pv-head span{overflow:hidden;text-overflow:ellipsis}
+.pivot tbody th{text-align:left;font-weight:700;color:var(--ink-2);font-size:12px;letter-spacing:.04em;text-transform:uppercase;position:sticky;left:0;background:var(--surface)}
+.pivot td.num{text-align:right;font-variant-numeric:tabular-nums;font-weight:700}
+.pivot td.pos{color:var(--win)} .pivot td.neg{color:var(--loss)} .pivot td.flat{color:var(--ink-3)}
+.pivot tr.total th,.pivot tr.total td{border-bottom:0;border-top:1px solid var(--rule-2);font-weight:800;font-size:14px}
+.pivot tr.total th{color:var(--ink)}

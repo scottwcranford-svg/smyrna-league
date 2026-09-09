@@ -84,6 +84,13 @@ test("ledger: winner collects the stake from each loser, unpaid debts net pairwi
   assert.equal(L.risk.m0, 0, "an open bet isn't in play yet"); assert.equal(L.offered.m0, 15); assert.equal(L.offered.m1, 0);
   assert.equal(L.cancelled.m0, 40, "no takers by lock counts"); assert.equal(L.cancelled.m2, 0, "pulled by hand doesn't"); assert.equal(L.cancelled.m1, 0);
   assert.equal(L.pnl.m0.net, 50, "a cancelled bet moves no money");
+  // net by kind: b1 is a season bet (no week); add a settled weekly one
+  const L2 = R.computeLedger(config, [
+    { id: "b1", status: "settled", amount: 25, winner: "m0", entries: [{ memberId: "m0" }, { memberId: "m1" }, { memberId: "m2" }], paid: ["m2"] },
+    { id: "w1", status: "settled", week: 3, amount: 10, winner: "m1", entries: [{ memberId: "m0" }, { memberId: "m1" }], paid: [] },
+  ]);
+  assert.deepEqual([L2.pnl.m0.season, L2.pnl.m0.weekly, L2.pnl.m0.net], [50, -10, 40]);
+  assert.deepEqual([L2.pnl.m1.season, L2.pnl.m1.weekly, L2.pnl.m1.net], [-25, 10, -15]);
 });
 
 test("coverSide: winner, total, and pushes", () => {

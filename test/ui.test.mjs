@@ -285,6 +285,33 @@ test("weekly high / low: a running tally on the ledger cards and a week-by-week 
   await p.close();
 });
 
+test("Settle Up opens with the season table: managers across, hi/low, weekly, season and total down", { skip }, async () => {
+  const { p, errors } = await page();
+  const out = await p.evaluate(async () => {
+    const { state } = await import("./state.js?v=dev"); const V = await import("./render.js?v=dev");
+    state.bets = [
+      { id: "s1", status: "settled", week: 0, amount: 25, winner: "a", entries: [{ memberId: "a", pick: "x" }, { memberId: "b", pick: "y" }], paid: ["b"] },
+      { id: "w1", status: "settled", week: 2, amount: 10, winner: "c", entries: [{ memberId: "a", pick: "x" }, { memberId: "c", pick: "y" }], paid: [] },
+    ];
+    state.highlow = { weeks: { "1": { high: [{ id: "b", name: "Bob", pts: 140 }], low: [{ id: "c", name: "Cara", pts: 90 }] } } };
+    V.render();
+    const t = document.querySelector("#settle table.pivot");
+    return { heads: [...t.querySelectorAll("thead th")].slice(1).map(h => [h.querySelector(".pv-head span").textContent, h.classList.contains("me")]),
+      rows: [...t.querySelectorAll("tbody tr")].map(r => [r.querySelector("th").textContent, ...[...r.querySelectorAll("td")].map(d => d.textContent + ":" + d.className.replace("num ", "").replace(" total", ""))]),
+      scrolls: getComputedStyle(document.querySelector("#settle .pivot-wrap")).overflowX, debts: document.querySelectorAll("#settle .debt").length };
+  });
+  assert.deepEqual(out.heads, [["Alice", true], ["Bob", false], ["Cara", false]], "a column per manager, yours marked");
+  assert.deepEqual(out.rows, [
+    ["Hi / low", "$0:flat", "+$5:pos", "−$5:neg"],
+    ["Weekly bets", "−$10:neg", "$0:flat", "+$10:pos"],
+    ["Season bets", "+$25:pos", "−$25:neg", "$0:flat"],
+    ["Total", "+$15:pos", "−$20:neg", "+$5:pos"]], "net all season, paid or not");
+  assert.equal(out.scrolls, "auto", "wide tables scroll inside the section");
+  assert.equal(out.debts, 1, "the unpaid weekly bet still lists below it; the paid season one doesn't");
+  assert.deepEqual(errors, []);
+  await p.close();
+});
+
 test("League dialog: when each manager was last in", { skip }, async () => {
   const { p, errors } = await page();
   const out = await p.evaluate(async () => {

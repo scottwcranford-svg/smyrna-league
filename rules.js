@@ -243,9 +243,9 @@ export function computeLedger(config,bets){
   // cancelled: stake on bets that reached the lock with no takers and cancelled themselves.
   var pnl={}, pairs={}, risk={}, offered={}, cancelled={}, picks={};
   (config?config.members:[]).forEach(function(m){
-    pnl[m.id]={net:0,w:0,l:0,p:0}; risk[m.id]=0; offered[m.id]=0; cancelled[m.id]=0; picks[m.id]=[];
+    pnl[m.id]={net:0,w:0,l:0,p:0,weekly:0,season:0}; risk[m.id]=0; offered[m.id]=0; cancelled[m.id]=0; picks[m.id]=[];
   });
-  var touch=function(id){ if(id&&!pnl[id]) pnl[id]={net:0,w:0,l:0,p:0}; };
+  var touch=function(id){ if(id&&!pnl[id]) pnl[id]={net:0,w:0,l:0,p:0,weekly:0,season:0}; };
 
   (bets||[]).forEach(function(b){
     var amt=Number(b.amount)||0;
@@ -269,10 +269,11 @@ export function computeLedger(config,bets){
     if(!win||!pnl[win]) return;
 
     var losers=ents.filter(function(e){ return e.memberId!==win; });
-    pnl[win].net += amt*losers.length; pnl[win].w++;
+    var bucket=Number(b.week)>0?"weekly":"season";   // net by kind, for the season table
+    pnl[win].net += amt*losers.length; pnl[win].w++; pnl[win][bucket]+=amt*losers.length;
     var paid=Array.isArray(b.paid)?b.paid:[];
     losers.forEach(function(e){
-      pnl[e.memberId].net -= amt; pnl[e.memberId].l++;
+      pnl[e.memberId].net -= amt; pnl[e.memberId].l++; pnl[e.memberId][bucket]-=amt;
       if(paid.indexOf(e.memberId)>=0) return;
       var key=[win,e.memberId].sort().join("|");
       if(pairs[key]==null) pairs[key]=0;

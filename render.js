@@ -221,12 +221,29 @@ function board(){
     : "Net across every settled bet.";
 }
 
+// The season in one table: a column per manager, a row per pool, net all season, paid or not.
+function seasonTable(L){
+  var HL=R.hlTally(state.highlow,members(),R.hlStake(state.config));
+  var cols=realMembers().filter(function(m){ return !m.test; });
+  if(!cols.length) return "";
+  var val=function(m,row){ var p=L.pnl[m.id]||{}, h=HL.byId[m.id]||{};
+    return row==="hl"?(h.net||0):row==="weekly"?(p.weekly||0):row==="season"?(p.season||0):(h.net||0)+(p.weekly||0)+(p.season||0); };
+  var cell=function(v,total){ v=Math.round(v*100)/100; return '<td class="num '+(v>0?"pos":v<0?"neg":"flat")+(total?" total":"")+'">'+signed(v)+"</td>"; };
+  var rows=[["hl","Hi / low"],["weekly","Weekly bets"],["season","Season bets"],["total","Total"]];
+  return '<div class="pivot-wrap"><table class="pivot"><thead><tr><th></th>'+cols.map(function(m){
+      return '<th'+(m.id===state.me?' class="me"':"")+'><span class="pv-head">'+avatarHtml(m.id,22)+'<span>'+esc(m.name)+"</span></span></th>"; }).join("")+"</tr></thead><tbody>"+
+    rows.map(function(r){ var total=r[0]==="total";
+      return "<tr"+(total?' class="total"':"")+"><th>"+esc(r[1])+"</th>"+cols.map(function(m){ return cell(val(m,r[0]),total); }).join("")+"</tr>"; }).join("")+
+    "</tbody></table></div>";
+}
+
 function settle(){
   var L=computeLedger(), host=document.getElementById("settle");
+  var table=seasonTable(L);
   if(!L.debts.length){
-    host.innerHTML='<div class="empty">Nobody owes anybody yet.</div>'; return;
+    host.innerHTML=table+'<div class="empty">Nobody owes anybody yet.</div>'; return;
   }
-  host.innerHTML='<div class="settle">'+L.debts.map(function(d){
+  host.innerHTML=table+'<div class="settle">'+L.debts.map(function(d){
     var n=0;
     state.bets.forEach(function(b){
       if(b.status!=="settled"||b.winner==="push") return;
