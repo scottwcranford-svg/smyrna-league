@@ -360,9 +360,11 @@ export function submitJoin(){
   var d=state.draft[0]||{}, scope=state.draftScope;
   if(scope&&rosterRows().length){
     if(!(d.picks&&d.picks.length)) return toast(scope==="team"?"Pick a defense":"Pick a player");
-    // a player bet is even-handed: join with as many players as the proposer put up
-    var want=((entriesOf(bet)[0]||{}).picks||[]).length;
-    if(scope==="player"&&want&&d.picks.length!==want) return toast("Pick "+want+(want===1?" player":" players")+", same as "+mName(bet.createdBy||(entriesOf(bet)[0]||{}).memberId));
+    // A player pot is even-handed: join with as many players as everyone else put up.
+    // Unless it's a player-vs-the-field bet, where the sides are uneven on purpose —
+    // then any number goes.
+    var counts=[]; entriesOf(bet).forEach(function(e){ var n=(e.picks||[]).length; if(n&&counts.indexOf(n)<0) counts.push(n); });
+    if(scope==="player"&&counts.length===1&&d.picks.length!==counts[0]) return toast("Pick "+counts[0]+(counts[0]===1?" player":" players")+", same as everyone else on this bet");
     var held={}; entriesOf(bet).forEach(function(e){ (e.picks||[]).forEach(function(p){ held[p.id]=1; }); });
     var dup=null; d.picks.forEach(function(p){ if(held[p.id]) dup=p.name; });
     if(dup) return toast(dup+" is already taken");
