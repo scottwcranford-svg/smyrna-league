@@ -114,15 +114,15 @@ export function runRefresh(db,by,forced,ctx){
           if(!ctx.mobile&&ageMin(roster.updatedAt)>6*60) writes.push(sj(SLEEPER+"/v1/players/nfl").then(function(players){
             var rows=parseRoster(players);
             return db.doc("league/roster").set({ updatedAt:now, count:rows.length, players:rows }); }).catch(function(){}));
-          // Projections for the weeks in play: this week, next, and any week with a live weekly
-          // stat bet. Trimmed to the roster and the tracked stats, written only when changed.
+          // Projections for the weeks in play: the season ("0"), this week, next, and any week
+          // with a live weekly stat bet. Trimmed to the roster and the tracked stats, written only when changed.
           var rosterIds=R.rosterRows(ctx.roster).map(function(r){ return r[0]; });
           if(rosterIds.length){
-            var want={}, cw=Math.min(18,Math.max(1,Number(st.week)||1)); want[cw]=1; if(cw<18) want[cw+1]=1;
+            var want={0:1}, cw=Math.min(18,Math.max(1,Number(st.week)||1)); want[cw]=1; if(cw<18) want[cw+1]=1;
             (ctx.bets||[]).forEach(function(b){ if(b.stats&&!b.game&&(b.status==="open"||b.status==="active")&&Number(b.week)>0) want[Number(b.week)]=1; });
             var prevW=(ctx.proj&&ctx.proj.weeks)||{}, weeksOut={}, changed=false;
             writes.push(Promise.all(Object.keys(want).map(function(w){
-              return sj(SLEEPER+"/v1/projections/nfl/regular/"+season+"/"+w).then(function(raw){
+              return sj(SLEEPER+"/v1/projections/nfl/regular/"+season+(w==="0"?"":"/"+w)).then(function(raw){
                 var s=JSON.stringify(R.trimProjections(raw,rosterIds)); weeksOut[w]=s; if(prevW[w]!==s) changed=true;
               }).catch(function(){ if(prevW[w]) weeksOut[w]=prevW[w]; });
             })).then(function(){

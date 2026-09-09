@@ -157,7 +157,7 @@ function draftWeek(){
 }
 // "82 rec yds · 5 rec": a pick's projection for the form's week and the stats it tracks.
 function projText(id){
-  var wk=draftWeek(), P=wk>0?R.projFor(wk,state.proj):null;
+  var wk=draftWeek(), P=R.projFor(wk||0,state.proj);   // week 0: the season projections
   if(!P) return "";
   return (state.draftStats||[]).slice(0,2).map(function(st){ return R.valueFor(id,st,P)+" "+(R.STAT_SHORT[st]||st); }).join(" · ");
 }

@@ -101,10 +101,10 @@ test("runRefresh: projections for this week, next, and live weekly bets; rewritt
   const roster = { updatedAt: N.isoNow(), players: [["2", "Ja'Marr Chase", "WR", "CIN"], ["3", "Drake Maye", "QB", "NE"]] };
   const bets = [{ id: "b1", week: 7, status: "open", stats: { stat: "rec_yd", rows: [{ key: "2", entry: 0 }] } }, { id: "g", week: 5, status: "active", game: { id: "x" }, stats: null }];
   await N.runRefresh(db, "m1", true, { config: { ...config, scheduleUpdatedAt: N.isoNow() }, refresh: {}, bets, roster, holder: "m1", mobile: true });
-  assert.deepEqual(projUrls.map((u) => u.split("/").pop()).sort(), ["3", "4", "7"], "this week, next, and the open week-7 bet; not the game bet's week");
+  assert.deepEqual(projUrls.map((u) => u.split("/").pop()).sort(), ["2026", "3", "4", "7"], "the season, this week, next, and the open week-7 bet; not the game bet's week");
   const w = db.writes.find((x) => x[1] === "league/proj");
   assert.ok(w, "projections written");
-  assert.deepEqual(Object.keys(w[2].weeks).sort(), ["3", "4", "7"]);
+  assert.deepEqual(Object.keys(w[2].weeks).sort(), ["0", "3", "4", "7"], "the season rides as week 0");
   assert.deepEqual(JSON.parse(w[2].weeks["7"]), { "2": { rec_yd: 82.5, rec: 5.2 }, "3": { pass_yd: 241.3 } }, "trimmed to the roster, one decimal");
   // same data again: nothing to write
   const db2 = fakeDb();

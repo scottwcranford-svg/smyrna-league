@@ -119,6 +119,12 @@ render as it does for everyone.
 - **Locks an hour before kickoff** — the week's first game for stat bets, that game for
   game bets. Countdown on every ticket. A bet still waiting on a seat at lock is
   cancelled automatically.
+- **Projections and status** — until something has been played, a stat ticket's standings
+  show Sleeper's projections for the bet's own stat (weekly or season-long), with the
+  projected leader marked; once played, actuals lead, the projection sits beside each
+  and a tick on the bar marks it. The picker shows projections for the form's week and
+  stats. Players carry Sleeper's status (Q, OUT, IR…) as a tag wherever they appear, and
+  a bye tag on weeks their team is off. The roster refreshes every six hours from a desktop.
 - **Live standings** — every stat bet shows a standings strip per tracked stat; every
   game bet shows score, quarter, clock and possession and tags the side that's ahead.
   A scores ticker runs under the header.

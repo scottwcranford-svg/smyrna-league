@@ -147,7 +147,7 @@ test("bye week: off teams are greyed in the picker and refused on post or join",
     const { state } = await import("./state.js?v=dev"); const F = await import("./forms.js?v=dev");
     const wk = document.getElementById("bWeek"); wk.innerHTML = '<option value="0">Season long</option><option value="5">Week 5</option>';
     const sugg = () => [...document.querySelectorAll("#sugg0 button")].map(x => [x.textContent, x.disabled, getComputedStyle(x).opacity, !!x.querySelector(".tag.bye"), [...x.querySelectorAll(".st-tag")].map(t => t.textContent), (x.querySelector(".proj") || {}).textContent || ""]);
-    state.proj = { weeks: { "5": JSON.stringify({ "2": { rec_yd: 61.5, rec: 4.1 }, "3": { pass_yd: 240 } }) } };
+    state.proj = { weeks: { "5": JSON.stringify({ "2": { rec_yd: 61.5, rec: 4.1 }, "3": { pass_yd: 240 } }), "0": JSON.stringify({ "2": { rec_yd: 1210 } }) } };
     state.draftScope = "player"; state.draftStats = ["rec_yd"]; state.draft = [{ memberId: "a", pick: "", picks: [] }]; F.drawEntries();
     wk.value = "5"; F.drawSugg(0, "chase"); const w5chase = sugg(); F.drawSugg(0, "maye"); const w5maye = sugg();
     state.draftScope = "team"; F.drawEntries(); F.drawSugg(0, "ch"); const w5def = sugg();
@@ -166,7 +166,7 @@ test("bye week: off teams are greyed in the picker and refused on post or join",
   assert.equal(out.w5chase[0][2], "0.45"); assert.equal(out.w5chase[0][3], true, "bye tag shown");
   assert.deepEqual(out.w5maye, [["Drake MayeQB0 rec ydsNE", false, "1", false, [], "0 rec yds"]]);
   assert.deepEqual(out.w5chase.map(r => r[5]), ["0 rec yds", "61.5 rec yds"], "the picker shows the projection for the selected stat and week");
-  assert.deepEqual(out.w0chase.map(r => r[5]), ["", ""], "no projections on a season-long bet");
+  assert.deepEqual(out.w0chase.map(r => r[5]), ["0 rec yds", "1210 rec yds"], "a season-long bet shows the season projection");
   assert.deepEqual(out.w5chase.map(r => r[4]), [[], ["Q"]], "the picker tags the questionable player");
   assert.equal(out.w5def[0][1], true, "KC's defense is off too");
   assert.deepEqual(out.w0chase.map(r => r[1]), [false, false], "season-long filters nobody");

@@ -302,7 +302,7 @@ function stripHtml(S,ents,week){
   var multiTrack=tracks.length>1;
   // Sleeper's projections for this week, if the app has them: shown in place of the
   // actuals until something has been played, then as a small reference beside them.
-  var P=Number(week)>0?R.projFor(week,state.proj):null, anyPre=false;
+  var P=R.projFor(Number(week)||0,state.proj), anyPre=false;   // week 0: the season projections
   var blocks=tracks.map(function(t){
     var anyPlayed=false;
     S.rows.forEach(function(r){ if(valueOf(r,t)) anyPlayed=true; });
