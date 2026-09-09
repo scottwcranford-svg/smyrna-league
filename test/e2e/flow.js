@@ -5,6 +5,7 @@
 // player picker. Nothing here writes to the book. Saves a screenshot.
 //
 //   E2E_USER=mwong22 E2E_PASS=... [E2E_KEY=smyrna-league-2026] [SITE=http://127.0.0.1:8898/] node test/e2e/flow.js
+//   E2E_ADMIN=1 when the account is an app admin: the header switch must show, and be off.
 "use strict";
 const puppeteer = require("puppeteer-core");
 const path = require("path");
@@ -53,7 +54,10 @@ let browser; const errors = [], checks = {};
     seats: document.querySelectorAll(".seat").length,
     tickerGames: document.querySelectorAll(".ticker .game").length / 2,
     forcedPw: document.getElementById("pwDlg").open,
-    adminSwitchHidden: getComputedStyle(document.getElementById("adminBtn")).display === "none",   // this is a non-admin account
+    // a non-admin never sees the switch; an admin sees it, off by default on a fresh browser,
+    // so everything below still renders the way it does for everyone else
+    adminSwitchHidden: getComputedStyle(document.getElementById("adminBtn")).display === "none",
+    adminSwitchOff: document.getElementById("adminBtn").getAttribute("aria-pressed") === "false",
     // tickets still looking for people carry a glow (computed shadow, not just the class)
     seeking: document.querySelectorAll("article.ticket.seeking").length,
     seekingGlow: (a => a ? getComputedStyle(a).boxShadow !== getComputedStyle(document.querySelector("article.ticket:not(.seeking)") || a).boxShadow : false)(document.querySelector("article.ticket.seeking")),
@@ -80,8 +84,9 @@ let browser; const errors = [], checks = {};
   checks.rosterRows = await page.evaluate(() => document.querySelectorAll("#rosterList .rrow").length);
   checks.rosterReadOnly = await page.evaluate(() => document.getElementById("rSave").hidden && document.getElementById("rName").disabled);
   // signing in stamps league/seen, so this account's own row should say it was just in
-  await page.waitForFunction(() => [...document.querySelectorAll("#rosterList .rrow")].some(r => /mwong22/.test(r.querySelector(".r-name").textContent) && /Last in/.test(r.querySelector(".r-seen").textContent)), { timeout: 10000 });
-  checks.seenSelf = await page.evaluate(() => [...document.querySelectorAll("#rosterList .rrow")].filter(r => /mwong22/.test(r.querySelector(".r-name").textContent)).map(r => r.querySelector(".r-seen").textContent)[0]);
+  const seenRow = (u) => [...document.querySelectorAll("#rosterList .rrow")].filter(r => r.querySelector(".r-name").textContent === u).map(r => r.querySelector(".r-seen").textContent)[0] || "";
+  await page.waitForFunction((u) => [...document.querySelectorAll("#rosterList .rrow")].some(r => r.querySelector(".r-name").textContent === u && /Last in/.test(r.querySelector(".r-seen").textContent)), { timeout: 10000 }, USER).catch(() => {});
+  checks.seenSelf = await page.evaluate(seenRow, USER);
   await page.evaluate(() => document.getElementById("rosterDlg").close());
 
   // the propose form: player mode with the picker, stat chips toggle, game mode lists games
@@ -115,7 +120,7 @@ let browser; const errors = [], checks = {};
   await browser.close();
 
   const ok = checks.appDisplay !== "none" && checks.me === USER && checks.tickets >= 1 && checks.seats >= 1 && checks.liveOnly === true
-    && checks.joinOn.length >= 1 && !checks.joinOn.some(t => /White Men Can Catch|NE @ SEA/.test(t)) && checks.adminSwitchHidden === true && checks.seeking >= 1 && checks.seekingGlow === true
+    && checks.joinOn.length >= 1 && !checks.joinOn.some(t => /White Men Can Catch|NE @ SEA/.test(t)) && (process.env.E2E_ADMIN ? checks.adminSwitchHidden === false && checks.adminSwitchOff === true : checks.adminSwitchHidden === true) && checks.seeking >= 1 && checks.seekingGlow === true
     && checks.rosterRows >= 1 && checks.rosterReadOnly === true && /Last in/.test(checks.seenSelf)
     && checks.title === "Propose a bet" && checks.scopeChips === 3 && checks.statChips >= 10 && checks.entryRows === 1 && checks.rowOneLocked === true && checks.twoStats === 2
     && /Chase/.test(checks.pickChip) && checks.gameOptions >= 1 && checks.sideTaken === 1 && errors.length === 0;
