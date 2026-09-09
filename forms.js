@@ -182,7 +182,7 @@ export function drawSugg(i,q){
   box.innerHTML=hits.map(function(r){
     var bye=R.onBye(r[3],playing), pt=projText(r[0]);
     return '<button type="button" data-act="dAdd" data-i="'+i+'" data-id="'+esc(r[0])+'"'+(bye?' disabled title="Off this week"':"")+'>'+esc(r[1])+
-      (r[2]!=="DEF"?'<span class="tag">'+esc(r[2])+"</span>":"")+statusTagsHtml(r[0])+(bye?'<span class="tag bye">bye</span>':"")+
+      (r[2]!=="DEF"?'<span class="tag pos-'+esc(r[2])+'">'+esc(r[2])+"</span>":"")+statusTagsHtml(r[0])+(bye?'<span class="tag bye">bye</span>':"")+
       (pt?'<span class="proj" title="Sleeper projection">'+esc(pt)+"</span>":"")+'<span class="team">'+esc(r[3])+"</span></button>";
   }).join("");
 }

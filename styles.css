@@ -13,28 +13,28 @@
 }
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
-    --bg:#12141B; --surface:#1B1E27; --surface-2:#242832;
-    --ink:#F3F5F8; --ink-2:#9BA4B5; --ink-3:#69707F;
-    --rule:#2B2F3A; --rule-2:#3A4050;
-    --accent:#22DDA8; --accent-ink:#052A21; --accent-bg:#12312A;
-    --win:#22DDA8; --win-bg:#122B22;
-    --loss:#FF6B6B; --loss-bg:#341B1D;
-    --gold:#FFB648; --gold-bg:#332510;
-    --open:#5B9CFF; --open-bg:#16233F; --open-glow:rgba(91,156,255,.22); --open-edge:rgba(91,156,255,.40);
-    --void:#69707F; --void-bg:#20232B;
+    --bg:#181C28; --surface:#212A3C; --surface-2:#2D3649;
+    --ink:#FFFFFF; --ink-2:#A3BBD3; --ink-3:#7988A1;
+    --rule:#2F3A4E; --rule-2:#3A465B;
+    --accent:#00CEB8; --accent-ink:#022047; --accent-bg:#1A4B55;
+    --win:#00CEB8; --win-bg:#1A4B55;
+    --loss:#FF2B6D; --loss-bg:#4D2A46;
+    --gold:#FFAE58; --gold-bg:#4D4442;
+    --open:#58A7FF; --open-bg:#2C4363; --open-glow:rgba(88,167,255,.22); --open-edge:rgba(88,167,255,.40);
+    --void:#7988A1; --void-bg:#283245;
     --shadow:0 1px 2px rgba(0,0,0,.4), 0 16px 40px -20px rgba(0,0,0,.7);
   }
 }
 :root[data-theme="dark"]{
-  --bg:#12141B; --surface:#1B1E27; --surface-2:#242832;
-  --ink:#F3F5F8; --ink-2:#9BA4B5; --ink-3:#69707F;
-  --rule:#2B2F3A; --rule-2:#3A4050;
-  --accent:#22DDA8; --accent-ink:#052A21; --accent-bg:#12312A;
-  --win:#22DDA8; --win-bg:#122B22;
-  --loss:#FF6B6B; --loss-bg:#341B1D;
-  --gold:#FFB648; --gold-bg:#332510;
-  --open:#5B9CFF; --open-bg:#16233F; --open-glow:rgba(91,156,255,.22); --open-edge:rgba(91,156,255,.40);
-  --void:#69707F; --void-bg:#20232B;
+  --bg:#181C28; --surface:#212A3C; --surface-2:#2D3649;
+  --ink:#FFFFFF; --ink-2:#A3BBD3; --ink-3:#7988A1;
+  --rule:#2F3A4E; --rule-2:#3A465B;
+  --accent:#00CEB8; --accent-ink:#022047; --accent-bg:#1A4B55;
+  --win:#00CEB8; --win-bg:#1A4B55;
+  --loss:#FF2B6D; --loss-bg:#4D2A46;
+  --gold:#FFAE58; --gold-bg:#4D4442;
+  --open:#58A7FF; --open-bg:#2C4363; --open-glow:rgba(88,167,255,.22); --open-edge:rgba(88,167,255,.40);
+  --void:#7988A1; --void-bg:#283245;
   --shadow:0 1px 2px rgba(0,0,0,.4), 0 16px 40px -20px rgba(0,0,0,.7);
 }
 
@@ -42,7 +42,7 @@
 [hidden]{display:none!important}   /* author styles (display:flex etc.) must never override hidden */
 body{
   background:var(--bg); color:var(--ink);
-  font-family:"Manrope",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  font-family:"Inter",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
   font-size:15px; line-height:1.5; -webkit-font-smoothing:antialiased;
 }
 .wrap{max-width:1120px;margin:0 auto;padding:20px 16px 80px}
@@ -310,3 +310,10 @@ dialog::backdrop{background:rgba(10,12,18,.6)}
 @media (prefers-reduced-motion: reduce){ *{animation:none!important;transition:none!important} }
 
 footer.foot{margin-top:36px;padding-top:16px;border-top:1px solid var(--rule);font-size:12.5px;color:var(--ink-3)}
+
+/* ---- Sleeper look: type, tabs, positions ---- */
+h1,h2,h3,.terms,.login-brand h1{font-family:"Poppins","Inter",system-ui,sans-serif}
+.chip{background:var(--accent-bg);color:var(--accent)}
+.chip:hover{color:var(--ink)}
+.chip .n{background:rgba(0,0,0,.18)}
+.tag.pos-QB{color:#FF2B6D} .tag.pos-RB{color:#00CEB8} .tag.pos-WR{color:#58A7FF} .tag.pos-TE{color:#FFAE58} .tag.pos-K{color:#BD66FF}
