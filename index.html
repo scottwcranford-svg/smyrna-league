@@ -409,9 +409,9 @@ footer.foot{margin-top:36px;padding-top:16px;border-top:1px solid var(--rule);fo
 </dialog>
 
 <dialog id="signDlg">
-  <form method="dialog" class="dlg-head"><h3>Sign in</h3><button class="btn" value="cancel">Close</button></form>
+  <form method="dialog" class="dlg-head"><h3>Smyrna League · sign in</h3><button class="btn" value="cancel" id="siClose">Close</button></form>
   <div class="dlg-body">
-    <p class="bet-desc" style="margin:0 0 12px">Your name and the password the admin gave you. This device remembers you.</p>
+    <p class="bet-desc" style="margin:0 0 12px">Pick your name and enter your password. This device remembers you.</p>
     <div class="grid c2">
       <label class="f"><span>Who are you</span><select class="field" id="siName"></select></label>
       <label class="f"><span>Password</span><input class="field" id="siPw" type="password" autocomplete="current-password"></label>
@@ -1939,26 +1939,31 @@ function authMsg(e){
   if(c==="auth/network-request-failed") return "Offline — try again";
   return (e&&e.message)||"Couldn't sign in";
 }
-function openSignIn(){
+function openSignIn(required){
   if(!state.connected||state.local) return toast("Not connected");
-  var sel=document.getElementById("siName");
+  var dlg=document.getElementById("signDlg"), sel=document.getElementById("siName");
+  var keep=sel.value;
   sel.innerHTML=(state.config?state.config.members:[]).map(function(m){ return '<option value="'+esc(m.id)+'">'+esc(m.name)+"</option>"; }).join("");
-  document.getElementById("siPw").value=""; document.getElementById("siHint").textContent="";
-  document.getElementById("signDlg").showModal(); document.getElementById("siPw").focus();
+  if(keep) sel.value=keep;
+  state.signRequired=!!required;
+  document.getElementById("siClose").hidden=!!required;
+  if(!dlg.open){ document.getElementById("siPw").value=""; document.getElementById("siHint").textContent=""; dlg.showModal(); }
+  document.getElementById("siPw").focus();
 }
+document.getElementById("signDlg").addEventListener("cancel",function(e){ if(state.signRequired) e.preventDefault(); });
 function submitSignIn(){
   var id=document.getElementById("siName").value, pw=document.getElementById("siPw").value, hint=document.getElementById("siHint");
   var m=member(id); if(!m) return; if(!pw) return toast("Enter your password");
   hint.textContent="Signing in…";
   firebase.auth().signInWithEmailAndPassword(emailFor(m),pw).then(function(){
-    document.getElementById("signDlg").close(); toast("Signed in as "+m.name);
+    state.signRequired=false; document.getElementById("signDlg").close(); toast("Signed in as "+m.name);
   }).catch(function(e){
     // First-ever sign-in by the admin creates their account with this password.
     if((e.code==="auth/user-not-found"||e.code==="auth/invalid-credential"||e.code==="auth/invalid-login-credentials")&&adminIds().indexOf(id)>=0){
       return firebase.auth().fetchSignInMethodsForEmail(emailFor(m)).then(function(methods){
         if(methods&&methods.length) throw e;
         return firebase.auth().createUserWithEmailAndPassword(emailFor(m),pw).then(function(){
-          document.getElementById("signDlg").close(); toast("Admin account created — you're in");
+          state.signRequired=false; document.getElementById("signDlg").close(); toast("Admin account created — you're in");
         });
       }).catch(function(e2){ hint.textContent=authMsg(e2); });
     }
@@ -2261,7 +2266,11 @@ connectDb().then(function(db){
     state.ready=true;
     if(!db){ render(); return; }
     state.db=db; state.connected=true;
-    firebase.auth().onAuthStateChanged(function(user){ applyAuth(user); render(); if(user) enforceFreshPassword(user); });
+    firebase.auth().onAuthStateChanged(function(user){
+      applyAuth(user); render();
+      if(user) enforceFreshPassword(user);
+      else openSignIn(true);   // the sign-in screen is the front door
+    });
 
     // Keep the book current from this browser: scores every minute during games,
     // a full refresh hourly. Leases keep it to one writer across all open pages.
