@@ -297,6 +297,7 @@ footer.foot{margin-top:36px;padding-top:16px;border-top:1px solid var(--rule);fo
     </form>
     <div class="hint" id="siHint"></div>
     <button type="button" class="btn" id="siReset" hidden>Start over on this device</button>
+    <div class="hint" id="siVer" style="font-size:10px;opacity:.6">build 9</div>
   </div>
 </div>
 
@@ -2234,6 +2235,10 @@ if(!window.FIREBASE_CONFIG||!window.FIREBASE_CONFIG.projectId||!window.firebase)
   showLogin("This copy isn't connected to the league's book.");
 } else {
   if(!firebase.apps.length) firebase.initializeApp(window.FIREBASE_CONFIG);
+  // Plain long-polling instead of Firestore's streaming channel: the stream is what
+  // Brave Shields, some ad blockers and some networks quietly break, leaving the book
+  // stuck at "Opening…". Long-polling costs a little latency and works everywhere.
+  try{ firebase.firestore().settings({ experimentalForceLongPolling:true, merge:true }); }catch(e){}
   storedKey();   // scrub a ?key= link into device memory right away
   firebase.auth().onAuthStateChanged(function(user){
     applyAuth(user);
