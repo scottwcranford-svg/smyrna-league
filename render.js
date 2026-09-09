@@ -221,6 +221,15 @@ function board(){
     : "Net across every settled bet.";
 }
 
+// Scroll a ticket into view and flash it, from a drill-through line.
+export function showBet(id){
+  var el=document.querySelector('article.ticket[data-bet="'+id+'"]');
+  if(!el){ toast("That bet is filtered out of the book right now"); return false; }
+  el.scrollIntoView({ behavior:"smooth", block:"center" });
+  el.classList.remove("flash"); void el.offsetWidth; el.classList.add("flash");
+  return true;
+}
+
 // The season in one table: a column per manager, a row per pool, net all season, paid or not.
 function seasonTable(L){
   var HL=R.hlTally(state.highlow,members(),R.hlStake(state.config));
@@ -228,12 +237,13 @@ function seasonTable(L){
   if(!cols.length) return "";
   var val=function(m,row){ var p=L.pnl[m.id]||{}, h=HL.byId[m.id]||{};
     return row==="hl"?(h.net||0):row==="weekly"?(p.weekly||0):row==="season"?(p.season||0):(h.net||0)+(p.weekly||0)+(p.season||0); };
-  var cell=function(v,total){ v=Math.round(v*100)/100; return '<td class="num '+(v>0?"pos":v<0?"neg":"flat")+(total?" total":"")+'">'+signed(v)+"</td>"; };
+  var cell=function(v,total,m,row){ v=Math.round(v*100)/100;
+    return '<td class="num '+(v>0?"pos":v<0?"neg":"flat")+(total?" total":"")+'" data-act="drill" data-m="'+esc(m.id)+'" data-row="'+row+'" title="What\u2019s behind this" tabindex="0">'+signed(v)+"</td>"; };
   var rows=[["hl","Hi / low"],["weekly","Weekly bets"],["season","Season bets"],["total","Total"]];
   return '<div class="pivot-wrap"><table class="pivot"><thead><tr><th></th>'+cols.map(function(m){
       return '<th'+(m.id===state.me?' class="me"':"")+'><span class="pv-head">'+avatarHtml(m.id,22)+'<span>'+esc(m.name)+"</span></span></th>"; }).join("")+"</tr></thead><tbody>"+
     rows.map(function(r){ var total=r[0]==="total";
-      return "<tr"+(total?' class="total"':"")+"><th>"+esc(r[1])+"</th>"+cols.map(function(m){ return cell(val(m,r[0]),total); }).join("")+"</tr>"; }).join("")+
+      return "<tr"+(total?' class="total"':"")+"><th>"+esc(r[1])+"</th>"+cols.map(function(m){ return cell(val(m,r[0]),total,m,r[0]); }).join("")+"</tr>"; }).join("")+
     "</tbody></table></div>";
 }
 
@@ -467,7 +477,7 @@ function ticketHtml(b){
   var paidStamp=(b.status==="settled"&&b.winner!=="push"&&!unpaid.length)?'<span class="paid-stamp">Paid</span>':"";
   // Still looking for people: a seat to fill, or a pot you could add yourself to.
   var seeking=!isLocked(b)&&(b.status==="open"||(state.me&&R.canJoin(b)&&!mine));
-  return '<article class="ticket '+esc(b.status)+(seeking?" seeking":"")+'">'+
+  return '<article class="ticket '+esc(b.status)+(seeking?" seeking":"")+'" data-bet="'+esc(b.id)+'">'+
     '<div class="t-meta"><div class="t-meta-l">'+
       '<span class="wk'+(isPlayoff(b.week)?" po":"")+'">'+weekLabel(b.week)+"</span>"+
       '<span class="kind">'+esc(kindLabel(b.kind))+(live.length>2?" · "+live.length+"-way":"")+"</span>"+

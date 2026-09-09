@@ -5,7 +5,7 @@
 import * as R from "./rules.js?v=dev";
 import * as A from "./auth.js?v=dev";
 import { state, members, touch } from "./state.js?v=dev";
-import { toast } from "./render.js?v=dev";
+import { toast, showBet } from "./render.js?v=dev";
 import * as B from "./book.js?v=dev";
 import * as F from "./forms.js?v=dev";
 import * as D from "./dialogs.js?v=dev";
@@ -79,7 +79,10 @@ export const ACTIONS = {
   setPw:function(t,id){
     var pwIn=document.querySelector('input[data-pw="'+id+'"]');
     D.setPassword(id,pwIn?pwIn.value:"").then(function(msg){ if(pwIn) pwIn.value=""; toast(msg); }).catch(function(e){ toast(A.authMsg(e)); });
-  }
+  },
+  // the season table in Settle Up: drill through to the bets behind a cell, and jump to one
+  drill:function(t){ D.openDrill(attr(t,"data-m"),attr(t,"data-row")); },
+  goBet:function(t,id){ document.getElementById("drillDlg").close(); showBet(id); },
 };
 
 // data-act changes on selects and checkboxes

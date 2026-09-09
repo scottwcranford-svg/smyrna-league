@@ -57,6 +57,23 @@ export function openRoster(){
   drawRoster();
   document.getElementById("rosterDlg").showModal();
 }
+// Drill-through from the season table: the bets or hi / low weeks behind one cell.
+export function openDrill(memberId,row){
+  var m=member(memberId); if(!m) return;
+  var rows=R.drillRows(memberId,row,state.bets,state.highlow,R.hlStake(state.config),members());
+  var title={ hl:"Hi / low", weekly:"Weekly bets", season:"Season bets", total:"Everything" }[row]||row;
+  var net=rows.reduce(function(s,r){ return s+r.amount; },0);
+  document.getElementById("drillTitle").innerHTML=avatarHtml(m.id,24)+" "+esc(m.name)+' <span class="drill-row">· '+esc(title)+"</span>";
+  document.getElementById("drillList").innerHTML=rows.length?rows.map(function(r){
+    var v=Math.round(r.amount*100)/100, cls=v>0?"pos":v<0?"neg":"flat";
+    return '<div class="drill"'+(r.kind==="bet"?' data-act="goBet" data-id="'+esc(r.id)+'" role="button" tabindex="0"':"")+'>'+
+      '<span class="wk">'+esc(R.weekLabel(r.week))+"</span>"+
+      '<span class="drill-txt"><b>'+esc(r.label)+"</b><small>"+esc(r.note)+"</small></span>"+
+      '<b class="num '+cls+'">'+R.signed(v)+"</b></div>";
+  }).join("")+'<div class="drill-net">Net <b class="'+(net>0?"pos":net<0?"neg":"flat")+'">'+R.signed(Math.round(net*100)/100)+"</b></div>"
+  :'<div class="empty">Nothing here yet.</div>';
+  document.getElementById("drillDlg").showModal();
+}
 // When a manager last opened the app, from league/seen.
 function seenHtml(id){
   var iso=state.seen&&state.seen[id], t=Date.parse(iso||"");

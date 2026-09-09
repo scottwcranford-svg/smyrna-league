@@ -195,6 +195,25 @@ test("weekly high / low: top score takes the stake from the bottom, ties share, 
   assert.deepEqual(R.finalWeeks({ games: [{ week: 1, status: "final" }, { week: 1, status: "final" }, { week: 2, status: "final" }, { week: 2, status: "live" }, { week: 3, status: "pre" }] }), [1], "only weeks with every game final");
 });
 
+test("drillRows: what's behind a season-table cell, newest first", () => {
+  const members = [{ id: "a", name: "Alice" }, { id: "b", name: "Bob" }, { id: "c", name: "Cara" }];
+  const bets = [
+    { id: "s1", status: "settled", week: 0, amount: 25, winner: "a", name: "Wire to Wire", entries: [{ memberId: "a" }, { memberId: "b" }], settledAt: "2026-12-01T00:00:00Z" },
+    { id: "w2", status: "settled", week: 2, amount: 10, winner: "c", name: "Week 2 thing", entries: [{ memberId: "a" }, { memberId: "c" }], settledAt: "2026-09-15T00:00:00Z" },
+    { id: "w3", status: "settled", week: 3, amount: 10, winner: "push", name: "Pushed", entries: [{ memberId: "a" }, { memberId: "b" }], settledAt: "2026-09-22T00:00:00Z" },
+    { id: "open", status: "active", week: 4, amount: 10, entries: [{ memberId: "a" }, { memberId: "b" }] },
+    { id: "notme", status: "settled", week: 1, amount: 10, winner: "b", entries: [{ memberId: "b" }, { memberId: "c" }] },
+  ];
+  const hl = { weeks: { "1": { high: [{ id: "a", name: "Alice", pts: 140 }], low: [{ id: "c", name: "Cara", pts: 90 }] }, "2": { high: [{ id: "b", pts: 150 }], low: [{ id: "a", pts: 80 }, { id: "c", pts: 80 }] } } };
+  const weekly = R.drillRows("a", "weekly", bets, hl, 5, members);
+  assert.deepEqual(weekly.map((r) => [r.id, r.amount, r.note]), [["w3", 0, "push"], ["w2", -10, "lost to Cara"]], "weekly: newest first, pushes shown at 0, open and others' bets left out");
+  assert.deepEqual(R.drillRows("a", "season", bets, hl, 5, members).map((r) => [r.id, r.amount, r.note]), [["s1", 25, "beat Bob"]]);
+  const hlRows = R.drillRows("a", "hl", bets, hl, 5, members);
+  assert.deepEqual(hlRows.map((r) => [r.week, r.amount, r.label, r.note]), [[2, -2.5, "Low score · 80", "under Bob"], [1, 5, "High score · 140", "over Cara"]], "a shared low splits the stake");
+  const total = R.drillRows("a", "total", bets, hl, 5, members);
+  assert.equal(total.length, 5); assert.equal(Math.round(total.reduce((s, r) => s + r.amount, 0) * 100) / 100, 17.5, "the total row adds everything up");
+});
+
 test("projections: trimmed to the roster and the tracked stats, read with valueFor", () => {
   const raw = {
     "2": { rec_yd: 82.46, rec: 5.2, pts_ppr: 17.1, adp_dd_ppr: 12, pass_yd: 0 },

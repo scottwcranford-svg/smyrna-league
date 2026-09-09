@@ -165,6 +165,42 @@ export function finalWeeks(games){
   return Object.keys(by).map(Number).filter(function(w){ return by[w].n>0&&by[w].done===by[w].n; }).sort(function(a,b){ return a-b; });
 }
 
+// What's behind one cell of the season table: the settled bets (or hi / low weeks)
+// that make up a manager's net in that row, newest first. Rows: hl, weekly, season, total.
+export function drillRows(memberId,row,bets,highlow,stake,members){
+  var out=[];
+  if(row==="hl"||row==="total"){
+    var hl=(highlow&&highlow.weeks)||{};
+    Object.keys(hl).map(Number).sort(function(a,b){ return b-a; }).forEach(function(w){
+      var e=hl[String(w)]; if(!e||!e.high||!e.low) return;
+      var hi=e.high.some(function(r){ return r.id===memberId; }), lo=e.low.some(function(r){ return r.id===memberId; });
+      if(!hi&&!lo) return;
+      var mine=(hi?e.high:e.low).filter(function(r){ return r.id===memberId; })[0]||{};
+      var other=(hi?e.low:e.high).map(function(r){ return r.id?mName(r.id,members):r.name; }).join(" · ");
+      out.push({ kind:"hl", week:w, label:(hi?"High score":"Low score")+" · "+(mine.pts!=null?mine.pts:""),
+        note:(hi?"over ":"under ")+other, amount:hi?stake/e.high.length:-stake/e.low.length });
+    });
+  }
+  if(row!=="hl"){
+    (bets||[]).forEach(function(b){
+      if(b.status!=="settled") return;
+      var ents=entriesOf(b).filter(function(e){ return e.memberId; });
+      if(ents.length<2||!ents.some(function(e){ return e.memberId===memberId; })) return;
+      var weekly=Number(b.week)>0;
+      if(row==="weekly"&&!weekly) return; if(row==="season"&&weekly) return;
+      var amt=Number(b.amount)||0, val;
+      if(b.winner==="push") val=0;
+      else if(b.winner===memberId) val=amt*(ents.length-1);
+      else if(b.winner) val=-amt; else return;
+      out.push({ kind:"bet", id:b.id, week:Number(b.week)||0, label:b.name||b.terms||"", amount:val,
+        note:b.winner==="push"?"push":b.winner===memberId?"beat "+ents.filter(function(e){ return e.memberId!==memberId; }).map(function(e){ return mName(e.memberId,members); }).join(" · "):"lost to "+mName(b.winner,members),
+        at:b.settledAt||b.editedAt||b.createdAt||"" });
+    });
+  }
+  out.sort(function(a,b){ return (b.week-a.week)||String(b.at||"").localeCompare(String(a.at||"")); });
+  return out;
+}
+
 /* ---- projections ----
    Sleeper's weekly projections, trimmed to the roster and to the stats the app tracks,
    ride in league/proj as { weeks: { "5": "<json>" } }. A projection is read with the

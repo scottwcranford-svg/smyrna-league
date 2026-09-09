@@ -308,6 +308,19 @@ test("Settle Up opens with the season table: managers across, hi/low, weekly, se
     ["Total", "+$15:pos", "−$20:neg", "+$5:pos"]], "net all season, paid or not");
   assert.equal(out.scrolls, "auto", "wide tables scroll inside the section");
   assert.equal(out.debts, 1, "the unpaid weekly bet still lists below it; the paid season one doesn't");
+  // drill through: Alice's Total cell lists her three lines; the bet line jumps to its ticket
+  await p.$eval('#settle td[data-act="drill"][data-m="a"][data-row="total"]', el => el.click());   // through the real click wiring
+  await p.waitForFunction(() => document.getElementById("drillDlg").open, { timeout: 5000 });
+  const drill = await p.evaluate(() => ({
+    title: document.getElementById("drillTitle").textContent.replace(/^AL\s*/, ""),
+    lines: [...document.querySelectorAll("#drillList .drill")].map(d => [d.querySelector(".wk").textContent, d.querySelector(".drill-txt b").textContent, d.querySelector("b.num").textContent, d.getAttribute("data-id")]),
+    net: document.querySelector("#drillList .drill-net b").textContent }));
+  assert.equal(drill.title, "Alice · Everything");
+  assert.deepEqual(drill.lines, [["WK 2", "", "−$10", "w1"], ["SEASON", "", "+$25", "s1"]], "her weekly loss and season win; no hi/low line since she wasn't high or low");
+  assert.equal(drill.net, "+$15");
+  await p.$eval('#drillList .drill[data-id="s1"]', el => el.click());
+  const jumped = await p.evaluate(() => ({ closed: !document.getElementById("drillDlg").open, flashed: !!document.querySelector('article.ticket[data-bet="s1"].flash') }));
+  assert.deepEqual(jumped, { closed: true, flashed: true }, "the line closes the dialog and flashes the ticket");
   assert.deepEqual(errors, []);
   await p.close();
 });
