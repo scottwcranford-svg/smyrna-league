@@ -17,10 +17,10 @@ if (!USER || !PASS) { console.error("set E2E_USER and E2E_PASS"); process.exit(2
 const $ = (sel) => document.querySelector(sel);
 const shown = (id) => getComputedStyle(document.getElementById(id)).display !== "none";
 
+let browser; const errors = [], checks = {};
 (async () => {
-  const browser = await puppeteer.launch({ executablePath: CHROME, headless: "new", args: ["--no-sandbox", "--disable-extensions"], defaultViewport: { width: 1200, height: 900 } });
+  browser = await puppeteer.launch({ executablePath: CHROME, headless: "new", args: ["--no-sandbox", "--disable-extensions"], defaultViewport: { width: 1200, height: 900 } });
   const page = await browser.newPage();
-  const errors = [], checks = {};
   page.on("pageerror", e => errors.push(e.message));
   // console errors count, except the browser's own "Failed to load resource" for the site's missing favicon
   page.on("console", m => { if (m.type() === "error" && !/Failed to load resource/.test(m.text())) errors.push("console: " + m.text()); });
@@ -109,4 +109,11 @@ const shown = (id) => getComputedStyle(document.getElementById(id)).display !== 
   console.log(JSON.stringify({ ...checks, errors }, null, 0));
   console.log(ok ? "E2E OK — screenshot " + shot : "E2E FAILED");
   process.exit(ok ? 0 : 1);
-})().catch(e => { console.error("E2E FAILED:", e.message); process.exit(1); });
+})().catch(async e => {
+  // say what the login card was showing when it gave up
+  let hint = "";
+  try { const pages = await browser.pages(); hint = await pages[pages.length - 1].evaluate(() => document.getElementById("siHint").textContent); } catch (_) {}
+  console.error("E2E FAILED:", e.message, hint ? "| login card said: " + hint : "", JSON.stringify(checks), JSON.stringify(errors));
+  try { await browser.close(); } catch (_) {}
+  process.exit(1);
+});
