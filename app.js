@@ -8,7 +8,7 @@ import * as A from "./auth.js?v=dev";
 import * as N from "./sleeper.js?v=dev";
 import { state, members, onRender, touch } from "./state.js?v=dev";
 import { render, toast, ticker, statsBar } from "./render.js?v=dev";
-import { expireBets } from "./book.js?v=dev";
+import { expireBets, settleFinished } from "./book.js?v=dev";
 import { drawScope, drawEntries } from "./forms.js?v=dev";
 import { showLogin, enforceFreshPassword } from "./dialogs.js?v=dev";
 import { bindEvents } from "./actions.js?v=dev";
@@ -121,7 +121,7 @@ function subscribeBook(db){
 }
 
 /* ---- boot ---- */
-onRender(function(){ expireBets(); render(); });
+onRender(function(){ expireBets(); settleFinished(); render(); });
 bindEvents({ enterBook:enterBook });
 state.config={ leagueName:"Smyrna League", season:"2026", stake:25, kickoff:R.DEFAULT_KICKOFF, members:[] };
 state.bets=[];

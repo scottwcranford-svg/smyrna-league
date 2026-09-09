@@ -329,7 +329,8 @@ function actionsHtml(b,ents,live,mine,unpaid){
       }
     });
   }
-  if(b.status==="active") acts.push('<button class="btn'+(mine?" pri":"")+'" data-act="settle" data-id="'+esc(b.id)+'">Settle</button>');
+  // Results record themselves when the game or the period is done; an admin can still call one by hand.
+  if(b.status==="active"&&state.admin) acts.push('<button class="btn" data-act="settle" data-id="'+esc(b.id)+'" title="Admin: record the result by hand">Settle</button>');
   unpaid.forEach(function(e){
     acts.push('<button class="btn" data-act="paidOne" data-id="'+esc(b.id)+'" data-m="'+esc(e.memberId)+'">'+esc(mName(e.memberId))+" paid</button>");
   });
@@ -356,8 +357,9 @@ function ticketHtml(b){
   var mine=state.me&&live.some(function(e){ return e.memberId===state.me; });
 
   var chip;
-  if(b.status==="settled"&&b.winner==="push") chip='<span class="status push">Push</span>';
-  else if(b.status==="settled") chip='<span class="status settled">'+esc(mName(b.winner))+" wins</span>";
+  var how=b.settledNote?' title="'+esc(b.settledNote)+'"':"";
+  if(b.status==="settled"&&b.winner==="push") chip='<span class="status push"'+how+'>Push</span>';
+  else if(b.status==="settled") chip='<span class="status settled"'+how+'>'+esc(mName(b.winner))+" wins</span>";
   else if(b.status==="active") chip='<span class="status active">Live</span>';
   else if(b.status==="void") chip='<span class="status void">'+(b.autoVoid?"Cancelled · no takers":b.cancelled?"Cancelled":"Void")+"</span>";
   else {

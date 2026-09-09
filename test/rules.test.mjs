@@ -88,6 +88,44 @@ test("coverSide: winner, total, and pushes", () => {
   assert.equal(R.coverSide(tot, { awayScore: 20, homeScore: 21 }), "under");
 });
 
+test("autoResult: a game bet settles from the final score, or pushes", () => {
+  const games = { games: [{ id: "g1", week: 1, away: "NE", home: "SEA", date: "2026-09-10T00:20:00Z", status: "final", awayScore: 17, homeScore: 24 }] };
+  const ml = { status: "active", week: 1, game: { id: "g1", week: 1, away: "NE", home: "SEA", date: "2026-09-10T00:20:00Z" }, market: "ml",
+    entries: [{ memberId: "m0", side: "NE" }, { memberId: "m1", side: "SEA" }] };
+  assert.equal(R.autoResult(ml, games).winner, "m1");
+  assert.match(R.autoResult(ml, games).note, /Final · NE 17, SEA 24/);
+  const tot = { ...ml, market: "total", line: 41, entries: [{ memberId: "m0", side: "over" }, { memberId: "m1", side: "under" }] };
+  assert.equal(R.autoResult(tot, games).winner, "push", "41 total on the 41 line");
+  assert.equal(R.autoResult({ ...tot, line: 40.5 }, games).winner, "m0", "over");
+  const live = { games: [{ ...games.games[0], status: "live" }] };
+  assert.equal(R.autoResult(ml, live), null, "not while it's on");
+  assert.equal(R.autoResult({ ...ml, status: "open" }, games), null, "an unfilled bet never settles");
+});
+
+test("autoResult: a stat bet settles when the period is final and the stats are fresher than the last game", () => {
+  const kick = "2026-09-14T00:20:00Z", lastEnd = Date.parse(kick) + R.SETTLE_LAG;
+  const games = { games: [{ id: "a", week: 1, date: "2026-09-13T17:00:00Z", status: "final" }, { id: "b", week: 1, date: kick, status: "final" }] };
+  const bet = (rows, tracks, updatedAt) => ({ status: "active", week: 1, entries: [{ memberId: "m0" }, { memberId: "m1" }],
+    stats: { scope: "player", stat: tracks[0].stat, tracks, rows, updatedAt, through: "Through week 1" } });
+  const rows = [{ key: "1", entry: 0, values: { rec_yd: 120 } }, { key: "2", entry: 1, values: { rec_yd: 80 } }];
+  const fresh = new Date(lastEnd + 60e3).toISOString(), stale = new Date(lastEnd - 60e3).toISOString(), after = lastEnd + 120e3;
+  assert.equal(R.autoResult(bet(rows, [{ stat: "rec_yd" }], fresh), games, after).winner, "m0");
+  assert.equal(R.autoResult(bet(rows, [{ stat: "rec_yd" }], stale), games, after), null, "stats predate the end of the last game");
+  assert.equal(R.autoResult(bet(rows, [{ stat: "rec_yd" }], fresh), { games: [games.games[0], { ...games.games[1], status: "live" }] }, after), null, "a game still on");
+  const allowed = [{ key: "HOU", entry: 0, values: { pts_allow: 24 } }, { key: "DAL", entry: 1, values: { pts_allow: 17 } }];
+  assert.equal(R.autoResult(bet(allowed, [{ stat: "pts_allow", lower: true }], fresh), games, after).winner, "m1", "lower is better");
+  const tie = [{ key: "1", entry: 0, values: { rec_yd: 100 } }, { key: "2", entry: 1, values: { rec_yd: 100 } }];
+  assert.equal(R.autoResult(bet(tie, [{ stat: "rec_yd" }], fresh), games, after).winner, "push");
+  const multi = [{ key: "1", entry: 0, values: { rec_yd: 120, rec: 5, rec_td: 1 } }, { key: "2", entry: 1, values: { rec_yd: 80, rec: 9, rec_td: 2 } }];
+  assert.equal(R.autoResult(bet(multi, [{ stat: "rec_yd" }, { stat: "rec" }, { stat: "rec_td" }], fresh), games, after).winner, "m1", "most stats led");
+  // a season bet waits for the last week
+  const season = { ...bet(rows, [{ stat: "rec_yd" }], fresh), week: 0 };
+  assert.equal(R.autoResult(season, games, after), null, "week 17 hasn't been played");
+  const wk17 = { games: [{ id: "z", week: 17, date: "2027-01-04T01:20:00Z", status: "final" }] };
+  const seasonFresh = { ...season, stats: { ...season.stats, updatedAt: "2027-01-05T00:00:00Z" } };
+  assert.equal(R.autoResult(seasonFresh, wk17, Date.parse("2027-01-05T01:00:00Z")).winner, "m0");
+});
+
 test("schedule CSV → first kickoff per week, Eastern → UTC across the clock change", () => {
   const csv = ["game_id,season,game_type,week,gameday,weekday,gametime,away_team,home_team",
     "a,2026,REG,1,2026-09-09,Wednesday,20:20,NE,SEA", "b,2026,REG,1,2026-09-13,Sunday,13:00,CHI,CAR",

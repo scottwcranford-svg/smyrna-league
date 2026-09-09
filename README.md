@@ -114,8 +114,14 @@ copy renders but can't sign in. Use a spare manager account for it, never an adm
 - **Live standings** — every stat bet shows a standings strip per tracked stat; every
   game bet shows score, quarter, clock and possession and tags the side that's ahead.
   A scores ticker runs under the header.
-- **Settle** by naming the winner (or push); **settle up** nets who owes whom; marking
-  paid is separate so the P&L and the debt list stay honest.
+- **Bets settle themselves.** A game bet settles from the final score (winner, or the
+  total against the line; a tie on the line is a push). A stat bet settles once every
+  game of its period is final and the standings have refreshed after the last one
+  ended: the leader on the stat wins, a tie is a push, and a bet tracking several stats
+  goes to whoever leads the most of them. Season bets run through week 17. An admin
+  can still record a result by hand, and reopen one.
+- **Settle up** nets who owes whom; marking paid is separate so the P&L and the debt
+  list stay honest.
 
 House takes nothing: the full pot goes to the winner, zero-sum.
 

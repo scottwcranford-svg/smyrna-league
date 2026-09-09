@@ -52,6 +52,20 @@ export function expireBets(){
   });
 }
 
+// Bets settle themselves once the result is in (rules.autoResult decides). Like
+// expireBets: whichever open page notices first writes it, and two pages writing
+// the same result is harmless.
+export function settleFinished(){
+  var now=Date.now();
+  state.bets.forEach(function(b){
+    var r=R.autoResult(b,state.games,now); if(!r) return;
+    b.status="settled"; b.winner=r.winner; b.settledAt=new Date(now).toISOString(); b.settledBy="auto"; b.settledNote=r.note;
+    if(!Array.isArray(b.paid)) b.paid=[];
+    if(state.db&&!state.local) state.db.doc("bets/"+b.id).update({ status:"settled", winner:r.winner, settledAt:b.settledAt, settledBy:"auto", settledNote:r.note })
+      .catch(function(){ /* another page got there first, or offline */ });
+  });
+}
+
 export function publishLeague(){
   if(!state.db) return toast("Not connected");
   var cfg=state.config, bets=state.bets.slice();
