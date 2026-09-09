@@ -154,6 +154,36 @@ test("bye week: off teams are greyed in the picker and refused on post or join",
   await p.close();
 });
 
+test("a test account is off the ledger board and out of the pickers; League shows it to admins and to itself", { skip }, async () => {
+  const { p, errors } = await page();
+  const out = await p.evaluate(async () => {
+    const { state } = await import("./state.js?v=dev"); const V = await import("./render.js?v=dev");
+    const F = await import("./forms.js?v=dev"); const D = await import("./dialogs.js?v=dev");
+    state.config.members[2].test = true;   // Cara
+    const res = {};
+    state.me = "a"; V.render();
+    res.board = [...document.querySelectorAll("#board .seat-name")].map(e => e.textContent);
+    state.draftScope = "player"; state.draftStats = ["rec_yd"];
+    state.admin = false; state.draft = [{ memberId: "a", pick: "", picks: [] }, { memberId: null, pick: "", picks: [], side: "" }]; F.drawEntries();
+    res.invites = [...document.querySelectorAll('#bEntries select[data-i="1"] option')].map(o => o.textContent);
+    D.drawRoster(); res.rosterAsAlice = [...document.querySelectorAll("#rosterList .r-name")].map(e => e.textContent);
+    state.admin = true; D.drawRoster();
+    res.rosterAsAdmin = [...document.querySelectorAll("#rosterList .rrow")].map(r => [r.querySelector(".r-name").textContent, !!r.querySelector(".r-test"), r.querySelector('[data-act="testToggle"]').checked]);
+    state.admin = false; state.me = "c"; V.render(); D.drawRoster();
+    res.boardAsCara = [...document.querySelectorAll("#board .seat-name")].map(e => e.textContent);
+    res.rosterAsCara = [...document.querySelectorAll("#rosterList .r-name")].map(e => e.textContent);
+    return res;
+  });
+  assert.deepEqual(out.board, ["Alice", "Bob"], "Cara is off the board");
+  assert.deepEqual(out.invites, ["Open seat — anyone", "Invite Bob"], "and can't be invited");
+  assert.deepEqual(out.rosterAsAlice, ["Alice", "Bob"], "a regular manager doesn't see her in League");
+  assert.deepEqual(out.rosterAsAdmin, [["Alice", false, false], ["Bob", false, false], ["Cara", true, true]], "an admin sees her, tagged, box ticked");
+  assert.deepEqual(out.boardAsCara, ["Alice", "Bob"], "the board is the league's even for her");
+  assert.deepEqual(out.rosterAsCara, ["Alice", "Bob", "Cara"], "but she sees herself in League");
+  assert.deepEqual(errors, []);
+  await p.close();
+});
+
 test("League dialog: when each manager was last in", { skip }, async () => {
   const { p, errors } = await page();
   const out = await p.evaluate(async () => {

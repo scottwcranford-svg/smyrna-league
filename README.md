@@ -98,8 +98,10 @@ the Firebase key is locked to that domain; a local copy renders but can't sign i
 
 Give it its own manager. A real manager's password changes the first time they sign
 in (the forced change), and the test dies with them. Add a manager such as `testbot`
-in the League dialog with the admin switch on, set its password there, and keep that
-password in the environment, never in git. Run with `E2E_ADMIN=1` only when the account
+in the League dialog with the admin switch on, set its password there, tick **Test**
+on its row so the league never sees it (off the ledger board and out of the pickers;
+it still signs in and can bet), and keep that password in the environment, never in
+git. Run with `E2E_ADMIN=1` only when the account
 is an app admin: the header switch must then show, off, and everything else still
 render as it does for everyone.
 

@@ -3,7 +3,7 @@
 // a bet. Reads state, writes the dialogs' DOM, saves through book.js.
 
 import * as R from "./rules.js?v=dev";
-import { state, members } from "./state.js?v=dev";
+import { state, members, realMembers } from "./state.js?v=dev";
 import { toast } from "./render.js?v=dev";
 import { guard, findBet, saveBet } from "./book.js?v=dev";
 import { dbMsg } from "./store.js?v=dev";
@@ -99,13 +99,13 @@ export function drawEntries(hostId){
     // Admin switch on: any manager can be placed on any row outright, no invitation.
     var opts, lockedSeat=false, admin=!!state.admin;
     if(admin){
-      opts=(i>0?'<option value="">Open seat — anyone</option>':"")+members().map(function(m){
+      opts=(i>0?'<option value="">Open seat — anyone</option>':"")+realMembers().map(function(m){
         return '<option value="'+esc(m.id)+'"'+(m.id===e.memberId?" selected":"")+">"+esc(m.name)+(m.id===state.me?" (you)":"")+"</option>"; }).join("");
     } else if(i===0||e.memberId){
       opts='<option value="'+esc(e.memberId||state.me)+'">'+esc(mName(e.memberId||state.me))+(i===0?" (you)":" · accepted")+"</option>";
       lockedSeat=true;
     } else {
-      opts='<option value="">Open seat — anyone</option>'+members().filter(function(m){ return m.id!==state.me; }).map(function(m){
+      opts='<option value="">Open seat — anyone</option>'+realMembers().filter(function(m){ return m.id!==state.me; }).map(function(m){
         return '<option value="'+esc(m.id)+'"'+(m.id===e.invite?" selected":"")+">Invite "+esc(m.name)+"</option>"; }).join("");
     }
     var pickUi;

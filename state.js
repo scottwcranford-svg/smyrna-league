@@ -18,6 +18,9 @@ export const state = {
 };
 
 export function members(){ return (state.config&&state.config.members)||[]; }
+// The roster as the league sees it: test accounts (member.test) are left out of the
+// ledger board and the pickers, but never out of name lookups. You always see yourself.
+export function realMembers(){ return members().filter(function(m){ return !m.test||m.id===state.me; }); }
 
 var renderFn=null, pending=false;
 export function onRender(fn){ renderFn=fn; }

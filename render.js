@@ -3,7 +3,7 @@
 // DOM, never the book. forms.js and actions.js are the other DOM writers.
 
 import * as R from "./rules.js?v=dev";
-import { state, members, touch } from "./state.js?v=dev";
+import { state, members, realMembers, touch } from "./state.js?v=dev";
 
 const esc=R.esc, money=R.money, signed=R.signed, initials=R.initials, weekLabel=R.weekLabel, isPlayoff=R.isPlayoff,
       kindLabel=R.kindLabel, entriesOf=R.entriesOf, fmtWhen=R.fmtWhen, countdown=R.countdown, lineText=R.lineText,
@@ -131,7 +131,7 @@ function banner(){
 
 function board(){
   var L=computeLedger();
-  var list=members().slice();
+  var list=realMembers().filter(function(m){ return !m.test; });   // not even yourself: the board is the league's
   var host=document.getElementById("board");
   if(!list.length){
     host.className=""; host.innerHTML='<div class="empty">No managers yet.</div>';

@@ -70,6 +70,8 @@ header.top{display:flex;flex-wrap:wrap;gap:14px;align-items:center;padding-botto
 .rrow .r-pw{flex:1 1 150px;width:auto;min-height:34px;font-size:13px}
 .rrow .r-adm{font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);background:var(--accent-bg);padding:2px 7px;border-radius:99px}
 .rrow .r-chk{margin:0;flex:none;font-size:12px}
+.rrow .r-test{color:var(--ink-3);background:var(--surface-2)}
+.rrow.test .r-name{color:var(--ink-2)}
 
 select,input,textarea,button{font:inherit;color:inherit}
 .field{appearance:none;background:var(--surface-2);border:1px solid var(--rule);border-radius:10px;padding:8px 12px;font-size:13.5px;font-weight:600;color:var(--ink);min-height:38px;width:100%}

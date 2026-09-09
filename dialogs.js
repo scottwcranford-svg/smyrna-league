@@ -6,7 +6,7 @@
 import * as R from "./rules.js?v=dev";
 import * as S from "./store.js?v=dev";
 import * as A from "./auth.js?v=dev";
-import { state, members } from "./state.js?v=dev";
+import { state, members, realMembers } from "./state.js?v=dev";
 import { toast, avatarHtml } from "./render.js?v=dev";
 import { guard, findBet } from "./book.js?v=dev";
 
@@ -66,15 +66,18 @@ function seenHtml(id){
 }
 export function drawRoster(){
   var adm=!!state.admin;
-  document.getElementById("rosterList").innerHTML=members().map(function(m){
-    return '<div class="rrow">'+avatarHtml(m.id,26)+
+  // Test accounts show to admins (to manage them) and to themselves; nobody else sees them.
+  document.getElementById("rosterList").innerHTML=(adm?members():realMembers()).map(function(m){
+    return '<div class="rrow'+(m.test?" test":"")+'">'+avatarHtml(m.id,26)+
       '<span class="r-name">'+esc(m.name)+"</span>"+
       (isAdminMember(m.id)?'<span class="r-adm">Admin</span>':"")+
+      (m.test?'<span class="r-adm r-test" title="Left out of the ledger and the pickers">Test</span>':"")+
       '<span class="r-team">'+esc(m.team||"—")+"</span>"+seenHtml(m.id)+
       (adm?'<input class="field r-pw" type="password" data-pw="'+esc(m.id)+'" autocomplete="new-password" placeholder="Set password">'+
            '<button class="btn" data-act="setPw" data-id="'+esc(m.id)+'">Set</button>'+
            '<button class="btn" data-act="pwDefault" data-id="'+esc(m.id)+'" title="'+esc(defaultPw(m))+'">Default</button>':"")+
       (adm?'<label class="check r-chk"><input type="checkbox" data-act="admToggle" data-id="'+esc(m.id)+'"'+(isAdminMember(m.id)?" checked":"")+'> Admin</label>':"")+
+      (adm?'<label class="check r-chk" title="A test account: kept off the ledger board and out of the pickers"><input type="checkbox" data-act="testToggle" data-id="'+esc(m.id)+'"'+(m.test?" checked":"")+'> Test</label>':"")+
       (adm&&m.id!==state.me?'<button class="btn danger" data-act="rmMember" data-id="'+esc(m.id)+'">Remove</button>':"")+
     "</div>";
   }).join("");

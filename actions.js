@@ -84,6 +84,14 @@ export const ACTIONS = {
 
 // data-act changes on selects and checkboxes
 const CHANGES = {
+  // Flag a manager as a test account: still signs in and can bet, but the league doesn't see it.
+  testToggle:function(t){
+    if(!state.admin){ t.checked=!t.checked; return toast("Only the admin can do that"); }
+    var mm=member(attr(t,"data-id")); if(!mm) return;
+    if(t.checked) mm.test=true; else delete mm.test;
+    B.saveConfig(); D.drawRoster(); touch();
+    toast(t.checked?mm.name+" is a test account":mm.name+" is a regular manager again");
+  },
   admToggle:function(t){
     if(!state.admin){ t.checked=!t.checked; return toast("Only the admin can do that"); }
     var mm=member(attr(t,"data-id")); if(!mm) return;
