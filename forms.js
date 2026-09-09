@@ -4,7 +4,7 @@
 
 import * as R from "./rules.js?v=dev";
 import { state, members, realMembers } from "./state.js?v=dev";
-import { toast } from "./render.js?v=dev";
+import { toast, statusTagsHtml } from "./render.js?v=dev";
 import { guard, findBet, saveBet } from "./book.js?v=dev";
 import { dbMsg } from "./store.js?v=dev";
 
@@ -125,7 +125,7 @@ export function drawEntries(hostId){
       }
     } else if(usePicker){
       var chips=(e.picks||[]).map(function(p){
-        return '<span class="pick-chip">'+esc(p.name)+(p.pos!=="DEF"?" <small>"+esc(p.pos+" · "+p.team)+"</small>":"")+
+        return '<span class="pick-chip">'+esc(p.name)+(p.pos!=="DEF"?" <small>"+esc(p.pos+" · "+p.team)+"</small>":"")+statusTagsHtml(p.id)+
           '<button type="button" data-act="dDrop" data-i="'+i+'" data-id="'+esc(p.id)+'" aria-label="Remove">✕</button></span>';
       }).join("");
       pickUi='<div class="picker">'+
@@ -171,7 +171,7 @@ export function drawSugg(i,q){
   box.innerHTML=hits.map(function(r){
     var bye=R.onBye(r[3],playing);
     return '<button type="button" data-act="dAdd" data-i="'+i+'" data-id="'+esc(r[0])+'"'+(bye?' disabled title="Off this week"':"")+'>'+esc(r[1])+
-      (r[2]!=="DEF"?'<span class="tag">'+esc(r[2])+"</span>":"")+(bye?'<span class="tag bye">bye</span>':"")+'<span class="team">'+esc(r[3])+"</span></button>";
+      (r[2]!=="DEF"?'<span class="tag">'+esc(r[2])+"</span>":"")+statusTagsHtml(r[0])+(bye?'<span class="tag bye">bye</span>':"")+'<span class="team">'+esc(r[3])+"</span></button>";
   }).join("");
 }
 export function addPick(i,id){

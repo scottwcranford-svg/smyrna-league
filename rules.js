@@ -399,6 +399,27 @@ export function isAdminMember(id,config){ var m=member(id,config?config.members:
 
 export function rosterRows(roster){ return (roster&&Array.isArray(roster.players))?roster.players:[]; }
 
+/* ---- player status ----
+   A roster row's fifth slot is a short status code from Sleeper, present only when
+   the player isn't simply active. Injury designations first, then the roster status. */
+export const STATUS_LABEL={ Q:"Questionable", D:"Doubtful", OUT:"Out", IR:"Injured reserve", PUP:"Physically unable to perform",
+  SUS:"Suspended", COV:"COVID list", NA:"Not active", DNR:"Did not report", INA:"Inactive", PS:"Practice squad" };
+var INJURY={ questionable:"Q", doubtful:"D", out:"OUT", ir:"IR", pup:"PUP", sus:"SUS", cov:"COV", na:"NA", dnr:"DNR" };
+var ROSTER_STATUS={ "injured reserve":"IR", "physically unable to perform":"PUP", "practice squad":"PS", inactive:"INA" };
+export function statusCode(v){
+  if(!v) return "";
+  var inj=String(v.injury_status||"").trim().toLowerCase();
+  if(inj&&INJURY[inj]) return INJURY[inj];
+  var st=String(v.status||"").trim().toLowerCase();
+  if(!st||st==="active") return "";
+  return ROSTER_STATUS[st]||"";
+}
+// Status codes for a pick id ("a", or "a+b" for a combined pick), from the current roster.
+export function statusOf(id,roster){
+  var out=[];
+  String(id||"").split("+").forEach(function(k){ var r=rosterFind(k.trim(),roster); var c=r&&r[4]; if(c&&out.indexOf(c)<0) out.push(c); });
+  return out;
+}
 export function rosterFind(id,roster){ var rows=rosterRows(roster); for(var i=0;i<rows.length;i++){ if(rows[i][0]===id) return rows[i]; } return null; }
 
 export function teamName(code,roster){

@@ -127,6 +127,7 @@ function subscribeBook(db){
   db.doc("league/roster").onSnapshot(function(snap){
     state.roster=snap.exists?snap.data():null;   // read-only; no clone needed
     if(document.getElementById("betDlg").open){ drawScope(); drawEntries(); }
+    touch();   // tickets show each pick's current status
   },function(){ /* picker falls back to free text */ });
 
   db.collection("bets").limit(1000).onSnapshot(function(snap){

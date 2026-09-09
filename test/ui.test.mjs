@@ -48,7 +48,7 @@ async function page() {
       members: [{ id: "a", name: "Alice" }, { id: "b", name: "Bob" }, { id: "c", name: "Cara" }],
       kickoff: "2026-09-10T00:20:00Z" };
     state.me = "a"; state.local = true; state.bets = []; state.admin = false; state.isAdmin = false;
-    state.roster = { players: [["1", "Chase Brown", "RB", "CIN"], ["2", "Ja'Marr Chase", "WR", "CIN"], ["3", "Drake Maye", "QB", "NE"], ["SEA", "Seattle Seahawks", "DEF", "SEA"], ["KC", "Kansas City Chiefs", "DEF", "KC"]] };
+    state.roster = { players: [["1", "Chase Brown", "RB", "CIN"], ["2", "Ja'Marr Chase", "WR", "CIN", "Q"], ["3", "Drake Maye", "QB", "NE"], ["SEA", "Seattle Seahawks", "DEF", "SEA"], ["KC", "Kansas City Chiefs", "DEF", "KC"]] };
     state.games = { games: [{ id: "g5", week: 5, away: "NE", home: "SEA", date: "2026-10-11T17:00:00Z", status: "pre" }] };
   });
   return { p, errors };
@@ -72,6 +72,7 @@ test("a proposer sees the open seat, not a Take it button; anyone else gets the 
     const res = {};
     state.me = "a"; V.render();
     res.byeTags = [...document.querySelectorAll(".srow")].map(r => [r.querySelector(".s-lab").textContent, !!r.querySelector(".s-bye")]);
+    res.statusTags = [...document.querySelectorAll(".srow")].map(r => [r.querySelector(".s-lab").textContent, [...r.querySelectorAll(".st-tag")].map(t => t.textContent + ":" + t.title + ":" + (getComputedStyle(t).display !== "none"))]);
     res.proposerTake = document.querySelectorAll('[data-act="take"]').length;
     res.seeking = [...document.querySelectorAll("article.ticket")].map(a => [a.querySelector(".terms").textContent, a.classList.contains("seeking")]);
     const glow = document.querySelector("article.ticket.seeking"), flat = document.querySelector("article.ticket:not(.seeking)");
@@ -84,6 +85,7 @@ test("a proposer sees the open seat, not a Take it button; anyone else gets the 
   assert.equal(out.otherTake, 1, "another manager can take the seat");
   assert.deepEqual(Object.fromEntries(out.seeking), { "NE @ SEA": true, Done: false, Pot: true }, "open and joinable glow, settled doesn't");
   assert.deepEqual(out.byeTags, [["Ja'Marr Chase", true], ["Drake Maye", false]], "the CIN row wears a bye tag in week 5");
+  assert.deepEqual(out.statusTags, [["Ja'Marr Chase", ["Q:Questionable:true"]], ["Drake Maye", []]], "the questionable player is tagged on the ticket, from the roster");
   assert.equal(out.glowDiffers, true, "and the glow is real computed style");
   assert.deepEqual(errors, []);
   await p.close();
@@ -127,7 +129,7 @@ test("bye week: off teams are greyed in the picker and refused on post or join",
   const out = await p.evaluate(async () => {
     const { state } = await import("./state.js?v=dev"); const F = await import("./forms.js?v=dev");
     const wk = document.getElementById("bWeek"); wk.innerHTML = '<option value="0">Season long</option><option value="5">Week 5</option>';
-    const sugg = () => [...document.querySelectorAll("#sugg0 button")].map(x => [x.textContent, x.disabled, getComputedStyle(x).opacity, !!x.querySelector(".tag.bye")]);
+    const sugg = () => [...document.querySelectorAll("#sugg0 button")].map(x => [x.textContent, x.disabled, getComputedStyle(x).opacity, !!x.querySelector(".tag.bye"), [...x.querySelectorAll(".st-tag")].map(t => t.textContent)]);
     state.draftScope = "player"; state.draftStats = ["rec_yd"]; state.draft = [{ memberId: "a", pick: "", picks: [] }]; F.drawEntries();
     wk.value = "5"; F.drawSugg(0, "chase"); const w5chase = sugg(); F.drawSugg(0, "maye"); const w5maye = sugg();
     state.draftScope = "team"; F.drawEntries(); F.drawSugg(0, "ch"); const w5def = sugg();
@@ -144,7 +146,8 @@ test("bye week: off teams are greyed in the picker and refused on post or join",
   });
   assert.deepEqual(out.w5chase.map(r => r[1]), [true, true], "both CIN rows disabled");
   assert.equal(out.w5chase[0][2], "0.45"); assert.equal(out.w5chase[0][3], true, "bye tag shown");
-  assert.deepEqual(out.w5maye, [["Drake MayeQBNE", false, "1", false]]);
+  assert.deepEqual(out.w5maye, [["Drake MayeQBNE", false, "1", false, []]]);
+  assert.deepEqual(out.w5chase.map(r => r[4]), [[], ["Q"]], "the picker tags the questionable player");
   assert.equal(out.w5def[0][1], true, "KC's defense is off too");
   assert.deepEqual(out.w0chase.map(r => r[1]), [false, false], "season-long filters nobody");
   assert.equal(out.w5saved, 0); assert.match(out.w5toast, /off in week 5/);

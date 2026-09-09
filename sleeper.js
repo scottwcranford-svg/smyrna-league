@@ -47,7 +47,11 @@ export function parseRoster(players){
   var rows=[];
   Object.keys(players||{}).forEach(function(pid){ var v=players[pid]||{};
     if(v.position==="DEF") rows.push([pid,((v.first_name||"")+" "+(v.last_name||"")).trim(),"DEF",pid]);
-    else if(v.team&&(v.fantasy_positions||[]).some(function(p){ return R.FANTASY_POS[p]; })) rows.push([pid,v.full_name||"",v.position||"",v.team]); });
+    else if(v.team&&(v.fantasy_positions||[]).some(function(p){ return R.FANTASY_POS[p]; })){
+      var row=[pid,v.full_name||"",v.position||"",v.team], st=R.statusCode(v);
+      if(st) row.push(st);   // Q, OUT, IR… only when there's something to say
+      rows.push(row);
+    } });
   rows.sort(function(a,b){ return ((a[2]==="DEF")-(b[2]==="DEF"))||a[1].localeCompare(b[1]); });
   return rows;
 }
@@ -102,11 +106,12 @@ export function runRefresh(db,by,forced,ctx){
             var S=restat(b.stats,totals,through,now); if(!S) return;
             writes.push(db.doc("bets/"+b.id).update({ stats:S })); n++;
           });
-          // the schedule daily; the roster weekly, and never from a phone (the player index is 10 MB)
+          // the schedule daily; the roster every six hours so injury designations keep up,
+          // and never from a phone (the player index is 10 MB)
           var roster=ctx.roster||{}, cfg=ctx.config||{};
           if(ageMin(cfg.scheduleUpdatedAt)>24*60) writes.push(fetch(NFLVERSE_GAMES).then(function(r){ return r.text(); }).then(function(csv){
             var starts=R.weekStartsFromCsv(csv,season); if(Object.keys(starts).length) return db.doc("league/config").update({ weekStarts:starts, scheduleUpdatedAt:now }); }).catch(function(){}));
-          if(!ctx.mobile&&ageMin(roster.updatedAt)>7*24*60) writes.push(sj(SLEEPER+"/v1/players/nfl").then(function(players){
+          if(!ctx.mobile&&ageMin(roster.updatedAt)>6*60) writes.push(sj(SLEEPER+"/v1/players/nfl").then(function(players){
             var rows=parseRoster(players);
             return db.doc("league/roster").set({ updatedAt:now, count:rows.length, players:rows }); }).catch(function(){}));
           var weeks=[]; for(var i=1;i<=18;i++) weeks.push(i);

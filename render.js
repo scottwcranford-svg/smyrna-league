@@ -35,6 +35,14 @@ export function avatarHtml(id,size){
   if(!m) return '<span class="avatar" style="width:'+size+'px;height:'+size+'px;background:var(--ink-3);font-size:'+fs+'px">?</span>';
   return '<span class="avatar" style="width:'+size+'px;height:'+size+'px;background:'+esc(m.color)+';font-size:'+fs+'px">'+esc(initials(m.name))+"</span>";
 }
+// Status tags for a pick id: Q, OUT, IR… from the roster as it is now, not as it was when the bet was made.
+export function statusTagsHtml(id){
+  return R.statusOf(id,state.roster).map(function(c){
+    var hard=c==="Q"?"soft":"hard";
+    return '<span class="st-tag '+hard+'" title="'+esc(R.STATUS_LABEL[c]||c)+'">'+esc(c)+"</span>";
+  }).join("");
+}
+
 export function openAvatarHtml(size){
   size=size||28;
   return '<span class="avatar open" style="width:'+size+'px;height:'+size+'px;font-size:'+Math.round(size*0.5)+'px">+</span>';
@@ -312,6 +320,7 @@ function stripHtml(S,ents,week){
             (owner?'<span class="dot" style="background:'+esc(own)+'"></span>':"")+
             '<span class="s-lab">'+esc(r.label||(owner?mName(owner):"Open seat"))+"</span>"+
             (r.team?'<span class="s-team">'+esc(r.team)+"</span>":"")+
+            statusTagsHtml(r.id||r.key)+
             (onBye(r)?'<span class="s-bye" title="Off this week">bye</span>':"")+
             (owner&&r.label?'<span class="s-own">'+esc(mName(owner))+"</span>":"")+
           "</span>"+

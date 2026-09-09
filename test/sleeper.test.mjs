@@ -4,6 +4,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import * as R from "../rules.js";
 
 const fx = (n) => JSON.parse(fs.readFileSync(new URL("./fixtures/" + n, import.meta.url), "utf8"));
 const N = await import("../sleeper.js");
@@ -25,6 +26,22 @@ test("parseScores: live and final games carry score, quarter, clock, possession"
   assert.equal(L.status, "live"); assert.equal(L.q, 3); assert.equal(L.clock, "7:12"); assert.equal(L.pos, "CAR"); assert.equal(L.rz, true); assert.equal(L.dd, "2nd & 4");
   assert.equal(L.awayScore, 14); assert.equal(L.homeScore, 17);
   assert.equal(F.status, "final"); assert.equal(F.homeScore, 27); assert.equal(F.ot, false); assert.equal(F.pos, undefined);
+});
+
+test("parseRoster: a status code rides on the row only when there's one", () => {
+  const rows = N.parseRoster({
+    q: { full_name: "Q Guy", position: "WR", fantasy_positions: ["WR"], team: "CIN", status: "Active", injury_status: "Questionable" },
+    o: { full_name: "Out Guy", position: "RB", fantasy_positions: ["RB"], team: "NE", status: "Active", injury_status: "Out" },
+    ir: { full_name: "IR Guy", position: "TE", fantasy_positions: ["TE"], team: "SEA", status: "Injured Reserve", injury_status: null },
+    ok: { full_name: "Fine Guy", position: "QB", fantasy_positions: ["QB"], team: "KC", status: "Active", injury_status: null },
+  });
+  const by = Object.fromEntries(rows.map((r) => [r[0], r]));
+  assert.equal(by.q[4], "Q"); assert.equal(by.o[4], "OUT"); assert.equal(by.ir[4], "IR");
+  assert.equal(by.ok.length, 4, "an active player carries no fifth slot");
+  assert.deepEqual(R.statusOf("q+o", { players: rows }), ["Q", "OUT"], "a combined pick lists each");
+  assert.deepEqual(R.statusOf("ok", { players: rows }), []);
+  assert.equal(R.statusCode({ status: "Inactive" }), "INA"); assert.equal(R.statusCode({ status: "Practice Squad" }), "PS");
+  assert.equal(R.statusCode({ status: "Something New" }), "", "unknown roster statuses stay quiet");
 });
 
 test("parseRoster: fantasy positions on a team plus every defense, defenses last", () => {
