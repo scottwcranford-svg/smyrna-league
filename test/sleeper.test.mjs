@@ -167,11 +167,11 @@ test("runRefresh: the Sleeper league's team names and avatars, one call for ever
   assert.equal(hits.filter((h) => /^league\//.test(h)).length, 2, "two league calls for everyone: the users and the settings");
   // all known, fresh, league cached: no lookups at all
   hits.length = 0; const db2 = fakeDb();
-  await N.runRefresh(db2, "m0", true, { config: cfg, refresh: {}, bets: [], roster: { updatedAt: N.isoNow() }, holder: "m0", mobile: true, sleeper: { updatedAt: N.isoNow(), leagueId: "L1", byId: w[2].byId } });
+  await N.runRefresh(db2, "m0", true, { config: cfg, refresh: {}, bets: [], roster: { updatedAt: N.isoNow() }, holder: "m0", mobile: true, sleeper: { updatedAt: N.isoNow(), leagueId: "L1", byId: w[2].byId, league: w[2].league } });
   assert.equal(hits.some((h) => /^(user|league)\//.test(h)), false); assert.equal(db2.writes.some((x) => x[1] === "league/sleeper"), false);
   // a new manager: sync again
   hits.length = 0; const db3 = fakeDb();
-  await N.runRefresh(db3, "m0", true, { config: { ...cfg, members: cfg.members.concat([{ id: "m2", name: "newguy" }]) }, refresh: {}, bets: [], roster: { updatedAt: N.isoNow() }, holder: "m0", mobile: true, sleeper: { updatedAt: N.isoNow(), leagueId: "L1", byId: w[2].byId } });
+  await N.runRefresh(db3, "m0", true, { config: { ...cfg, members: cfg.members.concat([{ id: "m2", name: "newguy" }]) }, refresh: {}, bets: [], roster: { updatedAt: N.isoNow() }, holder: "m0", mobile: true, sleeper: { updatedAt: N.isoNow(), leagueId: "L1", byId: w[2].byId, league: w[2].league } });
   assert.equal(db3.writes.some((x) => x[1] === "league/sleeper"), true);
   assert.equal(hits.some((h) => /leagues\/nfl/.test(h)), false, "league id was cached");
 });

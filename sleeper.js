@@ -145,7 +145,7 @@ export function runRefresh(db,by,forced,ctx){
           // gets their public avatar and no team; a name Sleeper doesn't know keeps initials.
           var sl=ctx.sleeper||{}, mem=cfg.members||[];
           var newFace=mem.some(function(m){ return !(sl.byId&&(m.id in sl.byId)); });
-          if(mem.length&&(newFace||ageMin(sl.updatedAt)>24*60)){
+          if(mem.length&&(newFace||!sl.league||ageMin(sl.updatedAt)>24*60)){   // also when the league's settings aren't in yet
             writes.push(Promise.resolve(leagueIdOf(cfg)).then(function(lid){
               var leagueP=lid?sj(SLEEPER+"/v1/league/"+lid).then(function(L){
                 if(!L||typeof L!=="object") return null;
