@@ -107,11 +107,54 @@ ngrok tunnel (`.env`: `LEAGUE_KEY`, `NGROK_AUTHTOKEN`, `NGROK_DOMAIN`). It needs
 host awake; the Firebase setup above doesn't. To use it, point `index.html` back at the
 server shim (git history has it).
 
+## Sign-in, passwords and admins
+
+Each manager signs in with **their name and a password**; the device remembers them.
+Identity comes from Firebase Auth, so nobody can act as someone else. Under the hood
+the account ID is `<name-slug>@smyrna.league` — never shown, never a real mailbox;
+Firebase just needs an email-shaped identifier.
+
+- **Admins** are listed in `league/config.adminEmails`. On the League screen an admin
+  sees a password field and an **Admin** toggle on every manager, can add/remove
+  managers, edit league settings, and gets an **Update** button on any live or open
+  bet (even after lock) to fix mistakes. Anyone can be flagged admin; there must
+  always be at least one.
+- **Setting a password** creates the manager's account (on a second Firebase app
+  instance so the admin stays signed in). Changing one asks for the current password;
+  if it's lost, delete the user in Firebase console → Authentication and set it again.
+- **First admin sign-in** creates the admin's own account with whatever password they
+  type, as long as they're already listed in `adminEmails`.
+- Firebase console, once: Authentication → Sign-in method → **Email/Password → Enable**
+  (the mechanism, not a requirement for real emails). After all accounts exist,
+  Authentication → Settings → User actions → **disable "Enable create (sign-up)"** so
+  only existing accounts can sign in.
+
+Rules (Firestore → Rules): reads need the league passcode path; writes need a signed-in
+member; `league/config` writes need an admin:
+
+```
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{db}/documents {
+    function opened(key){ return exists(/databases/$(db)/documents/SmyrnaLeague/$(key)); }
+    function member(){ return request.auth != null && request.auth.token.email != null
+      && request.auth.token.email.matches('.*@smyrna[.]league'); }
+    function admin(key){ return member()
+      && request.auth.token.email in get(/databases/$(db)/documents/books/$(key)/league/config).data.adminEmails; }
+    match /SmyrnaLeague/{key} { allow read, write: if false; }
+    match /books/{key}/league/config { allow read: if opened(key); allow write: if admin(key); }
+    match /books/{key}/{col}/{id} {
+      allow read: if opened(key);
+      allow write: if opened(key) && member() && !(col == 'league' && id == 'config');
+    }
+  }
+}
+```
+
 ## Two things worth remembering
 
-1. **Identity is honor-system.** "Acting as" is a self-picked name remembered per device.
-   The passcode keeps strangers out; it doesn't stop a leaguemate picking the wrong name.
-   Every action is stamped with the acting name.
+1. **Settling is honor-system.** Sign-in proves who did what; it doesn't referee the
+   result. Every action is stamped with the signed-in name.
 2. **It's a ledger, not a bank.** It tracks the money; it never holds or moves it, and
    there's no rake. Keep it private and small-stakes; check your state's rule on
    social betting if in doubt.
