@@ -7,7 +7,7 @@
   --win:#0BAE87; --win-bg:#E3FBF4;
   --loss:#E5484D; --loss-bg:#FCE8E8;
   --gold:#B4780A; --gold-bg:#FBF0D8;
-  --open:#2F6FE0; --open-bg:#E8EFFD;
+  --open:#2F6FE0; --open-bg:#E8EFFD; --open-glow:rgba(47,111,224,.16); --open-edge:rgba(47,111,224,.35);
   --void:#8991A0; --void-bg:#EDEEF2;
   --shadow:0 1px 2px rgba(18,20,27,.05), 0 16px 40px -20px rgba(18,20,27,.22);
 }
@@ -20,7 +20,7 @@
     --win:#22DDA8; --win-bg:#122B22;
     --loss:#FF6B6B; --loss-bg:#341B1D;
     --gold:#FFB648; --gold-bg:#332510;
-    --open:#5B9CFF; --open-bg:#16233F;
+    --open:#5B9CFF; --open-bg:#16233F; --open-glow:rgba(91,156,255,.22); --open-edge:rgba(91,156,255,.40);
     --void:#69707F; --void-bg:#20232B;
     --shadow:0 1px 2px rgba(0,0,0,.4), 0 16px 40px -20px rgba(0,0,0,.7);
   }
@@ -33,7 +33,7 @@
   --win:#22DDA8; --win-bg:#122B22;
   --loss:#FF6B6B; --loss-bg:#341B1D;
   --gold:#FFB648; --gold-bg:#332510;
-  --open:#5B9CFF; --open-bg:#16233F;
+  --open:#5B9CFF; --open-bg:#16233F; --open-glow:rgba(91,156,255,.22); --open-edge:rgba(91,156,255,.40);
   --void:#69707F; --void-bg:#20232B;
   --shadow:0 1px 2px rgba(0,0,0,.4), 0 16px 40px -20px rgba(0,0,0,.7);
 }
@@ -148,6 +148,8 @@ section{margin-top:28px}
 .tickets{display:flex;flex-direction:column;gap:10px}
 .ticket{background:var(--surface);border:1px solid var(--rule);border-radius:16px;box-shadow:var(--shadow);padding:15px 16px;display:flex;flex-direction:column;gap:11px}
 .ticket.void{opacity:.6}
+/* Still looking for people: a soft blue edge and glow, the same blue as the "seat open" pill. */
+.ticket.seeking{border-color:var(--open-edge);box-shadow:var(--shadow),0 0 0 1px var(--open-glow),0 0 28px -4px var(--open-glow)}
 .t-meta{display:flex;align-items:center;gap:9px;flex-wrap:wrap;justify-content:space-between}
 .t-meta-l{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
 .wk{font-size:10.5px;font-weight:800;letter-spacing:.04em;background:var(--surface-2);color:var(--ink-2);padding:3px 8px;border-radius:6px}

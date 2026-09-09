@@ -379,7 +379,9 @@ function ticketHtml(b){
   var sides=ents.map(function(e,i){ return sideHtml(e,i,b); }).join('<span class="vs">VS</span>');
   var pot=(Number(b.amount)||0)*live.length;
   var paidStamp=(b.status==="settled"&&b.winner!=="push"&&!unpaid.length)?'<span class="paid-stamp">Paid</span>':"";
-  return '<article class="ticket '+esc(b.status)+'">'+
+  // Still looking for people: a seat to fill, or a pot you could add yourself to.
+  var seeking=!isLocked(b)&&(b.status==="open"||(state.me&&R.canJoin(b)&&!mine));
+  return '<article class="ticket '+esc(b.status)+(seeking?" seeking":"")+'">'+
     '<div class="t-meta"><div class="t-meta-l">'+
       '<span class="wk'+(isPlayoff(b.week)?" po":"")+'">'+weekLabel(b.week)+"</span>"+
       '<span class="kind">'+esc(kindLabel(b.kind))+(live.length>2?" · "+live.length+"-way":"")+"</span>"+

@@ -54,6 +54,9 @@ let browser; const errors = [], checks = {};
     tickerGames: document.querySelectorAll(".ticker .game").length / 2,
     forcedPw: document.getElementById("pwDlg").open,
     adminSwitchHidden: getComputedStyle(document.getElementById("adminBtn")).display === "none",   // this is a non-admin account
+    // tickets still looking for people carry a glow (computed shadow, not just the class)
+    seeking: document.querySelectorAll("article.ticket.seeking").length,
+    seekingGlow: (a => a ? getComputedStyle(a).boxShadow !== getComputedStyle(document.querySelector("article.ticket:not(.seeking)") || a).boxShadow : false)(document.querySelector("article.ticket.seeking")),
     // Join shows on stat bets this manager isn't in; never on game bets or player-vs-field bets
     joinOn: [...document.querySelectorAll("article.ticket")].filter(a => a.querySelector('[data-act="join"]')).map(a => a.querySelector(".terms").textContent),
   })));
@@ -109,7 +112,7 @@ let browser; const errors = [], checks = {};
   await browser.close();
 
   const ok = checks.appDisplay !== "none" && checks.me === USER && checks.tickets >= 1 && checks.seats >= 1 && checks.liveOnly === true
-    && checks.joinOn.length >= 1 && !checks.joinOn.some(t => /White Men Can Catch|NE @ SEA/.test(t)) && checks.adminSwitchHidden === true
+    && checks.joinOn.length >= 1 && !checks.joinOn.some(t => /White Men Can Catch|NE @ SEA/.test(t)) && checks.adminSwitchHidden === true && checks.seeking >= 1 && checks.seekingGlow === true
     && checks.rosterRows >= 1 && checks.rosterReadOnly === true
     && checks.title === "Propose a bet" && checks.scopeChips === 3 && checks.statChips >= 10 && checks.entryRows === 1 && checks.rowOneLocked === true && checks.twoStats === 2
     && /Chase/.test(checks.pickChip) && checks.gameOptions >= 1 && checks.sideTaken === 1 && errors.length === 0;
