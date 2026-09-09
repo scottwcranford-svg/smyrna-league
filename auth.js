@@ -64,7 +64,7 @@ export function authMsg(e){
   if(c==="auth/weak-password") return "Password needs at least 6 characters";
   if(c==="auth/email-already-in-use") return "That account exists — enter its current password to change it";
   if(c==="auth/operation-not-allowed") return "Sign-in isn't enabled in Firebase yet";
-  if(c==="auth/admin-restricted-operation") return "New accounts are closed — ask the admin";
+  if(c==="auth/admin-restricted-operation") return "Firebase has account creation switched off — Authentication → Settings → User actions → Enable create, or add the user in the console";
   if(c==="auth/network-request-failed") return "Offline — try again";
   return (e&&e.message)||"Couldn't sign in";
 }

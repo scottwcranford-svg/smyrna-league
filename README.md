@@ -184,29 +184,14 @@ Firebase just needs an email-shaped identifier.
 - Firebase console, once: Authentication → Sign-in method → **Email/Password → Enable**
   (the mechanism, not a requirement for real emails). After all accounts exist,
   Authentication → Settings → User actions → **disable "Enable create (sign-up)"** so
-  only existing accounts can sign in.
+  only existing accounts can sign in. With sign-up closed, the League dialog's Set
+  button can't create an account for a manager added later (Firebase answers
+  `admin-restricted-operation`). Either turn "Enable create" back on for a minute,
+  press Set, and turn it off again, or add the user yourself in Authentication →
+  Users → Add user, with the email `<slug>@smyrna.league` (the name lowercased with
+  everything but letters and digits removed) and the password you want.
 
-Rules (Firestore → Rules): reads need the league passcode path; writes need a signed-in
-member; `league/config` writes need an admin:
-
-```
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{db}/documents {
-    function opened(key){ return exists(/databases/$(db)/documents/SmyrnaLeague/$(key)); }
-    function member(){ return request.auth != null && request.auth.token.email != null
-      && request.auth.token.email.matches('.*@smyrna[.]league'); }
-    function admin(key){ return member()
-      && request.auth.token.email in get(/databases/$(db)/documents/books/$(key)/league/config).data.adminEmails; }
-    match /SmyrnaLeague/{key} { allow read, write: if false; }
-    match /books/{key}/league/config { allow read: if opened(key); allow write: if admin(key); }
-    match /books/{key}/{col}/{id} {
-      allow read: if opened(key);
-      allow write: if opened(key) && member() && !(col == 'league' && id == 'config');
-    }
-  }
-}
-```
+Rules: see `firestore.rules` at the repo root, and step 3 under *Setting it up*.
 
 ## About the API key in `firebase-config.js`
 
