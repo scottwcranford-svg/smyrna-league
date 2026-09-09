@@ -2,10 +2,10 @@
 // to the local copy first (so the page answers at once) and then to Firestore.
 // The lease-guarded ones (taking a seat) re-read before they write.
 
-import * as R from "./rules.js?v=17";
-import { dbMsg } from "./store.js?v=17";
-import { state, members, touch } from "./state.js?v=17";
-import { toast, statsBar } from "./render.js?v=17";
+import * as R from "./rules.js?v=dev";
+import { dbMsg } from "./store.js?v=dev";
+import { state, members, touch } from "./state.js?v=dev";
+import { toast, statsBar } from "./render.js?v=dev";
 
 const entriesOf=R.entriesOf, openSeats=R.openSeats, clone=R.clone;
 const mName=function(id){ return R.mName(id,members()); };

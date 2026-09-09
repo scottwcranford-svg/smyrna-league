@@ -1,7 +1,14 @@
 # Refactor plan: split the single-file app
 
-**Status:** planned, not started. **When:** a quiet weekday, never on a game day.
-**Behavior change for users:** none. Same page, same features, same URL.
+**Status:** done — Sept 9 2026, steps 0–6 as one commit each, live browser test green
+after every push. **Behavior change for users:** none. Same page, same features, same URL.
+
+What differs from the plan below: the "forms" slice became three files (`book.js` for
+writes, `forms.js` for the two big forms, `dialogs.js` for the small ones) so nothing
+passed ~430 lines; `state.js` exposes `touch()` (one coalesced redraw per microtask)
+rather than `set(patch)`, since most changes mutate bets in place; `sleeper.js` takes a
+context snapshot instead of reading state; the deploy stamp is the commit hash written
+by `.github/workflows/pages.yml`, replacing `?v=dev` / `build dev` in the source.
 
 ## Why
 

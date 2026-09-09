@@ -1,0 +1,36 @@
+# Deploys the site to GitHub Pages on every push to master, stamping the commit
+# into the module URLs first. Browsers cache ES modules per URL, so "?v=dev" in
+# the source becomes "?v=<commit>" at deploy time and every file of a build is
+# fetched together — no stale rules.js under a fresh app.js, and no build number
+# to bump by hand. The login card shows the same stamp.
+name: pages
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: true
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Stamp the commit into module URLs and the build label
+        run: |
+          sha=$(git rev-parse --short=7 HEAD)
+          sed -i "s/?v=dev/?v=$sha/g; s/build dev/build $sha/g" index.html *.js
+          grep -c "$sha" index.html app.js
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+      - id: deploy
+        uses: actions/deploy-pages@v4

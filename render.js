@@ -2,8 +2,8 @@
 // list, filters, tickets, the stats strip and the footer. Reads state, writes the
 // DOM, never the book. forms.js and actions.js are the other DOM writers.
 
-import * as R from "./rules.js?v=17";
-import { state, members, touch } from "./state.js?v=17";
+import * as R from "./rules.js?v=dev";
+import { state, members, touch } from "./state.js?v=dev";
 
 const esc=R.esc, money=R.money, signed=R.signed, initials=R.initials, weekLabel=R.weekLabel, isPlayoff=R.isPlayoff,
       kindLabel=R.kindLabel, entriesOf=R.entriesOf, fmtWhen=R.fmtWhen, countdown=R.countdown, lineText=R.lineText,

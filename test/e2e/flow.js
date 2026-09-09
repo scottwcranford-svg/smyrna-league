@@ -30,8 +30,20 @@ const shown = (id) => getComputedStyle(document.getElementById(id)).display !== 
   if (!(await page.$eval("#siKeyRow", e => e.hidden))) await page.type("#siKey", KEY);
   await page.click("#siGo");
 
-  // the first Firestore long-poll after a fresh deploy can take a while
-  await page.waitForFunction(() => getComputedStyle(document.getElementById("login")).display === "none", { timeout: 45000 });
+  // The first sign-in right after a deploy sometimes never opens the book (cold CDN
+  // edge or a slow first Firestore long-poll); a reload and second try always has.
+  const bookOpen = () => page.waitForFunction(() => getComputedStyle(document.getElementById("login")).display === "none", { timeout: 45000 });
+  try { await bookOpen(); }
+  catch (e) {
+    checks.retried = await page.evaluate(() => document.getElementById("siHint").textContent);
+    await page.reload({ waitUntil: "load" });
+    await page.waitForSelector("#siName", { timeout: 15000 });
+    // the device remembers the passcode now; the account may still be signed in
+    if (await page.evaluate(() => !document.getElementById("login").hidden)) {
+      await page.type("#siName", USER); await page.type("#siPw", PASS); await page.click("#siGo");
+    }
+    await bookOpen();
+  }
   await page.waitForFunction(() => document.querySelectorAll("article.ticket").length > 0, { timeout: 15000 });
   Object.assign(checks, await page.evaluate(() => ({
     appDisplay: getComputedStyle(document.getElementById("app")).display,

@@ -2,16 +2,16 @@
 // signed in with the passcode, and keep it current. Everything else lives in the
 // modules below; this file is the only one that knows about all of them.
 
-import * as R from "./rules.js?v=17";
-import * as S from "./store.js?v=17";
-import * as A from "./auth.js?v=17";
-import * as N from "./sleeper.js?v=17";
-import { state, members, onRender, touch } from "./state.js?v=17";
-import { render, toast, ticker, statsBar } from "./render.js?v=17";
-import { expireBets } from "./book.js?v=17";
-import { drawScope, drawEntries } from "./forms.js?v=17";
-import { showLogin, enforceFreshPassword } from "./dialogs.js?v=17";
-import { bindEvents } from "./actions.js?v=17";
+import * as R from "./rules.js?v=dev";
+import * as S from "./store.js?v=dev";
+import * as A from "./auth.js?v=dev";
+import * as N from "./sleeper.js?v=dev";
+import { state, members, onRender, touch } from "./state.js?v=dev";
+import { render, toast, ticker, statsBar } from "./render.js?v=dev";
+import { expireBets } from "./book.js?v=dev";
+import { drawScope, drawEntries } from "./forms.js?v=dev";
+import { showLogin, enforceFreshPassword } from "./dialogs.js?v=dev";
+import { bindEvents } from "./actions.js?v=dev";
 
 const memberForEmail=function(email){ return R.memberForEmail(email,members()); };
 

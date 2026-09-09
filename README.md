@@ -14,17 +14,35 @@ league, nothing to keep awake.
 ## How it's put together
 
 ```
-index.html            the whole app
+index.html        markup only: the login card, the page shell, the dialogs
+styles.css        the look
+app.js            boot: draw, watch sign-in, open the book, keep it current
+state.js          the shared state object and touch() — one redraw per change, coalesced
+render.js         draws the page from state (header, ticker, ledger, tickets, stats strip)
+book.js           every change to a bet or the league: local copy first, then Firestore
+forms.js          the propose/edit and join forms: draft, picker, game mode, submit
+dialogs.js        settle, League (roster/passwords/admins), change password, login
+actions.js        data-act → function map for clicks; binds the page's events
+rules.js          PURE: stat catalog, locks, ledger math, auto names/terms, covers, parsing
+store.js          Firestore shim, leases, the passcode (the only Firestore caller)
+auth.js           Firebase Auth: sign in/out, who-am-I, admin flag, passwords
+sleeper.js        Sleeper feeds + refresh loops (the only other network caller)
 firebase-config.js    the Firebase project's public web config (not a secret)
-vendor/               the Firebase compat SDK (app + firestore), served with the page so
-                      browsers' tracking-prevention doesn't block a third-party script
+vendor/               the Firebase compat SDK, served with the page so browsers'
+                      tracking-prevention doesn't block a third-party script
+test/                 unit tests (node --test) and the browser smoke test (puppeteer)
+.github/workflows/pages.yml   deploys to Pages, stamping the commit into module URLs
 migrate-to-firebase.py  one-time copy of data/book.json into Firestore
 server.js, Dockerfile, docker-compose.yml   self-hosted alternative (see below)
 ```
 
+Module rules: `rules.js` imports nothing and touches no DOM; `render.js`, `forms.js`,
+`dialogs.js` and `actions.js` are the DOM writers; `store.js` and `sleeper.js` are the
+network callers; `app.js` is the only file that knows about all of them.
+
 - **The book** lives in Firestore under `books/<passcode>/…`. The security rules admit a
-  path only if `keys/<passcode>` exists, so the passcode is the door: the page never
-  contains it, and rotating it is adding a new `keys/` doc and deleting the old one.
+  path only if `SmyrnaLeague/<passcode>` exists, so the passcode is the door: the page
+  never contains it, and rotating it is adding a new doc there and deleting the old one.
 - **Live updates** are Firestore listeners; a change on one phone shows on the others
   in about a second.
 - **Sleeper data** is fetched by the page itself (Sleeper allows browser calls). Whoever
@@ -61,7 +79,23 @@ document reads and a few hundred writes, against 50,000 and 20,000 a day.
 4. Firestore → Data → collection `SmyrnaLeague` → a document whose **ID is the passcode**
    (letters, digits, dashes; e.g. `smyrna-league-2026`) with any field.
 5. Copy the book across: `python migrate-to-firebase.py --project <projectId> --key <passcode>`.
-6. Push to GitHub; Pages serves `index.html` from `main`.
+6. Push to GitHub. Repo → Settings → Pages → Source: **GitHub Actions**. The workflow
+   in `.github/workflows/pages.yml` deploys every push to `master`, rewriting `?v=dev`
+   in the module URLs to the commit hash so browsers fetch a whole build together.
+
+## Working on it
+
+```
+npm install          # puppeteer-core, for the browser test
+npm test             # rules, store, auth, sleeper — pure logic and fake Firebase/Sleeper
+E2E_USER=<name> E2E_PASS=<password> node test/e2e/flow.js
+```
+
+The browser test signs in to the live site, checks the login card is really gone
+(computed style), the tickets and ledger render, and drives the filters, the League
+dialog and the propose form (stat and game modes, the player picker) read-only. It
+runs against the live URL because the Firebase key is locked to that domain; a local
+copy renders but can't sign in. Use a spare manager account for it, never an admin.
 
 ## What it does
 
@@ -124,9 +158,11 @@ Firebase just needs an email-shaped identifier.
   if it's lost, delete the user in Firebase console → Authentication and set it again.
 - **Anyone signed in** can change their own password (header → Change password; asks
   for the current one). Nobody can change anyone else's except an admin.
-- **A change is required while on the default.** At every sign-in and page load the
-  page silently re-signs-in with `<Name>123!`; if that works, a non-dismissable
-  "pick a new password" dialog appears. An admin reset to Default triggers it again.
+- **A change is required while on the default.** If the password typed at sign-in is
+  `<Name>123!`, a non-dismissable "pick a new password" dialog appears before
+  anything else. (Decided from what was typed — the page never probes Firebase with
+  the default, which would count as failed logins and throttle the account.) An admin
+  reset to Default triggers it again at the next sign-in.
 - **First admin sign-in** creates the admin's own account with whatever password they
   type, as long as they're already listed in `adminEmails`.
 - Firebase console, once: Authentication → Sign-in method → **Email/Password → Enable**
