@@ -176,6 +176,7 @@ export function bindEvents(hooks){
   });
   on("signOutBtn","click",function(){ A.signOut().then(function(){ location.reload(); }); });
   on("pwBtn","click",D.openPasswordDlg);
+  on("adminBtn","click",hooks.toggleAdmin);
   on("pwGo","click",function(e){ e.preventDefault(); D.changeOwnPassword(); });
   on("pwDlg","cancel",function(e){ if(state.mustChange) e.preventDefault(); });
   on("siForm","submit",function(e){ e.preventDefault(); D.submitLogin(hooks.enterBook); });

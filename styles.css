@@ -210,6 +210,8 @@ section{margin-top:28px}
 .btn{background:var(--surface-2);border:1px solid transparent;border-radius:99px;padding:8px 15px;cursor:pointer;font-size:12.5px;font-weight:700;color:var(--ink-2)}
 .btn:hover{color:var(--ink)}
 .btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+/* the admin switch: quiet when off, the accent when the admin controls are showing */
+.btn.adm[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
 .btn.pri{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
 .btn.pri:hover{opacity:.88;color:var(--accent-ink)}
 .btn.gold{background:var(--gold);border-color:var(--gold);color:#1A1204}

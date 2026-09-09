@@ -10,7 +10,7 @@ import { state, members, onRender, touch } from "./state.js?v=dev";
 import { render, toast, ticker, statsBar } from "./render.js?v=dev";
 import { expireBets, settleFinished } from "./book.js?v=dev";
 import { drawScope, drawEntries } from "./forms.js?v=dev";
-import { showLogin, enforceFreshPassword } from "./dialogs.js?v=dev";
+import { showLogin, enforceFreshPassword, drawRoster } from "./dialogs.js?v=dev";
 import { bindEvents } from "./actions.js?v=dev";
 
 const memberForEmail=function(email){ return R.memberForEmail(email,members()); };
@@ -23,7 +23,18 @@ function scoresTick(db){ if(!db||state.local) return; N.scoresTick(db,refreshCtx
 function runRefresh(db,by,forced){ return N.runRefresh(db,by,forced,refreshCtx()); }
 function makeDb(key){ return S.makeDb(key,{ refresh:runRefresh }); }
 
-function applyAuth(user){ var w=A.whoAmI(user,state.config); state.me=w.me; state.admin=w.admin; }
+// An admin sees the admin controls only with the header switch on; off, the app
+// looks and behaves as it does for everyone else. The switch is remembered per device.
+const ADMIN_LS="smyrna.adminMode";
+try{ state.adminMode=localStorage.getItem(ADMIN_LS)==="on"; }catch(e){}
+function applyAuth(user){ var w=A.whoAmI(user,state.config); state.me=w.me; state.isAdmin=w.admin; state.admin=w.admin&&state.adminMode; }
+export function toggleAdmin(){
+  state.adminMode=!state.adminMode;
+  try{ localStorage.setItem(ADMIN_LS,state.adminMode?"on":"off"); }catch(e){}
+  state.admin=state.isAdmin&&state.adminMode;
+  if(document.getElementById("rosterDlg").open) drawRoster();
+  touch();
+}
 
 // Signed in and passcode known: open the book, subscribe once, show the app when it lands.
 function enterBook(user){
@@ -122,7 +133,7 @@ function subscribeBook(db){
 
 /* ---- boot ---- */
 onRender(function(){ expireBets(); settleFinished(); render(); });
-bindEvents({ enterBook:enterBook });
+bindEvents({ enterBook:enterBook, toggleAdmin:toggleAdmin });
 state.config={ leagueName:"Smyrna League", season:"2026", stake:25, kickoff:R.DEFAULT_KICKOFF, members:[] };
 state.bets=[];
 render();

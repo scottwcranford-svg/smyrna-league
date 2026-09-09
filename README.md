@@ -155,7 +155,10 @@ Identity comes from Firebase Auth, so nobody can act as someone else. Under the 
 the account ID is `<name-slug>@smyrna.league` — never shown, never a real mailbox;
 Firebase just needs an email-shaped identifier.
 
-- **Admins** are listed in `league/config.adminEmails`. On the League screen an admin
+- **Admins** get an **Admin on/off** switch in the header. Off (the default), the app
+  looks and behaves exactly as it does for any manager; on, the admin controls show.
+  The switch is remembered per device. Admins are listed in
+  `league/config.adminEmails`. With the switch on, on the League screen an admin
   sees a password field and an **Admin** toggle on every manager, can add/remove
   managers, edit league settings, and gets an **Update** button on any live or open
   bet (even after lock) to fix mistakes. Anyone can be flagged admin; there must

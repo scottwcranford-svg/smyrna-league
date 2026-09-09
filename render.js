@@ -107,6 +107,10 @@ function head(){
   var nm=document.getElementById("meName"); nm.hidden=!signed; nm.textContent=signed?mName(state.me):"";
   document.getElementById("signOutBtn").hidden=!signed;
   document.getElementById("pwBtn").hidden=!signed;
+  var adm=document.getElementById("adminBtn");
+  adm.hidden=!(signed&&state.isAdmin);
+  adm.setAttribute("aria-pressed",String(!!state.admin));
+  adm.textContent=state.admin?"Admin on":"Admin off";
 }
 
 function banner(){

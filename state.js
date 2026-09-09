@@ -4,7 +4,8 @@
 
 export const state = {
   db:null, connected:false, ready:false, local:true,
-  config:null, bets:[], me:null, admin:false,
+  // `isAdmin` is who you are; `admin` is whether the admin controls are showing right now
+  config:null, bets:[], me:null, isAdmin:false, admin:false, adminMode:false,
   filter:{ status:"all", week:"all", mine:false },
   refresh:null, roster:null, games:null,
   // the propose / join forms' draft
