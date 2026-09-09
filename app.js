@@ -1,9 +1,10 @@
 // The page: state, rendering, forms and the sign-in flow. Boot is at the bottom.
 // rules.js holds the pure logic, store.js the book (Firestore + passcode),
 // auth.js the accounts. Each refactor step moves more out of here.
-import * as R from "./rules.js?v=14";
-import * as S from "./store.js?v=14";
-import * as A from "./auth.js?v=14";
+import * as R from "./rules.js?v=15";
+import * as S from "./store.js?v=15";
+import * as A from "./auth.js?v=15";
+import * as N from "./sleeper.js?v=15";
 
 var COLORS=R.COLORS;
 var REG_WEEKS=R.REG_WEEKS, PLAYOFF_START=R.PLAYOFF_START, LAST_WEEK=R.LAST_WEEK;
@@ -1021,101 +1022,12 @@ function setKey(k){ S.setKey(k); }
 function storedKey(){ return S.storedKey(); }
 function tryKey(k){ return S.tryKey(k); }
 
-/* ---- keeping the book current, from the browser ----
-   Sleeper allows browser calls, so whoever has the page open pulls the feeds and
-   writes the results into the book for everyone. Short leases keep it to one
-   writer at a time so ten phones don't do the same work or burn the free quota. */
-var SLEEPER="https://api.sleeper.app";
-var COMPOSITES=R.COMPOSITES, FANTASY_POS=R.FANTASY_POS;
-function nflSeason(){ return String((state.config&&state.config.season)||"2026"); }
-function sj(url){ return fetch(url).then(function(r){ if(!r.ok) throw new Error(r.status+" "+url); return r.json(); }); }
-function isoNow(){ return new Date().toISOString().replace(/\.\d{3}Z$/,"Z"); }
-function ageMin(iso){ var t=Date.parse(iso||""); return isNaN(t)?1e9:(Date.now()-t)/60000; }
-function valueFor(key,kind,totals){ return R.valueFor(key,kind,totals); }
-var LEASE_ID="anon"+Math.random().toString(36).slice(2,8);
-function lease(db,name,ttl){ return S.lease(db,name,ttl,state.me||LEASE_ID); }
-
-function gamesFor(weeks){
-  return Promise.all(weeks.map(function(w){ return sj(SLEEPER+"/scores/nfl/regular/"+nflSeason()+"/"+w).catch(function(){ return []; }); })).then(function(lists){
-    var games=[];
-    lists.forEach(function(feed,i){ feed.forEach(function(s){
-      var m=s.metadata||{}, iso=(m.date_time||"").replace("+00:00","Z"); if(!iso) return;
-      var g={ id:s.game_id, week:Number(s.week||weeks[i]), away:m.away_team||s.away, home:m.home_team||s.home, date:iso.slice(0,19)+"Z" };
-      var over=!!m.is_over||s.status==="complete", live=!over&&(!!m.is_in_progress||!!m.has_started||s.status==="in_game");
-      g.status=over?"final":live?"live":"pre";
-      if(m.home_score!=null&&m.away_score!=null){ g.awayScore=Number(m.away_score); g.homeScore=Number(m.home_score); }
-      if(live||over){ var q=String(m.quarter_num==null?"":m.quarter_num).trim(); g.q=/^\d+$/.test(q)?Number(q):null; g.ql=m.quarter||""; g.clock=m.time_remaining||""; g.ot=!!m.is_overtime; }
-      if(live){ g.pos=m.possession||""; g.rz=!!m.red_zone; g.dd=m.down_and_distance||""; }
-      games.push(g);
-    }); });
-    return games;
-  });
-}
-// this week's (and next week's) scores — every minute while a game is on, else every ten
-function scoresTick(db){
-  if(!db||state.local) return;
-  var w=currentWeek(), weeks=[w]; if(w<18) weeks.push(w+1);
-  var G=allGames(), now=Date.now();
-  var hot=G.some(function(g){ return g.week===w&&(g.status==="live"||(now>=Date.parse(g.date)-3600000&&now<Date.parse(g.date)+4*3600000)); });
-  var cur=state.games||{};
-  if(ageMin(cur.updatedAt)<(hot?0.9:9.5)) return;          // fresh enough, or someone else just did it
-  lease(db,"scores",50000).then(function(ok){
-    if(!ok) return;
-    return gamesFor(weeks).then(function(fresh){
-      if(!fresh.length) return;
-      var keep=(cur.games||[]).filter(function(g){ return weeks.indexOf(g.week)<0; });
-      var games=keep.concat(fresh).sort(function(a,b){ return a.week-b.week||a.date.localeCompare(b.date); });
-      return db.doc("league/games").set(Object.assign({ season:nflSeason() },cur,{ updatedAt:isoNow(), count:games.length, source:"Sleeper scores", games:games }));
-    });
-  }).catch(function(){});
-}
-// stats, schedule, roster, every game — hourly, or on Refresh
-function runRefresh(db,by,forced){
-  var R=state.refresh||{};
-  if(!forced&&ageMin(R.finishedAt)<55) return Promise.resolve({ note:"recent" });
-  if(forced&&ageMin(R.finishedAt)<1){ scoresTick(db); return Promise.resolve({ note:"recent" }); }
-  return lease(db,"refresh",90000).then(function(ok){
-    if(!ok) return { note:"busy" };
-    var now=isoNow(), season=nflSeason();
-    db.doc("league/refresh").update({ requestedAt:now, requestedBy:by||null });
-    return sj(SLEEPER+"/v1/state/nfl").catch(function(){ return {}; }).then(function(st){
-      var maxW=Math.min(18,Math.max(1,Number(st.week)||18));
-      // through: the highest week with stats posted, bounded by the NFL's current week
-      var seq=Promise.resolve(0);
-      for(var w=1;w<=maxW;w++)(function(w){ seq=seq.then(function(last){ if(last<w-1) return last; return sj(SLEEPER+"/v1/stats/nfl/regular/"+season+"/"+w).then(function(d){ return (d&&Object.keys(d).length)?w:last; }).catch(function(){ return last; }); }); })(w);
-      return seq.then(function(week){
-        return sj(SLEEPER+"/v1/stats/nfl/regular/"+season).catch(function(){ return {}; }).then(function(totals){
-          var through=week?"Through week "+week:"No games played yet", writes=[], n=0;
-          state.bets.forEach(function(b){
-            var S=b.stats; if(!S||!Array.isArray(S.rows)) return;
-            var kind=S.stat||"pts_ppr", tracks=(Array.isArray(S.tracks)&&S.tracks.length)?S.tracks:[{stat:kind}];
-            var rows=S.rows.map(function(r){ var o=Object.assign({},r); o.values={}; tracks.forEach(function(t){ if(t.stat) o.values[t.stat]=valueFor(r.key,t.stat,totals); }); o.value=valueFor(r.key,kind,totals); return o; });
-            writes.push(db.doc("bets/"+b.id).update({ stats:Object.assign({},S,{ rows:rows, through:through, source:"Sleeper", updatedAt:now }) })); n++;
-          });
-          // the schedule daily; the roster weekly, and never from a phone (the player index is 10 MB)
-          var roster=state.roster||{}, cfg=state.config||{}, mobile=/Mobi|Android/i.test(navigator.userAgent);
-          if(ageMin(cfg.scheduleUpdatedAt)>24*60) writes.push(fetch("https://github.com/nflverse/nfldata/raw/master/data/games.csv").then(function(r){ return r.text(); }).then(function(csv){
-            var starts=weekStartsFromCsv(csv,season); if(Object.keys(starts).length) return db.doc("league/config").update({ weekStarts:starts, scheduleUpdatedAt:now }); }).catch(function(){}));
-          if(!mobile&&ageMin(roster.updatedAt)>7*24*60) writes.push(sj(SLEEPER+"/v1/players/nfl").then(function(players){
-            var rows=[]; Object.keys(players).forEach(function(pid){ var v=players[pid]||{};
-              if(v.position==="DEF") rows.push([pid,((v.first_name||"")+" "+(v.last_name||"")).trim(),"DEF",pid]);
-              else if(v.team&&(v.fantasy_positions||[]).some(function(p){ return FANTASY_POS[p]; })) rows.push([pid,v.full_name||"",v.position||"",v.team]); });
-            rows.sort(function(a,b){ return ((a[2]==="DEF")-(b[2]==="DEF"))||a[1].localeCompare(b[1]); });
-            return db.doc("league/roster").set({ updatedAt:now, count:rows.length, players:rows }); }).catch(function(){}));
-          var weeks=[]; for(var i=1;i<=18;i++) weeks.push(i);
-          writes.push(gamesFor(weeks).then(function(games){ if(games.length) return db.doc("league/games").set({ season:season, updatedAt:now, count:games.length, source:"Sleeper scores", games:games }); }).catch(function(){}));
-          return Promise.all(writes).then(function(){ return db.doc("league/refresh").update({ finishedAt:isoNow(), through:through, status:"done", by:by||null }); })
-            .then(function(){ return { ok:true, through:through, bets:n }; });
-        });
-      });
-    });
-  });
-}
-// first kickoff of each week from nflverse (gameday + gametime in Eastern)
-function weekStartsFromCsv(csv,season){ return R.weekStartsFromCsv(csv,season); }
-function splitCsv(line){ return R.splitCsv(line); }
-function etOffsetMin(t){ return R.etOffsetMin(t); }
-function etToUtc(dateStr,timeStr){ return R.etToUtc(dateStr,timeStr); }
+/* ---- keeping the book current (sleeper.js) ----
+   The loops need a snapshot of what this page knows; nothing in sleeper.js reads state. */
+function refreshCtx(){ return { config:state.config, games:state.games, refresh:state.refresh, bets:state.bets, roster:state.roster,
+                                holder:state.me, mobile:/Mobi|Android/i.test(navigator.userAgent) }; }
+function scoresTick(db){ if(!db||state.local) return; N.scoresTick(db,refreshCtx()); }
+function runRefresh(db,by,forced){ return N.runRefresh(db,by,forced,refreshCtx()); }
 
 
 /* ---- who you are: Firebase Auth ----
