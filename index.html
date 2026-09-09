@@ -289,10 +289,12 @@ footer.foot{margin-top:36px;padding-top:16px;border-top:1px solid var(--rule);fo
 <div class="login" id="login">
   <div class="login-card">
     <div class="login-brand"><span class="league-badge">SL</span><div><div class="kicker">2026 season · side bets</div><h1>Smyrna League</h1></div></div>
-    <label class="f"><span>Your name</span><input class="field" id="siName" autocomplete="username" autocapitalize="off" placeholder="Sleeper name, as it shows in the league"></label>
-    <label class="f"><span>Password</span><input class="field" id="siPw" type="password" autocomplete="current-password"></label>
-    <label class="f" id="siKeyRow" hidden><span>League passcode</span><input class="field" id="siKey" autocomplete="off" autocapitalize="off" placeholder="From the league chat"></label>
-    <button class="btn pri lg" id="siGo">Sign in</button>
+    <form id="siForm" autocomplete="on" style="display:contents">
+    <label class="f"><span>Your name</span><input class="field" id="siName" name="username" autocomplete="username" autocapitalize="off" placeholder="Sleeper name, as it shows in the league"></label>
+    <label class="f"><span>Password</span><input class="field" id="siPw" name="password" type="password" autocomplete="current-password"></label>
+    <label class="f" id="siKeyRow" hidden><span>League passcode</span><input class="field" id="siKey" name="passcode" autocomplete="off" autocapitalize="off" placeholder="From the league chat"></label>
+    <button class="btn pri lg" id="siGo" type="submit">Sign in</button>
+    </form>
     <div class="hint" id="siHint"></div>
   </div>
 </div>
@@ -1722,9 +1724,12 @@ function makeDb(key){
 // The league passcode: from the link (?key=…), else remembered on this device.
 // It's checked against a tiny "gate" document the rules let anyone read with the
 // right passcode — nothing else in the book is readable before sign-in.
+var memKey="";   // in-memory copy, so a browser that blocks storage still gets through this visit
+function setKey(k){ memKey=k; try{ localStorage.setItem(KEY_LS,k); }catch(e){} }
 function storedKey(){
   var k=""; try{ k=new URLSearchParams(location.search).get("key")||""; }catch(e){}
-  if(k){ try{ localStorage.setItem(KEY_LS,k); history.replaceState(null,"",location.pathname); }catch(e){} return k; }
+  if(k){ setKey(k); try{ history.replaceState(null,"",location.pathname); }catch(e){} return k; }
+  if(memKey) return memKey;
   try{ return localStorage.getItem(KEY_LS)||""; }catch(e){ return ""; }
 }
 function tryKey(k){
@@ -1899,17 +1904,23 @@ function submitLogin(){
   hint.textContent="Signing in…";
   tryKey(key).then(function(ok){
     if(!ok){ document.getElementById("siKeyRow").hidden=false; try{ localStorage.removeItem(KEY_LS); }catch(e){} hint.textContent="That passcode isn't right"; return; }
-    try{ localStorage.setItem(KEY_LS,key); }catch(e){}
+    setKey(key);
     return firebase.auth().signInWithEmailAndPassword(slugName(name)+"@"+AUTH_DOMAIN,pw)
-      .then(function(){ hint.textContent=""; /* onAuthStateChanged opens the book */ })
+      .then(function(cred){
+        hint.textContent="Opening the book…";
+        // if this browser was already signed in, auth state won't "change" — open the book directly
+        enterBook(cred.user||firebase.auth().currentUser);
+      })
       .catch(function(e){ hint.textContent=authMsg(e); });
   });
 }
 // Signed in and passcode known: open the book, subscribe once, show the app when it lands.
 function enterBook(user){
+  if(!user) return;
   var key=storedKey();
-  if(!key){ showLogin("Signed in as "+user.email.split("@")[0]+" — now the league passcode."); return; }
+  if(!key){ showLogin("Signed in — now the league passcode."); return; }
   if(!state.db){ state.db=makeDb(key); state.connected=true; subscribeBook(state.db); }
+  else if(!state.local){ document.getElementById("login").hidden=true; document.getElementById("app").hidden=false; render(); }
   enforceFreshPassword(user);
 }
 
@@ -2171,7 +2182,7 @@ document.getElementById("pwBtn").addEventListener("click",function(){
   document.getElementById("pwDlg").showModal(); document.getElementById("pwCur").focus();
 });
 document.getElementById("pwGo").addEventListener("click",function(e){ e.preventDefault(); changeOwnPassword(); });
-document.getElementById("siGo").addEventListener("click",function(e){ e.preventDefault(); submitLogin(); });
+document.getElementById("siForm").addEventListener("submit",function(e){ e.preventDefault(); submitLogin(); });
 ["siName","siPw","siKey"].forEach(function(id){ document.getElementById(id).addEventListener("keydown",function(e){ if(e.key==="Enter"){ e.preventDefault(); submitLogin(); } }); });
 document.getElementById("rAdd").addEventListener("click",function(e){
   e.preventDefault();
