@@ -63,6 +63,8 @@ let browser; const errors = [], checks = {};
     panelsShown: [...document.querySelectorAll("section[data-panel]")].filter(s => getComputedStyle(s).display !== "none").map(s => s.getAttribute("data-panel")),
     glance: document.getElementById("glanceTxt").textContent,
     leagueLine: document.getElementById("leagueSub").textContent,
+    // within an hour of kickoff the book is locked: nothing glows and nothing is joinable, and that's right
+    unlocked: document.querySelectorAll("article.ticket .lock-when").length,
     // tickets still looking for people carry a glow (computed shadow, not just the class)
     seeking: document.querySelectorAll("article.ticket.seeking").length,
     seekingGlow: (a => a ? getComputedStyle(a).boxShadow !== getComputedStyle(document.querySelector("article.ticket:not(.seeking)") || a).boxShadow : false)(document.querySelector("article.ticket.seeking")),
@@ -137,9 +139,9 @@ let browser; const errors = [], checks = {};
   await browser.close();
 
   const ok = checks.appDisplay !== "none" && checks.me === USER && checks.tickets >= 1 && checks.seats >= 1 && checks.liveOnly === true
-    && checks.joinOn.length >= 1 && !checks.joinOn.some(t => /White Men Can Catch|NE @ SEA/.test(t)) && (process.env.E2E_ADMIN ? checks.adminSwitchShown === true && checks.adminSwitchOff === true : checks.adminSwitchHidden === true && checks.adminSwitchShown === false)
+    && (checks.unlocked === 0 || (checks.joinOn.length >= 1 && !checks.joinOn.some(t => /White Men Can Catch|NE @ SEA/.test(t)))) && (process.env.E2E_ADMIN ? checks.adminSwitchShown === true && checks.adminSwitchOff === true : checks.adminSwitchHidden === true && checks.adminSwitchShown === false)
     && /Book/.test(checks.tabOn) && checks.panelsShown.join() === "book" && /bets running/.test(checks.glance) && /side bets/.test(checks.leagueLine)
-    && checks.ledgerTab.board === true && checks.ledgerTab.book === true && checks.ledgerTab.saved === "ledger" && checks.seeking >= 1 && checks.seekingGlow === true
+    && checks.ledgerTab.board === true && checks.ledgerTab.book === true && checks.ledgerTab.saved === "ledger" && (checks.unlocked === 0 || (checks.seeking >= 1 && checks.seekingGlow === true))
     && checks.rosterRows >= 1 && checks.rosterReadOnly === true && /Last in/.test(checks.seenSelf) && checks.onBoard === !checks.selfIsTest
     && checks.title === "Propose a bet" && checks.scopeChips === 3 && checks.statChips >= 10 && checks.entryRows === 1 && checks.rowOneLocked === true && checks.twoStats === 2
     && /Chase/.test(checks.pickChip) && checks.gameOptions >= 1 && checks.sideTaken === 1 && errors.length === 0;
