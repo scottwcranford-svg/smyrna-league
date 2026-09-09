@@ -33,6 +33,9 @@ export function avatarHtml(id,size){
   var m=member(id);
   var fs=Math.round(size*0.38);
   if(!m) return '<span class="avatar" style="width:'+size+'px;height:'+size+'px;background:var(--ink-3);font-size:'+fs+'px">?</span>';
+  // The manager's Sleeper avatar when the book has one; their initials otherwise.
+  var hash=state.avatars&&state.avatars.byId?state.avatars.byId[id]:"";
+  if(hash) return '<img class="avatar" src="https://sleepercdn.com/avatars/thumbs/'+esc(hash)+'" width="'+size+'" height="'+size+'" alt="" title="'+esc(m.name)+'" style="width:'+size+'px;height:'+size+'px">';
   return '<span class="avatar" style="width:'+size+'px;height:'+size+'px;background:'+esc(m.color)+';font-size:'+fs+'px">'+esc(initials(m.name))+"</span>";
 }
 // Status tags for a pick id: Q, OUT, IR… from the roster as it is now, not as it was when the bet was made.

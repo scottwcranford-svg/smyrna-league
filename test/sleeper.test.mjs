@@ -112,6 +112,28 @@ test("runRefresh: projections for this week, next, and live weekly bets; rewritt
   assert.equal(db2.writes.some((x) => x[1] === "league/proj"), false, "unchanged projections are not rewritten");
 });
 
+test("runRefresh: Sleeper avatars by username, daily or when a manager is new", async () => {
+  const db = fakeDb();
+  const users = [];
+  globalThis.fetch = async (u) => {
+    const m = /\/v1\/user\/([^/?]+)$/.exec(u); if (m) users.push(decodeURIComponent(m[1]));
+    return { ok: true, json: async () => (/state\/nfl/.test(u) ? { week: 1 } : m ? (m[1] === "hobnailboot" ? { username: "hobnailboot", avatar: "6dcbee5f" } : null) : /stats\/nfl\/regular\/2026/.test(u) ? {} : []), text: async () => "" };
+  };
+  const cfg = { ...config, scheduleUpdatedAt: N.isoNow(), members: [{ id: "m0", name: "hobnailboot" }, { id: "m1", name: "testbot" }] };
+  await N.runRefresh(db, "m0", true, { config: cfg, refresh: {}, bets: [], roster: { updatedAt: N.isoNow() }, holder: "m0", mobile: true });
+  assert.deepEqual(users.sort(), ["hobnailboot", "testbot"], "one lookup per manager");
+  const w = db.writes.find((x) => x[1] === "league/avatars");
+  assert.deepEqual(w[2].byId, { m0: "6dcbee5f", m1: "" }, "unknown names keep their initials");
+  // all known and fresh: no lookups
+  users.length = 0; const db2 = fakeDb();
+  await N.runRefresh(db2, "m0", true, { config: cfg, refresh: {}, bets: [], roster: { updatedAt: N.isoNow() }, holder: "m0", mobile: true, avatars: { updatedAt: N.isoNow(), byId: { m0: "6dcbee5f", m1: "" } } });
+  assert.equal(users.length, 0); assert.equal(db2.writes.some((x) => x[1] === "league/avatars"), false);
+  // a new manager on the roster: look everyone up again
+  const db3 = fakeDb();
+  await N.runRefresh(db3, "m0", true, { config: { ...cfg, members: cfg.members.concat([{ id: "m2", name: "newguy" }]) }, refresh: {}, bets: [], roster: { updatedAt: N.isoNow() }, holder: "m0", mobile: true, avatars: { updatedAt: N.isoNow(), byId: { m0: "6dcbee5f", m1: "" } } });
+  assert.equal(db3.writes.some((x) => x[1] === "league/avatars"), true);
+});
+
 test("runRefresh honours the hourly rule, then writes stats, games and the refresh stamp", async () => {
   const db = fakeDb();
   assert.equal((await N.runRefresh(db, "m1", false, { config, refresh: { finishedAt: N.isoNow() } })).note, "recent");

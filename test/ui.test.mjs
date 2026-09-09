@@ -231,6 +231,20 @@ test("Join dialog search works after the propose form has been drawn (shared ids
   await p.close();
 });
 
+test("Sleeper avatars show where the book has one; initials otherwise", { skip }, async () => {
+  const { p, errors } = await page();
+  const out = await p.evaluate(async () => {
+    const { state } = await import("./state.js?v=dev"); const V = await import("./render.js?v=dev");
+    state.avatars = { updatedAt: "2026-09-09T20:00:00Z", byId: { a: "6dcbee5f295974c3ea459f3aa1e3ba02", b: "" } };
+    V.render();
+    return [...document.querySelectorAll("#board .seat")].map(s => { const a = s.querySelector(".avatar"); return [s.querySelector(".seat-name").textContent, a.tagName, a.tagName === "IMG" ? a.getAttribute("src") : a.textContent, getComputedStyle(a).borderRadius]; });
+  });
+  assert.deepEqual(out.map(r => r.slice(0, 3)), [["Alice", "IMG", "https://sleepercdn.com/avatars/thumbs/6dcbee5f295974c3ea459f3aa1e3ba02"], ["Bob", "SPAN", "BO"], ["Cara", "SPAN", "CA"]]);
+  assert.equal(out[0][3], "50%", "round, like the initials");
+  assert.deepEqual(errors, []);
+  await p.close();
+});
+
 test("League dialog: when each manager was last in", { skip }, async () => {
   const { p, errors } = await page();
   const out = await p.evaluate(async () => {

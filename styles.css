@@ -118,6 +118,7 @@ section{margin-top:28px}
 .seat-top{display:flex;align-items:center;gap:9px;min-width:0}
 .avatar{display:inline-flex;align-items:center;justify-content:center;border-radius:50%;flex:none;color:#fff;font-weight:800;letter-spacing:-.02em;line-height:1}
 .avatar.open{background:var(--surface-2)!important;color:var(--ink-3)!important;border:1.5px dashed var(--rule-2)}
+img.avatar{object-fit:cover;background:var(--surface-2);vertical-align:middle}
 .seat-name{font-weight:700;font-size:13.5px;letter-spacing:-.005em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ink)}
 .seat-team{font-size:11.5px;line-height:1.3;min-height:1.3em;color:var(--ink-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .figs{display:flex;gap:12px 14px;align-items:flex-end;flex-wrap:wrap;margin-top:1px}

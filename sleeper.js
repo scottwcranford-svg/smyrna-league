@@ -114,6 +114,18 @@ export function runRefresh(db,by,forced,ctx){
           if(!ctx.mobile&&ageMin(roster.updatedAt)>6*60) writes.push(sj(SLEEPER+"/v1/players/nfl").then(function(players){
             var rows=parseRoster(players);
             return db.doc("league/roster").set({ updatedAt:now, count:rows.length, players:rows }); }).catch(function(){}));
+          // Sleeper avatars by username, daily or when a manager is new: league/avatars is
+          // { byId: { memberId: avatarId or "" } }. A name Sleeper doesn't know just keeps its initials.
+          var av=ctx.avatars||{}, mem=cfg.members||[];
+          var newFace=mem.some(function(m){ return !(av.byId&&(m.id in av.byId)); });
+          if(mem.length&&(newFace||ageMin(av.updatedAt)>24*60)){
+            writes.push(Promise.all(mem.map(function(m){
+              return sj(SLEEPER+"/v1/user/"+encodeURIComponent(m.name)).then(function(u){ return [m.id,(u&&typeof u.avatar==="string")?u.avatar:""]; }).catch(function(){ return [m.id,""]; });
+            })).then(function(pairs){
+              var byId={}; pairs.forEach(function(pr){ byId[pr[0]]=pr[1]; });
+              return db.doc("league/avatars").set({ updatedAt:now, byId:byId });
+            }).catch(function(){}));
+          }
           // Projections for the weeks in play: the season ("0"), this week, next, and any week
           // with a live weekly stat bet. Trimmed to the roster and the tracked stats, written only when changed.
           var rosterIds=R.rosterRows(ctx.roster).map(function(r){ return r[0]; });
