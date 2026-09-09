@@ -2,13 +2,13 @@
 // each to a function, so adding a button is one row here, not another branch in a
 // chain. bindEvents() runs once at boot with what it needs from app.js.
 
-import * as R from "./rules.js?v=16";
-import * as A from "./auth.js?v=16";
-import { state, members, touch } from "./state.js?v=16";
-import { toast } from "./render.js?v=16";
-import * as B from "./book.js?v=16";
-import * as F from "./forms.js?v=16";
-import * as D from "./dialogs.js?v=16";
+import * as R from "./rules.js?v=17";
+import * as A from "./auth.js?v=17";
+import { state, members, touch } from "./state.js?v=17";
+import { toast } from "./render.js?v=17";
+import * as B from "./book.js?v=17";
+import * as F from "./forms.js?v=17";
+import * as D from "./dialogs.js?v=17";
 
 const COLORS=R.COLORS, uid=R.uid, defaultPw=R.defaultPw, emailFor=R.emailFor;
 const member=function(id){ return R.member(id,members()); };

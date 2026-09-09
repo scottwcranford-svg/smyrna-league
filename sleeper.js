@@ -5,8 +5,8 @@
 // ones that touch the network; nothing here reads the page or the shared state —
 // callers pass a `ctx` snapshot: { config, games, refresh, bets, roster, holder, mobile }.
 
-import * as R from "./rules.js?v=16";
-import { lease } from "./store.js?v=16";
+import * as R from "./rules.js?v=17";
+import { lease } from "./store.js?v=17";
 
 export const SLEEPER="https://api.sleeper.app";
 export const NFLVERSE_GAMES="https://github.com/nflverse/nfldata/raw/master/data/games.csv";

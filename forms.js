@@ -2,11 +2,11 @@
 // picker, game mode (winner or over/under), and the submit that turns a draft into
 // a bet. Reads state, writes the dialogs' DOM, saves through book.js.
 
-import * as R from "./rules.js?v=16";
-import { state, members } from "./state.js?v=16";
-import { toast } from "./render.js?v=16";
-import { guard, findBet, saveBet } from "./book.js?v=16";
-import { dbMsg } from "./store.js?v=16";
+import * as R from "./rules.js?v=17";
+import { state, members } from "./state.js?v=17";
+import { toast } from "./render.js?v=17";
+import { guard, findBet, saveBet } from "./book.js?v=17";
+import { dbMsg } from "./store.js?v=17";
 
 const STATS=R.STATS, LAST_WEEK=R.LAST_WEEK, PLAYOFF_START=R.PLAYOFF_START, LOCK_LEAD=R.LOCK_LEAD;
 const esc=R.esc, money=R.money, uid=R.uid, clone=R.clone, entriesOf=R.entriesOf, fmtWhen=R.fmtWhen,

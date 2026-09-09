@@ -3,12 +3,12 @@
 // on the starting password), and the login card that is the whole page until
 // you're in. DOM in, auth.js/store.js out.
 
-import * as R from "./rules.js?v=16";
-import * as S from "./store.js?v=16";
-import * as A from "./auth.js?v=16";
-import { state, members } from "./state.js?v=16";
-import { toast, avatarHtml } from "./render.js?v=16";
-import { guard, findBet } from "./book.js?v=16";
+import * as R from "./rules.js?v=17";
+import * as S from "./store.js?v=17";
+import * as A from "./auth.js?v=17";
+import { state, members } from "./state.js?v=17";
+import { toast, avatarHtml } from "./render.js?v=17";
+import { guard, findBet } from "./book.js?v=17";
 
 const esc=R.esc, money=R.money, entriesOf=R.entriesOf, toLocalInput=R.toLocalInput, defaultPw=R.defaultPw, DEFAULT_KICKOFF=R.DEFAULT_KICKOFF;
 const member=function(id){ return R.member(id,members()); };

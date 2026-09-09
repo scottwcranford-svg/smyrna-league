@@ -4,7 +4,7 @@
 // league/config.adminEmails. This module owns every call into firebase.auth();
 // it has no DOM — the sign-in screen and dialogs live with the rest of the page.
 
-import { AUTH_DOMAIN, slugName, defaultPw, emailFor, memberForEmail, adminEmails } from "./rules.js?v=16";
+import { AUTH_DOMAIN, slugName, defaultPw, emailFor, memberForEmail, adminEmails } from "./rules.js?v=17";
 
 function auth(){ return firebase.auth(); }
 
