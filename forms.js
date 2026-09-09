@@ -282,7 +282,8 @@ export function submitBet(){
     d.memberId=null;
     if(d.invite){ if(inv[d.invite]) return toast(mName(d.invite)+" is invited twice"); inv[d.invite]=1; }
   }
-  if(state.draftScope&&rosterRows().length){
+  // Stat bets need a pick on every side. A game bet's sides are the two teams, set above.
+  if(statScope&&rosterRows().length){
     var missing=state.draft.some(function(e){ return !(e.picks&&e.picks.length); });
     if(missing) return toast(state.draftScope==="team"?"Pick a defense for every side":"Pick a player for every side");
     var held={}, dup=null;
@@ -359,6 +360,9 @@ export function submitJoin(){
   var d=state.draft[0]||{}, scope=state.draftScope;
   if(scope&&rosterRows().length){
     if(!(d.picks&&d.picks.length)) return toast(scope==="team"?"Pick a defense":"Pick a player");
+    // a player bet is even-handed: join with as many players as the proposer put up
+    var want=((entriesOf(bet)[0]||{}).picks||[]).length;
+    if(scope==="player"&&want&&d.picks.length!==want) return toast("Pick "+want+(want===1?" player":" players")+", same as "+mName(bet.createdBy||(entriesOf(bet)[0]||{}).memberId));
     var held={}; entriesOf(bet).forEach(function(e){ (e.picks||[]).forEach(function(p){ held[p.id]=1; }); });
     var dup=null; d.picks.forEach(function(p){ if(held[p.id]) dup=p.name; });
     if(dup) return toast(dup+" is already taken");
