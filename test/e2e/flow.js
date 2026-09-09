@@ -87,6 +87,9 @@ let browser; const errors = [], checks = {};
   const seenRow = (u) => [...document.querySelectorAll("#rosterList .rrow")].filter(r => r.querySelector(".r-name").textContent === u).map(r => r.querySelector(".r-seen").textContent)[0] || "";
   await page.waitForFunction((u) => [...document.querySelectorAll("#rosterList .rrow")].some(r => r.querySelector(".r-name").textContent === u && /Last in/.test(r.querySelector(".r-seen").textContent)), { timeout: 10000 }, USER).catch(() => {});
   checks.seenSelf = await page.evaluate(seenRow, USER);
+  // a test account (Test ticked on its row) sees its own row, tagged, and is left off the ledger board
+  checks.selfIsTest = await page.evaluate((u) => [...document.querySelectorAll("#rosterList .rrow")].some(r => r.querySelector(".r-name").textContent === u && !!r.querySelector(".r-test")), USER);
+  checks.onBoard = await page.evaluate((u) => [...document.querySelectorAll("#board .seat-name")].some(e => e.textContent === u), USER);
   await page.evaluate(() => document.getElementById("rosterDlg").close());
 
   // the propose form: player mode with the picker, stat chips toggle, game mode lists games
@@ -121,7 +124,7 @@ let browser; const errors = [], checks = {};
 
   const ok = checks.appDisplay !== "none" && checks.me === USER && checks.tickets >= 1 && checks.seats >= 1 && checks.liveOnly === true
     && checks.joinOn.length >= 1 && !checks.joinOn.some(t => /White Men Can Catch|NE @ SEA/.test(t)) && (process.env.E2E_ADMIN ? checks.adminSwitchHidden === false && checks.adminSwitchOff === true : checks.adminSwitchHidden === true) && checks.seeking >= 1 && checks.seekingGlow === true
-    && checks.rosterRows >= 1 && checks.rosterReadOnly === true && /Last in/.test(checks.seenSelf)
+    && checks.rosterRows >= 1 && checks.rosterReadOnly === true && /Last in/.test(checks.seenSelf) && checks.onBoard === !checks.selfIsTest
     && checks.title === "Propose a bet" && checks.scopeChips === 3 && checks.statChips >= 10 && checks.entryRows === 1 && checks.rowOneLocked === true && checks.twoStats === 2
     && /Chase/.test(checks.pickChip) && checks.gameOptions >= 1 && checks.sideTaken === 1 && errors.length === 0;
   console.log(JSON.stringify({ ...checks, errors }, null, 0));
