@@ -2297,6 +2297,7 @@ connectDb().then(function(db){
             state.bets=remoteBets||[];
           }
           applyAuth(firebase.auth().currentUser);   // the roster may have arrived after sign-in
+          if(document.getElementById("signDlg").open) openSignIn(state.signRequired);   // refresh its name list
         }
       }
       render();
