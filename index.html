@@ -1,4 +1,4 @@
-<title>Smyrna Side Book</title>
+<title>Smyrna League</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&display=swap">
@@ -280,7 +280,7 @@ footer.foot{margin-top:36px;padding-top:16px;border-top:1px solid var(--rule);fo
     <div class="brand">
       <span class="league-badge" id="leagueBadge"></span>
       <div class="brand-text">
-        <div class="kicker" id="kicker">2026 season · side book</div>
+        <div class="kicker" id="kicker">2026 season · side bets</div>
         <h1 id="leagueName">Smyrna League</h1>
         <div class="sub" id="leagueSub"></div>
       </div>
@@ -748,9 +748,9 @@ function ticker(){
 
 function head(){
   var c=state.config;
-  document.getElementById("leagueName").textContent=c?c.leagueName:"Side Book";
+  document.getElementById("leagueName").textContent=c?c.leagueName:"Smyrna League";
   document.getElementById("leagueBadge").textContent=initials(c?c.leagueName:"SB");
-  document.getElementById("kicker").textContent=((c&&c.season)?c.season+" season":"Fantasy")+" · side book";
+  document.getElementById("kicker").textContent=((c&&c.season)?c.season+" season":"Fantasy")+" · side bets";
   var live=0, n=state.bets.length;
   state.bets.forEach(function(b){ if(b.status==="active"||b.status==="open") live++; });
   document.getElementById("leagueSub").textContent = n
@@ -2083,7 +2083,7 @@ connectDb().then(function(db){
       if(snap.exists){
         var d=clone(snap.data());
         if(d&&Array.isArray(d.members)&&d.members.length){
-          state.config={ leagueName:d.leagueName||"Side Book", season:d.season||"",
+          state.config={ leagueName:d.leagueName||"Smyrna League", season:d.season||"",
                          stake:Number(d.stake)||25, members:d.members,
                          kickoff:d.kickoff||DEFAULT_KICKOFF,
                          weekStarts:(d.weekStarts&&typeof d.weekStarts==="object")?d.weekStarts:null };

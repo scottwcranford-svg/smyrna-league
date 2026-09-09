@@ -1,9 +1,9 @@
-# Smyrna Side Book
+# Smyrna League
 
 A shared side-bet ledger for the Smyrna League (Sleeper league `1314265150127116288`, 2026 season).
 Tracks wagers made *alongside* the fantasy league — not the league itself.
 
-**Live page:** https://scottwcranford-svg.github.io/side-action/ — open it, enter the league
+**Live page:** https://scottwcranford-svg.github.io/smyrna-league/ — open it, enter the league
 passcode once, pick your name.
 
 Free end to end: the page is a static file on GitHub Pages, the shared book is in
@@ -45,20 +45,21 @@ document reads and a few hundred writes, against 50,000 and 20,000 a day.
 
 1. Firebase console → new project → Firestore Database (production mode).
 2. Register a web app; paste its `firebaseConfig` into `firebase-config.js`.
-3. Rules (Firestore → Rules → Publish):
+3. Rules (Firestore → Rules → Publish). The passcode collection is `SmyrnaLeague` in
+   this project; any name works as long as the rules and the data agree:
    ```
    rules_version = '2';
    service cloud.firestore {
      match /databases/{db}/documents {
-       match /keys/{key} { allow read, write: if false; }
+       match /SmyrnaLeague/{key} { allow read, write: if false; }
        match /books/{key}/{doc=**} {
-         allow read, write: if exists(/databases/$(db)/documents/keys/$(key));
+         allow read, write: if exists(/databases/$(db)/documents/SmyrnaLeague/$(key));
        }
      }
    }
    ```
-4. Firestore → Data → collection `keys` → a document whose **ID is the passcode**
-   (letters, digits, dashes; e.g. `smyrna-2026-tigers`) with any field.
+4. Firestore → Data → collection `SmyrnaLeague` → a document whose **ID is the passcode**
+   (letters, digits, dashes; e.g. `smyrna-league-2026`) with any field.
 5. Copy the book across: `python migrate-to-firebase.py --project <projectId> --key <passcode>`.
 6. Push to GitHub; Pages serves `index.html` from `main`.
 

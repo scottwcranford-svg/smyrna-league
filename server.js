@@ -1,4 +1,4 @@
-// Smyrna Side Book — self-hosted server.
+// Smyrna League side bets — self-hosted server.
 //
 // One process, no dependencies: serves index.html, holds the shared book in
 // data/book.json, pushes live updates to open pages over server-sent events,
@@ -308,7 +308,7 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`Smyrna Side Book on http://localhost:${PORT}${LEAGUE_KEY ? " (league key required)" : " (open — set LEAGUE_KEY)"}`);
+  console.log(`Smyrna League on http://localhost:${PORT}${LEAGUE_KEY ? " (league key required)" : " (open — set LEAGUE_KEY)"}`);
   fullRefresh("startup").catch(() => {});
   setInterval(() => fullRefresh("timer").catch(() => {}), 60 * 60e3);   // hourly: stats, roster, schedule, all games
   setInterval(() => scoresRefresh().catch(() => {}), 60e3);            // every minute: this week's scores
