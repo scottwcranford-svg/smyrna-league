@@ -1,0 +1,24 @@
+services:
+  sidebook:
+    build: .
+    container_name: sidebook
+    restart: unless-stopped
+    ports:
+      - "8899:8899"
+    volumes:
+      - ./data:/data
+    environment:
+      LEAGUE_KEY: ${LEAGUE_KEY:-}
+      SEASON: ${SEASON:-2026}
+
+  # Public HTTPS address via ngrok's free plan (one permanent domain).
+  # Fill NGROK_AUTHTOKEN and NGROK_DOMAIN in .env; remove this service to stay local-only.
+  tunnel:
+    image: ngrok/ngrok:latest
+    container_name: sidebook-tunnel
+    restart: unless-stopped
+    depends_on:
+      - sidebook
+    environment:
+      NGROK_AUTHTOKEN: ${NGROK_AUTHTOKEN:-}
+    command: ["http", "sidebook:8899", "--domain=${NGROK_DOMAIN:-}"]
