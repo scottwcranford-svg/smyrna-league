@@ -53,7 +53,7 @@ let browser; const errors = [], checks = {};
     seats: document.querySelectorAll(".seat").length,
     tickerGames: document.querySelectorAll(".ticker .game").length / 2,
     forcedPw: document.getElementById("pwDlg").open,
-    adminSwitchHidden: document.getElementById("adminBtn").hidden,   // this is a non-admin account
+    adminSwitchHidden: getComputedStyle(document.getElementById("adminBtn")).display === "none",   // this is a non-admin account
     // Join shows on stat bets this manager isn't in; never on game bets or player-vs-field bets
     joinOn: [...document.querySelectorAll("article.ticket")].filter(a => a.querySelector('[data-act="join"]')).map(a => a.querySelector(".terms").textContent),
   })));
@@ -82,7 +82,9 @@ let browser; const errors = [], checks = {};
   await page.click("#newBetBtn");
   await page.waitForFunction(() => document.getElementById("betDlg").open, { timeout: 5000 });
   Object.assign(checks, await page.evaluate(() => ({ title: document.getElementById("bTitle").textContent, scopeChips: document.querySelectorAll("#bScope .chip").length,
-    statChips: document.querySelectorAll("#bStats .chip").length, entryRows: document.querySelectorAll("#bEntries .entry-row").length })));
+    statChips: document.querySelectorAll("#bStats .chip").length, entryRows: document.querySelectorAll("#bEntries .entry-row").length,
+    // admin switch off (or not an admin): row one is you and can't be changed
+    rowOneLocked: (s => s.disabled && s.options.length === 1 && /\(you\)/.test(s.options[0].textContent))(document.querySelector('#bEntries select[data-i="0"]')) })));
   await page.click('#bStats .chip[data-stat="rec_yd"]');
   checks.twoStats = await page.evaluate(() => document.querySelectorAll('#bStats .chip[aria-pressed="true"]').length);
   await page.type('#bEntries input[data-act="dSearch"][data-i="0"]', "chase");
@@ -109,7 +111,7 @@ let browser; const errors = [], checks = {};
   const ok = checks.appDisplay !== "none" && checks.me === USER && checks.tickets >= 1 && checks.seats >= 1 && checks.liveOnly === true
     && checks.joinOn.length >= 1 && !checks.joinOn.some(t => /White Men Can Catch|NE @ SEA/.test(t)) && checks.adminSwitchHidden === true
     && checks.rosterRows >= 1 && checks.rosterReadOnly === true
-    && checks.title === "Propose a bet" && checks.scopeChips === 3 && checks.statChips >= 10 && checks.entryRows === 1 && checks.twoStats === 2
+    && checks.title === "Propose a bet" && checks.scopeChips === 3 && checks.statChips >= 10 && checks.entryRows === 1 && checks.rowOneLocked === true && checks.twoStats === 2
     && /Chase/.test(checks.pickChip) && checks.gameOptions >= 1 && checks.sideTaken === 1 && errors.length === 0;
   console.log(JSON.stringify({ ...checks, errors }, null, 0));
   console.log(ok ? "E2E OK — screenshot " + shot : "E2E FAILED");

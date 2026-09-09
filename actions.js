@@ -96,7 +96,8 @@ const CHANGES = {
   week:function(t){ state.filter.week=t.value; touch(); },
   dMem:function(t){
     var i=num(t,"data-i"), d=state.draft[i];
-    if(i>0&&!d.memberId) d.invite=t.value||null;   // row one is always you; accepted seats don't change
+    if(state.admin){ d.memberId=t.value||(i===0?state.me:null); d.invite=null; }   // admin on: seat anyone outright
+    else if(i>0&&!d.memberId) d.invite=t.value||null;   // row one is always you; accepted seats don't change
   }
 };
 

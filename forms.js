@@ -96,8 +96,12 @@ export function drawEntries(hostId){
   host.innerHTML=state.draft.map(function(e,i){
     // You can only put yourself on a bet. Row one is you; other rows are open, or an
     // invitation the named manager has to accept. A seat already accepted stays put.
-    var opts, lockedSeat=false;
-    if(i===0||e.memberId){
+    // Admin switch on: any manager can be placed on any row outright, no invitation.
+    var opts, lockedSeat=false, admin=!!state.admin;
+    if(admin){
+      opts=(i>0?'<option value="">Open seat — anyone</option>':"")+members().map(function(m){
+        return '<option value="'+esc(m.id)+'"'+(m.id===e.memberId?" selected":"")+">"+esc(m.name)+(m.id===state.me?" (you)":"")+"</option>"; }).join("");
+    } else if(i===0||e.memberId){
       opts='<option value="'+esc(e.memberId||state.me)+'">'+esc(mName(e.memberId||state.me))+(i===0?" (you)":" · accepted")+"</option>";
       lockedSeat=true;
     } else {
@@ -133,7 +137,7 @@ export function drawEntries(hostId){
       pickUi='<input class="field" data-act="dPick" data-i="'+i+'" maxlength="60" placeholder="What they’re taking" value="'+esc(e.pick)+'">';
     }
     return '<div class="entry-row">'+
-      '<span class="entry-tag" style="margin-top:11px">'+(i===0?"You":"vs")+"</span>"+
+      '<span class="entry-tag" style="margin-top:11px">'+(i===0?(admin&&e.memberId&&e.memberId!==state.me?"For":"You"):"vs")+"</span>"+
       '<select class="field" data-act="dMem" data-i="'+i+'"'+(lockedSeat?" disabled":"")+'>'+opts+"</select>"+
       pickUi+
       (i>0&&scope!=="game"?'<button class="btn danger rm" data-act="dRm" data-i="'+i+'">✕</button>':"")+
@@ -277,14 +281,20 @@ export function submitBet(){
     if(id) seen[id]=1;
   }
   if(Object.keys(seen).length<1) return toast("At least one real manager");
-  // the proposer is row one; nobody else can be placed, only invited
-  var existing=state.editId?findBet(state.editId):null;
+  // the proposer is row one; nobody else can be placed, only invited — unless the
+  // admin switch is on, in which case the admin posts on anyone's behalf and can
+  // seat anyone outright
+  var existing=state.editId?findBet(state.editId):null, admin=!!state.admin;
   var proposer=(existing&&existing.createdBy)||state.me;
+  if(admin) proposer=state.draft[0].memberId||proposer;
   var inv={}; inv[proposer]=1;
   for(var k=0;k<state.draft.length;k++){
     var d=state.draft[k];
     if(k===0){ d.memberId=proposer; d.invite=null; continue; }
-    if(d.memberId&&d.memberId!==proposer) continue;   // already accepted (editing)
+    if(d.memberId&&d.memberId!==proposer){   // already accepted (editing), or placed by the admin
+      if(inv[d.memberId]) return toast(mName(d.memberId)+" is on the bet twice");
+      inv[d.memberId]=1; d.invite=null; continue;
+    }
     d.memberId=null;
     if(d.invite){ if(inv[d.invite]) return toast(mName(d.invite)+" is invited twice"); inv[d.invite]=1; }
   }
@@ -306,7 +316,7 @@ export function submitBet(){
   var bet={
     id:existing?existing.id:uid(),
     createdAt:existing?existing.createdAt:new Date().toISOString(),
-    createdBy:existing?existing.createdBy:state.me,
+    createdBy:existing&&!admin?existing.createdBy:proposer,
     week:wkPick,
     kind:isGame?"matchup":document.getElementById("bKind").value,
     amount:Math.round(amt*100)/100, name:name, terms:terms,
@@ -333,6 +343,7 @@ export function submitBet(){
   if(existing&&existing.stats&&stats&&statsKey(existing.stats)===statsKey(stats)) stats=existing.stats;
   if(stats) bet.stats=stats;
   if(existing){ bet.editedAt=new Date().toISOString(); bet.editedBy=state.me; }
+  if(admin&&proposer!==state.me) bet.postedBy=state.me;   // the admin posted it for them
   // Open until every seat is filled and at least two managers are in; at lock an
   // open bet cancels itself.
   var inIt=bet.entries.filter(function(e){ return e.memberId; }).length;
