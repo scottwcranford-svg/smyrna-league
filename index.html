@@ -1940,7 +1940,7 @@ function authMsg(e){
   return (e&&e.message)||"Couldn't sign in";
 }
 function openSignIn(required){
-  if(!state.connected||state.local) return toast("Not connected");
+  if(!state.connected) return toast("Not connected");   // the book may still be loading; names come from the roster we have
   var dlg=document.getElementById("signDlg"), sel=document.getElementById("siName");
   var keep=sel.value;
   sel.innerHTML=(state.config?state.config.members:[]).map(function(m){ return '<option value="'+esc(m.id)+'">'+esc(m.name)+"</option>"; }).join("");
@@ -2298,6 +2298,7 @@ connectDb().then(function(db){
           }
           applyAuth(firebase.auth().currentUser);   // the roster may have arrived after sign-in
           if(document.getElementById("signDlg").open) openSignIn(state.signRequired);   // refresh its name list
+          else if(!firebase.auth().currentUser) openSignIn(true);                        // book loaded, nobody signed in: front door
         }
       }
       render();
