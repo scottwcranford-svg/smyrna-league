@@ -186,8 +186,9 @@ function board(){
   host.innerHTML=list.map(function(m){
     var p=L.pnl[m.id], played=p.w+p.l+p.p;
     var h=HL.byId[m.id]||{ net:0, highs:0, lows:0 };
-    var hlLine=anyHL?'<div class="seat-hl"><span>High / low</span><b class="'+(h.net>0?"pos":h.net<0?"neg":"flat")+'">'+signed(h.net)+"</b>"+
-      '<span class="hl-count">'+h.highs+" high · "+h.lows+" low</span></div>":"";
+    // the weekly high / low tally, a figure like the others; the label carries the week counts
+    var hlFig='<div class="fig hl"><b class="'+(h.net>0?"pos":h.net<0?"neg":"zero")+'">'+signed(h.net)+"</b><span>"+
+      ((h.highs||h.lows)?h.highs+" hi · "+h.lows+" low":"hi / low")+"</span></div>";
     var cls=p.net>0?"pos":p.net<0?"neg":"flat";
     var inPlay=L.risk[m.id]||0, proposed=L.offered[m.id]||0, gone=L.cancelled[m.id]||0;
     var mine=L.picks[m.id]||[];
@@ -200,8 +201,8 @@ function board(){
         fig("stake",inPlay,"in play")+fig("prop",proposed,"proposed")+fig("gone",gone,"cancelled")+
         '<div class="fig net"><b class="'+cls+'">'+signed(p.net)+"</b><span>"+
           (played?p.w+"–"+p.l+(p.p?"–"+p.p:"")+" settled":"settled")+"</span></div>"+
+        hlFig+
       "</div>"+
-      hlLine+
       '<div class="seat-picks'+(mine.length?"":" none")+'">'+
         (mine.length?esc(mine.join(" · ")):"no action yet")+"</div>"+
     "</div>";

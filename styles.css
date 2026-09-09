@@ -327,10 +327,7 @@ h1,h2,h3,.terms,.login-brand h1{font-family:"Poppins","Inter",system-ui,sans-ser
 .tag.pos-QB{color:#FF2B6D} .tag.pos-RB{color:#00CEB8} .tag.pos-WR{color:#58A7FF} .tag.pos-TE{color:#FFAE58} .tag.pos-K{color:#BD66FF}
 
 /* ---- weekly high / low ---- */
-.seat-hl{display:flex;align-items:baseline;gap:7px;font-size:11px;color:var(--ink-3);font-weight:700;letter-spacing:.04em;text-transform:uppercase;margin-top:2px}
-.seat-hl b{font-size:13px;letter-spacing:0;font-variant-numeric:tabular-nums}
-.seat-hl b.pos{color:var(--win)} .seat-hl b.neg{color:var(--loss)} .seat-hl b.flat{color:var(--ink-3)}
-.seat-hl .hl-count{margin-left:auto;font-weight:600;letter-spacing:0;text-transform:none}
+.fig.hl b.pos{color:var(--win)} .fig.hl b.neg{color:var(--loss)}
 .hl-table{display:flex;flex-direction:column;gap:6px}
 .hl-row{display:grid;grid-template-columns:auto 1fr 1fr;gap:12px;align-items:center;background:var(--surface);border:1px solid var(--rule);border-radius:12px;padding:9px 13px}
 .hl-side{display:flex;align-items:center;gap:8px;min-width:0;font-size:13px}
