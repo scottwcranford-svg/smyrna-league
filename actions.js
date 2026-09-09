@@ -183,4 +183,7 @@ export function bindEvents(hooks){
   ["siName","siPw","siKey"].forEach(function(id){ on(id,"keydown",function(e){ if(e.key==="Enter"){ e.preventDefault(); D.submitLogin(hooks.enterBook); } }); });
   on("rAdd","click",function(e){ e.preventDefault(); addMember(); });
   on("rSave","click",function(e){ e.preventDefault(); saveLeague(); });
+  // The login card is in the HTML and shows before these modules have loaded; its
+  // button stays disabled until this point so a fast tap can't go nowhere.
+  document.getElementById("siGo").disabled=false;
 }

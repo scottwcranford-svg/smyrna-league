@@ -25,7 +25,8 @@ let browser; const errors = [], checks = {};
   // console errors count, except the browser's own "Failed to load resource" for the site's missing favicon
   page.on("console", m => { if (m.type() === "error" && !/Failed to load resource/.test(m.text())) errors.push("console: " + m.text()); });
   await page.goto(SITE, { waitUntil: "load" });
-  await page.waitForSelector("#siName", { timeout: 15000 });
+  // the Go button enables once the modules have loaded and bound the form
+  await page.waitForSelector("#siGo:not([disabled])", { timeout: 30000 });
   await page.type("#siName", USER); await page.type("#siPw", PASS);
   if (!(await page.$eval("#siKeyRow", e => e.hidden))) await page.type("#siKey", KEY);
   await page.click("#siGo");
@@ -37,7 +38,7 @@ let browser; const errors = [], checks = {};
   catch (e) {
     checks.retried = await page.evaluate(() => document.getElementById("siHint").textContent);
     await page.reload({ waitUntil: "load" });
-    await page.waitForSelector("#siName", { timeout: 15000 });
+    await page.waitForSelector("#siGo:not([disabled])", { timeout: 30000 });
     // the device remembers the passcode now; the account may still be signed in
     if (await page.evaluate(() => !document.getElementById("login").hidden)) {
       await page.type("#siName", USER); await page.type("#siPw", PASS); await page.click("#siGo");
