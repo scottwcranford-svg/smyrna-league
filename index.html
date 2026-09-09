@@ -296,6 +296,7 @@ footer.foot{margin-top:36px;padding-top:16px;border-top:1px solid var(--rule);fo
     <button class="btn pri lg" id="siGo" type="submit">Sign in</button>
     </form>
     <div class="hint" id="siHint"></div>
+    <button type="button" class="btn" id="siReset" hidden>Start over on this device</button>
   </div>
 </div>
 
@@ -1112,7 +1113,7 @@ function foot(){
 function body(b){ var o={}; Object.keys(b).forEach(function(k){ if(k!=="id") o[k]=b[k]; }); return o; }
 function dbMsg(e){
   var c=e&&e.code;
-  if(c==="permission-denied"){ try{ localStorage.removeItem(KEY_LS); }catch(x){} return "Wrong passcode — reload to enter it again"; }
+  if(c==="permission-denied") return "The book refused this — wrong passcode, or you're not signed in";
   if(c==="resource-exhausted") return "Daily free quota hit — back after midnight Pacific";
   if(c==="unavailable") return "Offline — will retry";
   if(c==="quota_exceeded") return "The book is full — delete old bets";
@@ -1922,6 +1923,15 @@ function enterBook(user){
   if(!state.db){ state.db=makeDb(key); state.connected=true; subscribeBook(state.db); }
   else if(!state.local){ document.getElementById("login").hidden=true; document.getElementById("app").hidden=false; render(); }
   enforceFreshPassword(user);
+  // If the book hasn't opened shortly, say why on the login screen instead of sitting there.
+  clearTimeout(state.bookTimer);
+  state.bookTimer=setTimeout(function(){
+    if(!document.getElementById("app").hidden) return;
+    var why=state.bookError?("The book refused to load: "+dbMsg(state.bookError)+" ("+(state.bookError.code||"")+").")
+      :"Signed in, but the book hasn't loaded. Something on this browser may be blocking firestore.googleapis.com — an ad blocker or strict tracking prevention. Try another browser, or start over below.";
+    document.getElementById("siHint").textContent=why;
+    document.getElementById("siReset").hidden=false;
+  },10000);
 }
 
 // Still on the default password? Prove it (a silent re-sign-in with the default) and,
@@ -2183,6 +2193,10 @@ document.getElementById("pwBtn").addEventListener("click",function(){
 });
 document.getElementById("pwGo").addEventListener("click",function(e){ e.preventDefault(); changeOwnPassword(); });
 document.getElementById("siForm").addEventListener("submit",function(e){ e.preventDefault(); submitLogin(); });
+document.getElementById("siReset").addEventListener("click",function(){
+  try{ localStorage.clear(); }catch(e){}
+  firebase.auth().signOut().catch(function(){}).then(function(){ location.replace(location.pathname); });
+});
 ["siName","siPw","siKey"].forEach(function(id){ document.getElementById(id).addEventListener("keydown",function(e){ if(e.key==="Enter"){ e.preventDefault(); submitLogin(); } }); });
 document.getElementById("rAdd").addEventListener("click",function(e){
   e.preventDefault();
@@ -2258,12 +2272,17 @@ function subscribeBook(db){
         }
         applyAuth(firebase.auth().currentUser);   // the roster may have arrived after sign-in
         // the book is here and you're signed in: show the app
+        clearTimeout(state.bookTimer);
         document.getElementById("login").hidden=true;
         document.getElementById("app").hidden=false;
+      } else {
+        state.bookError={ code:"empty-config", message:"league settings are empty" };
       }
+    } else {
+      state.bookError={ code:"no-config", message:"no league settings under this passcode" };
     }
     render();
-  },function(e){ toast(dbMsg(e)); });
+  },function(e){ state.bookError=e; console.error("league/config:",e); toast(dbMsg(e)); });
 
   db.doc("league/refresh").onSnapshot(function(snap){
     state.refresh=snap.exists?clone(snap.data()):null;
