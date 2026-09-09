@@ -13,7 +13,7 @@ export const STATS = {
     ["pass_yd","Passing yards"],["pass_td","Passing TDs"],["pass_int","Interceptions thrown",true],
     ["rush_yd","Rushing yards"],["rush_td","Rushing TDs"],
     ["rec","Receptions"],["rec_yd","Receiving yards"],["rec_td","Receiving TDs"],
-    ["td_scored","Rushing + receiving TDs"],["fum_lost","Fumbles lost",true]
+    ["rush_rec_yd","Rushing + receiving yards"],["td_scored","Rushing + receiving TDs"],["fum_lost","Fumbles lost",true]
   ],
   team:[
     ["takeaways","Takeaways · INT + fumble recoveries"],["int","Interceptions"],["ff","Forced fumbles"],
@@ -21,7 +21,7 @@ export const STATS = {
     ["yds_allow","Yards allowed",true],["pts_ppr","Defense fantasy points"]
   ]
 };
-export const COMPOSITES = { takeaways:["int","fum_rec"], td_scored:["rush_td","rec_td"] };
+export const COMPOSITES = { takeaways:["int","fum_rec"], td_scored:["rush_td","rec_td"], rush_rec_yd:["rush_yd","rec_yd"] };
 export const FANTASY_POS = {QB:1,RB:1,WR:1,TE:1,K:1};
 
 export const DEFAULT_KICKOFF="2026-09-10T00:20:00Z";   // the opener: Wed Sep 9 2026, 8:20 PM ET (Seattle)
@@ -132,7 +132,7 @@ export function currentWeek(config,games){
    ride in league/proj as { weeks: { "5": "<json>" } }. A projection is read with the
    same valueFor as the actuals, so it is always the bet's own stat. */
 export const STAT_SHORT={ pts_ppr:"pts", pts_std:"pts", pass_yd:"pass yds", pass_td:"pass TD", pass_int:"INT", rush_yd:"rush yds", rush_td:"rush TD",
-  rec:"rec", rec_yd:"rec yds", rec_td:"rec TD", td_scored:"TD", fum_lost:"fum", takeaways:"takeaways", int:"INT", ff:"FF", sack:"sacks",
+  rec:"rec", rec_yd:"rec yds", rec_td:"rec TD", rush_rec_yd:"scrimmage yds", td_scored:"TD", fum_lost:"fum", takeaways:"takeaways", int:"INT", ff:"FF", sack:"sacks",
   def_td:"TD", pts_allow:"pts allowed", yds_allow:"yds allowed" };
 export function projKeys(){
   var ks={};

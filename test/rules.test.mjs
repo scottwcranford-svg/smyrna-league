@@ -64,6 +64,8 @@ test("valueFor sums composites and combined keys", () => {
   assert.equal(R.valueFor("HOU", "takeaways", { HOU: { int: 19, fum_rec: 8 } }), 27);
   assert.equal(R.valueFor("a+b", "rec_yd", { a: { rec_yd: 100 }, b: { rec_yd: 50.5 } }), 150.5);
   assert.equal(R.valueFor("zz", "pts_ppr", {}), 0);
+  assert.equal(R.valueFor("a", "rush_rec_yd", { a: { rush_yd: 84, rec_yd: 31.5 } }), 115.5, "rushing + receiving yards");
+  assert.equal(R.STATS.player.some((s) => s[0] === "rush_rec_yd"), true, "offered in the catalog");
 });
 
 test("ledger: winner collects the stake from each loser, unpaid debts net pairwise", () => {
