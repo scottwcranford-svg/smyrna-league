@@ -156,6 +156,16 @@ service cloud.firestore {
 }
 ```
 
+## About the API key in `firebase-config.js`
+
+GitHub's secret scanning flags it as a Google API key. It is the Firebase **web** key,
+which is public by design — every Firebase web app ships it — and it grants nothing
+by itself: reads and writes are governed by the Firestore rules and by sign-in. It is
+still hardened in Google Cloud → APIs & Services → Credentials: application
+restriction = HTTP referrers (`scottwcranford-svg.github.io/*`), API restriction =
+Identity Toolkit, Token Service, Cloud Firestore, Firebase Installations. That stops
+the key being reused from another site (for example to hammer sign-in attempts).
+
 ## Two things worth remembering
 
 1. **Settling is honor-system.** Sign-in proves who did what; it doesn't referee the
