@@ -150,7 +150,7 @@ render as it does for everyone.
   anyone add themselves. Only the proposer can edit, and only the proposer can cancel,
   while it's still waiting on takers; once both sides are in, the bet stands (an admin
   can void a live bet to undo a mistake).
-- **Locks an hour before kickoff** — the week's first game for stat bets, that game for
+- **Locks five minutes before kickoff** — the week's first game for stat bets, that game for
   game bets. Countdown on every ticket. A bet still waiting on a seat at lock is
   cancelled automatically.
 - **Projections and status** — until something has been played, a stat ticket's standings

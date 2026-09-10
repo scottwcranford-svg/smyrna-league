@@ -22,7 +22,7 @@ const rosterSearch=function(q,scope){ return R.rosterSearch(q,scope,state.roster
 const autoTerms=function(scope,tracks,week,entries){ return R.autoTerms(scope,tracks,week,entries,members()); };
 const buildStats=function(entries){ return R.buildStats(entries,state.draftScope,state.draftStats); };
 
-// Games still open for a bet in a week: not yet within an hour of kickoff.
+// Games still open for a bet in a week: not yet within five minutes of kickoff.
 export function openGames(week){
   var now=Date.now();
   return allGames().filter(function(g){ return g.week===Number(week)&&now<Date.parse(g.date)-LOCK_LEAD; });
@@ -72,7 +72,7 @@ export function drawScope(){
   drawGameBox();
   if(scope==="game"){
     box.hidden=true;
-    hint.textContent=allGames().length?"Pick the game, take a side, say who you're betting, set the stake. The other owner gets the other side. Locks an hour before that game.":"Schedule isn't loaded yet — hit Refresh stats first.";
+    hint.textContent=allGames().length?"Pick the game, take a side, say who you're betting, set the stake. The other owner gets the other side. Locks five minutes before that game.":"Schedule isn't loaded yet — hit Refresh stats first.";
     return;
   }
   box.hidden=!scope;

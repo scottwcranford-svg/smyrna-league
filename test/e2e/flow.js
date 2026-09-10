@@ -63,7 +63,7 @@ let browser; const errors = [], checks = {};
     panelsShown: [...document.querySelectorAll("section[data-panel]")].filter(s => getComputedStyle(s).display !== "none").map(s => s.getAttribute("data-panel")),
     glance: document.getElementById("glanceTxt").textContent,
     leagueLine: document.getElementById("leagueSub").textContent,
-    // within an hour of kickoff the book is locked: nothing glows and nothing is joinable, and that's right
+    // within five minutes of kickoff the book is locked: nothing glows and nothing is joinable, and that's right
     unlocked: document.querySelectorAll("article.ticket .lock-when").length,
     // tickets still looking for people carry a glow (computed shadow, not just the class)
     seeking: document.querySelectorAll("article.ticket.seeking").length,

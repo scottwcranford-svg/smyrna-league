@@ -26,7 +26,7 @@ export const FANTASY_POS = {QB:1,RB:1,WR:1,TE:1,K:1};
 
 export const DEFAULT_KICKOFF="2026-09-10T00:20:00Z";   // the opener: Wed Sep 9 2026, 8:20 PM ET (Seattle)
 export const WEEK_ANCHOR="2026-09-11T00:15:00Z";       // Week 1's Thursday, 8:15 PM ET — weeks 2+ lock on that cadence
-export const LOCK_LEAD=60*60*1000;                     // bets lock one hour before the week's first game
+export const LOCK_LEAD=5*60*1000;                      // bets lock five minutes before the week's first game
 export const SLEEPER_LEAGUE_ID="1314265150127116288";   // the Smyrna League on Sleeper (league/config.sleeperLeagueId overrides)
 export const AUTH_DOMAIN="smyrna.league";              // sign-in ids are <slug(name)>@smyrna.league; nobody sees them
 
@@ -91,7 +91,7 @@ export function ago(iso){
 }
 
 /* ---- kickoff locks ----
-   Every bet locks one hour before the first game of its week (season bets: the opener).
+   Every bet locks five minutes before the first game of its week (season bets: the opener).
    `config.weekStarts` carries the real schedule; the anchor cadence is the fallback. */
 
 export function kickoffTime(config){ var t=Date.parse((config&&config.kickoff)||DEFAULT_KICKOFF); return isNaN(t)?Date.parse(DEFAULT_KICKOFF):t; }

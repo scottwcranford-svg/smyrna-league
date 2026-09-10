@@ -9,17 +9,17 @@ const config = { leagueName: "T", season: "2026", stake: 25, kickoff: KICKOFF,
   weekStarts: { "1": KICKOFF, "2": "2026-09-18T00:15:00Z", "12": "2026-11-26T01:00:00Z", "18": "2027-01-10T18:00:00Z" },
   members: [{ id: "m0", name: "gmelan1", color: "#000" }, { id: "m1", name: "JPorch", color: "#000" }, { id: "m2", name: "RTownsend", color: "#000" }] };
 
-test("locks are one hour before the week's first game", () => {
-  assert.equal(R.lockTime(0, config), Date.parse(KICKOFF) - 3600e3);
-  assert.equal(R.lockTime(1, config), Date.parse(KICKOFF) - 3600e3);
-  assert.equal(R.lockTime(2, config), Date.parse("2026-09-18T00:15:00Z") - 3600e3);
-  assert.equal(R.lockTime(12, config), Date.parse("2026-11-26T01:00:00Z") - 3600e3, "Thanksgiving week opens Wednesday");
-  assert.equal(R.lockTime(18, config), Date.parse("2027-01-10T18:00:00Z") - 3600e3, "week 18 opens Sunday");
+test("locks are five minutes before the week's first game", () => {
+  assert.equal(R.lockTime(0, config), Date.parse(KICKOFF) - 300e3);
+  assert.equal(R.lockTime(1, config), Date.parse(KICKOFF) - 300e3);
+  assert.equal(R.lockTime(2, config), Date.parse("2026-09-18T00:15:00Z") - 300e3);
+  assert.equal(R.lockTime(12, config), Date.parse("2026-11-26T01:00:00Z") - 300e3, "Thanksgiving week opens Wednesday");
+  assert.equal(R.lockTime(18, config), Date.parse("2027-01-10T18:00:00Z") - 300e3, "week 18 opens Sunday");
 });
 
-test("a game bet locks an hour before that game, not the week", () => {
+test("a game bet locks five minutes before that game, not the week", () => {
   const b = { week: 1, status: "open", game: { date: "2026-09-13T17:00:00Z" } };
-  assert.equal(R.betLock(b, config), Date.parse("2026-09-13T17:00:00Z") - 3600e3);
+  assert.equal(R.betLock(b, config), Date.parse("2026-09-13T17:00:00Z") - 300e3);
 });
 
 test("isLocked only applies to open/active bets and respects time", () => {
