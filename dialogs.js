@@ -125,10 +125,10 @@ export function openPushDlg(why){
     h='<p class="bet-desc" style="margin:0 0 12px">An iPhone only buzzes for apps that sit on its home screen, so this page has to go there first. It takes about a minute, once.</p>'+
       '<ol class="steps">'+
       '<li><b>Put it on the home screen.</b> In Safari, tap the share button '+share+' in the bar at the bottom of the screen (the square with an arrow pointing up). '+
-        'A sheet slides up; scroll its list down until you see <b>Add to Home Screen</b> and tap it, then tap <b>Add</b> in the top right. A <b>Smyrna</b> icon appears on your home screen.</li>'+
+        'A sheet slides up; scroll its list down until you see <b>Add to Home Screen</b> and tap it, then tap <b>Add</b> in the top right. A <b>Smyrna League</b> icon appears on your home screen.</li>'+
       '<li><b>Open it from the home screen</b> (not from Safari). It asks you to sign in again — that is normal, the home-screen app keeps its own memory. Your name and password as usual'+
         (key?', and when it asks for the league passcode: <b>'+esc(key)+'</b>':', plus the league passcode from the chat')+'.</li>'+
-      '<li><b>Turn them on.</b> Tap your name in the top right, tap <b>Notifications off</b>, and when the iPhone asks whether Smyrna may send notifications, tap <b>Allow</b>. The button changes to <b>Notifications on</b>.</li>'+
+      '<li><b>Turn them on.</b> Tap your name in the top right, tap <b>Notifications off</b>, and when the iPhone asks whether Smyrna League may send notifications, tap <b>Allow</b>. The button changes to <b>Notifications on</b>.</li>'+
       '</ol>'+
       '<p class="hint" style="margin:12px 0 0">From then on use the home-screen icon. It is the same app as this tab. If there is no Add to Home Screen in the share sheet, the phone is on an iOS older than 16.4 (Settings → General → Software Update).</p>';
   } else {
