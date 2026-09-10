@@ -89,10 +89,29 @@ export const ACTIONS = {
   },
   // the season table in Settle Up: drill through to the bets behind a cell, and jump to one
   drill:function(t){ D.openDrill(attr(t,"data-m"),attr(t,"data-row")); },
-  goBet:function(t,id){ document.getElementById("drillDlg").close(); showBet(id); },
+  // Jump to a bet from a drill or the Rivals grid: the Book has to be open, and the
+  // filters wide enough to show it, or the ticket isn't on the page to scroll to.
+  goBet:function(t,id){
+    document.getElementById("drillDlg").close();
+    var b=B.findBet(id);
+    if(b&&(state.tab!=="book"||(state.filter.status!=="all"&&state.filter.status!==b.status)||(state.filter.week!=="all"&&String(state.filter.week)!==String(b.week)))){
+      state.tab="book"; state.filter.status="all"; state.filter.week="all";
+      try{ localStorage.setItem("smyrna.tab","book"); }catch(e){}
+      touch();
+      setTimeout(function(){ showBet(id); },60);
+      return;
+    }
+    showBet(id);
+  },
   // notifications on this device: the nudge on the page, and "not now"
   push:function(){ D.pushToggle(); },
   pushLater:function(){ Nf.snooze(); touch(); },
+  // Rivals: the bets between two managers, under the grid. Tapping the open cell closes it.
+  rival:function(t){
+    var a=attr(t,"data-a"), b=attr(t,"data-b");
+    state.rival=(state.rival&&state.rival.a===a&&state.rival.b===b)?null:{ a:a, b:b };
+    touch();
+  },
   // phones: a ticket's Details / Less, and a ledger row's bet names
   fold:function(t,id){ state.unfolded[id]=!state.unfolded[id]; touch(); },
   seat:function(t,id){ state.unfolded["m:"+id]=!state.unfolded["m:"+id]; touch(); },

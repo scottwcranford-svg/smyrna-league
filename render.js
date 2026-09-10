@@ -22,7 +22,7 @@ const gameOf=function(b){ return R.gameOf(b,state.games); };
 const currentWeek=function(){ return R.currentWeek(state.config,state.games); };
 const computeLedger=function(){ return R.computeLedger(state.config,state.bets); };
 
-export function render(){ head(); ticker(); banner(); tabs(); glance(); board(); highLow(); settle(); filters(); tickets(); statsBar(); foot(); }
+export function render(){ head(); ticker(); banner(); tabs(); glance(); board(); highLow(); rivalsView(); settle(); filters(); tickets(); statsBar(); foot(); }
 
 var toastTimer=null;
 export function toast(msg){
@@ -147,7 +147,10 @@ function tabs(){
   var seats=0;
   state.bets.forEach(function(b){ if(b.status==="open"&&!isLocked(b)) entriesOf(b).forEach(function(e){ if(!e.memberId&&(!e.invite||e.declined)) seats++; }); });
   var Bal=R.balances(state.config,state.bets,state.highlow,state.payments&&state.payments.list,R.hlStake(state.config));
-  var badge={ book:seats, ledger:0, hl:HL.weeks.length, settle:Bal.transfers.length };
+  // Rivals badges the pairs you're behind on — the rivalries to fix.
+  var RV=R.rivals(realMembers().filter(function(m){ return !m.test; }),state.bets), owed=0;
+  if(state.me&&RV.byId[state.me]) Object.keys(RV.byId[state.me]).forEach(function(b){ if(RV.byId[state.me][b].net<0) owed++; });
+  var badge={ book:seats, ledger:0, hl:HL.weeks.length, rivals:owed, settle:Bal.transfers.length };
   Object.keys(badge).forEach(function(k){ var n=document.getElementById("tabN-"+k); if(!n) return; n.hidden=!badge[k]; n.textContent=badge[k]; });
   var cur=state.tab||"book";
   document.querySelectorAll("#tabs .tab").forEach(function(t){ var on=t.getAttribute("data-tab")===cur; t.classList.toggle("on",on); t.setAttribute("aria-selected",String(on)); });
@@ -302,6 +305,106 @@ function seasonTableByManager(L,HL,cols){
   return '<div class="pivot-wrap"><table class="pivot by-manager"><thead><tr><th>Manager</th><th class="num">Hi/lo</th><th class="num">Weekly</th><th class="num">Season</th><th class="num">Total</th></tr></thead><tbody>'+
     cols.map(function(m){ return "<tr"+(m.id===state.me?' class="me"':"")+"><th>"+avatarHtml(m.id,20)+'<span>'+esc(m.name)+"</span></th>"+["hl","weekly","season","total"].map(function(r){ return cell(m,r); }).join("")+"</tr>"; }).join("")+
     "</tbody></table></div>";
+}
+
+/* ---- Rivals: who took whose money ----
+   A grid of every pair, each cell the row manager's money against the column's.
+   Tap a cell for the bets behind it. Above it, the two managers who matter most to
+   you; beside it, the season's bragging rights and the last few results. */
+function rivalsView(){
+  var host=document.getElementById("rivals");
+  var list=realMembers().filter(function(m){ return !m.test; });
+  var RV=R.rivals(list,state.bets);
+  var played=Object.keys(RV.totals).some(function(id){ return RV.totals[id].w||RV.totals[id].l; });
+  if(!played){
+    host.innerHTML='<div class="empty">Nothing has settled yet. Once bets start paying out, this is where you see who owns whom — every pair, all season.</div>';
+    return;
+  }
+  var name=function(id){ return mName(id); };
+  var rec=function(r){ return r.w+"–"+r.l; };
+  var h="";
+
+  // you: the manager you're up on most, and the one who has your number
+  if(state.me&&RV.byId[state.me]){
+    var best=null, worst=null;
+    Object.keys(RV.byId[state.me]).forEach(function(b){
+      var r=RV.byId[state.me][b]; if(!r.w&&!r.l) return;
+      if(!best||r.net>RV.byId[state.me][best].net) best=b;
+      if(!worst||r.net<RV.byId[state.me][worst].net) worst=b;
+    });
+    var card=function(cls,lbl,id,sub){
+      if(!id) return "";
+      var r=RV.byId[state.me][id];
+      return '<div class="riv-you '+cls+'" data-act="rival" data-a="'+esc(state.me)+'" data-b="'+esc(id)+'" tabindex="0">'+
+        '<span class="lbl">'+lbl+"</span>"+avatarHtml(id,36)+
+        '<span class="riv-who"><b>'+esc(name(id))+"</b><small>"+rec(r)+" against them · "+esc(sub)+"</small></span>"+
+        '<b class="riv-n '+(r.net>0?"pos":r.net<0?"neg":"flat")+'">'+esc(signed(r.net))+"</b></div>";
+    };
+    var mine="";
+    if(best&&RV.byId[state.me][best].net>0) mine+=card("own","You own",best,"tap for the bets");
+    if(worst&&RV.byId[state.me][worst].net<0) mine+=card("owned","Owns you",worst,"a rivalry to fix");
+    if(mine) h+='<div class="riv-mine">'+mine+"</div>";
+  }
+
+  // the grid, richest season first
+  var order=list.slice().sort(function(x,y){ return (RV.totals[y.id].net-RV.totals[x.id].net)||x.name.localeCompare(y.name); });
+  var sel=state.rival;
+  h+='<div class="riv-wrap"><table class="riv"><thead><tr><th></th>'+
+    order.map(function(m){ return '<th'+(m.id===state.me?' class="me"':"")+' title="'+esc(m.name)+'">'+avatarHtml(m.id,22)+"<span>"+esc(m.name)+"</span></th>"; }).join("")+
+    '<th class="tot">Season</th></tr></thead><tbody>'+
+    order.map(function(a){
+      var t=RV.totals[a.id];
+      return "<tr"+(a.id===state.me?' class="me"':"")+'><th>'+avatarHtml(a.id,22)+"<span>"+esc(a.name)+"</span><small>"+rec(t)+"</small></th>"+
+        order.map(function(b){
+          if(a.id===b.id) return '<td class="self"></td>';
+          var r=RV.byId[a.id][b.id], n=r.w+r.l;
+          if(!n) return '<td class="c none"><b>·</b></td>';
+          var on=sel&&((sel.a===a.id&&sel.b===b.id)||(sel.a===b.id&&sel.b===a.id));
+          return '<td class="c '+(r.net>0?"pos":r.net<0?"neg":"flat")+(on?" sel":"")+'" data-act="rival" data-a="'+esc(a.id)+'" data-b="'+esc(b.id)+'" tabindex="0"'+
+            ' title="'+esc(a.name+" vs "+b.name+" · "+rec(r))+'"><b>'+esc(signed(r.net))+"</b><small>"+rec(r)+"</small></td>";
+        }).join("")+
+        '<td class="tot '+(t.net>0?"pos":t.net<0?"neg":"flat")+'"><b>'+esc(signed(t.net))+"</b><small>"+rec(t)+"</small></td></tr>";
+    }).join("")+"</tbody></table></div>";
+  h+='<div class="riv-legend"><span><i class="sw pos"></i>the row is up on that column</span><span><i class="sw neg"></i>down</span><span>· the small line is wins–losses</span></div>';
+
+  // the bets behind the open cell
+  if(sel&&RV.byId[sel.a]&&RV.byId[sel.a][sel.b]){
+    var r=RV.byId[sel.a][sel.b];
+    h+='<div class="riv-drill"><div class="riv-drill-hd">'+avatarHtml(sel.a,22)+"<b>"+esc(name(sel.a))+"</b>"+
+      '<span class="vs">vs</span>'+avatarHtml(sel.b,22)+"<b>"+esc(name(sel.b))+"</b>"+
+      '<span class="riv-rec">'+rec(r)+" · "+esc(signed(r.net))+"</span></div>"+
+      r.bets.map(function(x){
+        return '<div class="riv-bet" data-act="goBet" data-id="'+esc(x.id)+'" tabindex="0">'+
+          '<span class="wk">'+esc(weekLabel(x.week))+"</span>"+
+          '<span class="riv-nm"><b>'+esc(x.name)+"</b><small>"+esc(money(x.amount))+" a side</small></span>"+
+          '<span class="riv-w '+(x.won?"pos":"neg")+'">'+esc(name(x.won?sel.a:sel.b))+" won</span>"+
+          '<b class="num '+(x.won?"pos":"neg")+'">'+esc(signed(x.won?x.amount:-x.amount))+"</b></div>";
+      }).join("")+"</div>";
+  }
+
+  // bragging rights, and the last few results
+  var H=R.rivalHighlights(RV,state.bets,list);
+  var rows=[];
+  if(H.rivalry) rows.push(["Biggest rivalry",esc(name(H.rivalry.a))+" vs "+esc(name(H.rivalry.b))+" · "+money(H.rivalry.moved)+" has changed hands",H.rivalry.w+"–"+H.rivalry.l,"gold",[H.rivalry.a,H.rivalry.b]]);
+  if(H.lopsided) rows.push(["Most lopsided",esc(name(H.lopsided.a))+" owns "+esc(name(H.lopsided.b)),money(H.lopsided.net),"pos",[H.lopsided.a]]);
+  if(H.hammer) rows.push(["The hammer",esc(name(H.hammer.id))+" · most bets won off people",H.hammer.v+" W","pos",[H.hammer.id]]);
+  if(H.nail) rows.push(["The nail",esc(name(H.nail.id))+" · most bets lost to people",H.nail.v+" L","neg",[H.nail.id]]);
+  if(H.haul) rows.push(["Biggest haul",esc(name(H.haul.winner))+" took "+esc(H.haul.name)+" · "+H.haul.losers+" losers",money(H.haul.pot),"pos",[H.haul.winner]]);
+  var feed=R.rivalFeed(state.bets,5);
+  h+='<div class="riv-side">'+
+    '<div class="riv-box"><div class="lbl">Bragging rights</div>'+rows.map(function(x){
+      return '<div class="riv-brag"><span class="riv-pair">'+x[4].map(function(id){ return avatarHtml(id,22); }).join("")+"</span>"+
+        '<span class="riv-t"><b>'+esc(x[0])+"</b><small>"+x[1]+"</small></span>"+
+        '<b class="riv-n '+x[3]+'">'+esc(x[2])+"</b></div>";
+    }).join("")+"</div>"+
+    '<div class="riv-box"><div class="lbl">Latest</div>'+feed.map(function(f){
+      return '<div class="riv-bet" data-act="goBet" data-id="'+esc(f.id)+'" tabindex="0">'+
+        '<span class="wk">'+esc(weekLabel(f.week))+"</span>"+
+        '<span class="riv-nm"><b>'+esc(name(f.winner))+" beat "+esc(f.losers.map(name).join(", "))+"</b><small>"+esc(f.name)+" · "+esc(money(f.amount))+(f.losers.length>1?" each":"")+"</small></span>"+
+        '<b class="num pos">'+esc(signed(f.pot))+"</b></div>";
+    }).join("")+"</div></div>";
+
+  host.innerHTML=h;
 }
 
 // Settle Up: the season table, everyone's balance as it stands, the transfers that would

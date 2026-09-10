@@ -364,7 +364,7 @@ test("tabs: Book open by default, the others behind their tabs, badges and the g
   assert.equal(out.line, "2026 · 10-Team Keeper SF PPR · side bets", "the league's settings from Sleeper");
   assert.equal(out.glance, "1 bet running$10 on the tableyou −$25 net · 1 seat waiting on takers");
   assert.deepEqual(out.shown, ["book"]);
-  assert.deepEqual(out.badges, [["book", true, "1"], ["ledger", false, ""], ["hl", false, "1"], ["settle", false, "2"]], "a seat open, a week in, two transfers to clear");
+  assert.deepEqual(out.badges, [["book", true, "1"], ["ledger", false, ""], ["hl", false, "1"], ["rivals", false, "1"], ["settle", false, "2"]], "a seat open, a week in, a rivalry you're behind on, two transfers to clear");
   assert.equal(out.me, "Alice"); assert.equal(out.dropHidden, true);
   assert.deepEqual(out.afterClick, { shown: ["settle"], on: ["settle"], saved: "settle" }, "the tab switches through the real click wiring and is remembered");
   assert.equal(out.dropOpen, true); assert.equal(out.dropClosed, true, "the menu opens on its button and closes on a click elsewhere");
@@ -458,7 +458,11 @@ test("phone: tabs sit in a bar at the bottom, Propose floats, tickets fold and o
   const out = await p.evaluate(async () => {
     const cs = (el) => getComputedStyle(el), res = {}, wait = () => new Promise(r => setTimeout(r, 30));
     const tabs = document.getElementById("tabs"), r = tabs.getBoundingClientRect();
-    res.tabs = { position: cs(tabs).position, atBottom: Math.round(r.bottom) === innerHeight, fits: [...tabs.querySelectorAll(".tab")].every(t => t.getBoundingClientRect().right <= innerWidth + 1), count: tabs.querySelectorAll(".tab").length };
+    const tt = [...tabs.querySelectorAll(".tab")];
+    res.tabs = { position: cs(tabs).position, atBottom: Math.round(r.bottom) === innerHeight,
+      fits: tt.every(t => t.getBoundingClientRect().right <= innerWidth + 1),
+      oneRow: new Set(tt.map(t => Math.round(t.getBoundingClientRect().top))).size === 1,
+      count: tt.length };
     res.fab = cs(document.getElementById("newBetBtn")).position;
     res.refresh = document.getElementById("refreshBtn").textContent;
     res.filtersNoWrap = cs(document.getElementById("filters")).flexWrap;
@@ -482,7 +486,7 @@ test("phone: tabs sit in a bar at the bottom, Propose floats, tickets fold and o
     dlg.close();
     return res;
   });
-  assert.deepEqual(out.tabs, { position: "fixed", atBottom: true, fits: true, count: 4 }, "all four tabs on a fixed bar at the bottom");
+  assert.deepEqual(out.tabs, { position: "fixed", atBottom: true, fits: true, oneRow: true, count: 5 }, "all five tabs on one fixed row at the bottom");
   assert.equal(out.fab, "fixed"); assert.equal(out.refresh, "\u21bb"); assert.equal(out.filtersNoWrap, "nowrap");
   assert.deepEqual(out.open, { fold: false, foldBtn: false }, "a ticket still looking for people never folds");
   assert.deepEqual(out.pot, { fold: true, desc: "none", sides: "none", rows: 2, bar: "none", btn: "Details" }, "folded: the stat rows carry the sides and their numbers, no bars, no terms");
@@ -552,6 +556,121 @@ test("phone: a folded field bet shows the two sides and hides the field's player
     return { fold: t.classList.contains("fold"), sides: [...t.querySelectorAll(".srow.side-row")].map(cs), subs: [...t.querySelectorAll(".srow.sub")].map(cs) };
   });
   assert.deepEqual(out, { fold: true, sides: ["grid", "grid"], subs: ["none", "none", "none", "none"] });
+  assert.deepEqual(errors, []);
+  await p.close();
+});
+
+// Alice beat Bob twice and lost a pot to Cara; Cara's pot beat everyone.
+const RIVAL_BETS = [
+  { id: "r1", status: "settled", week: 1, name: "Opener", amount: 25, winner: "a", settledAt: "2026-09-11T00:00:00Z", entries: [{ memberId: "a" }, { memberId: "b" }], paid: [] },
+  { id: "r2", status: "settled", week: 2, name: "Gun Slinger", amount: 10, winner: "a", settledAt: "2026-09-18T00:00:00Z", entries: [{ memberId: "a" }, { memberId: "b" }], paid: [] },
+  { id: "r3", status: "settled", week: 0, name: "Season pot", amount: 20, winner: "c", settledAt: "2026-09-25T00:00:00Z", entries: [{ memberId: "a" }, { memberId: "b" }, { memberId: "c" }], paid: [] },
+];
+
+test("Rivals: a grid of every pair, your two rivalries above it, and the bets behind a cell on a click", { skip }, async () => {
+  const { p, errors } = await page();
+  const out = await p.evaluate(async (BETS) => {
+    const { state } = await import("./state.js?v=dev"); const V = await import("./render.js?v=dev");
+    state.bets = BETS; state.tab = "rivals"; V.render();
+    const res = {}, host = document.getElementById("rivals");
+    res.shown = [...document.querySelectorAll("section[data-panel]")].filter(s => !s.hidden).map(s => s.getAttribute("data-panel"));
+    res.badge = (() => { const n = document.getElementById("tabN-rivals"); return [n.hidden, n.textContent]; })();
+    res.mine = [...host.querySelectorAll(".riv-you")].map(c => [c.querySelector(".lbl").textContent, c.querySelector(".riv-who b").textContent, c.querySelector(".riv-n").textContent]);
+    // the grid: row manager, then each cell against the columns, then the season total
+    const head = [...host.querySelectorAll(".riv thead th")].map(t => (t.querySelector("span:not(.avatar)") || t).textContent.trim());
+    res.head = head;
+    res.rows = [...host.querySelectorAll(".riv tbody tr")].map(tr => [tr.querySelector("th span:not(.avatar)").textContent,
+      ...[...tr.querySelectorAll("td")].map(td => td.classList.contains("self") ? "—" : td.querySelector("b").textContent)]);
+    res.tot = [...host.querySelectorAll(".riv td.tot")].map(td => td.querySelector("b").textContent);
+    res.selfCells = host.querySelectorAll(".riv td.self").length;
+    // click Alice-vs-Bob
+    host.querySelector('.riv td.c[data-a="a"][data-b="b"]').click();
+    await new Promise(r => setTimeout(r, 40));
+    const d = document.querySelector("#rivals .riv-drill");
+    res.drill = [...d.querySelectorAll(".riv-bet")].map(x => [x.querySelector(".wk").textContent, x.querySelector(".riv-nm b").textContent, x.querySelector(".riv-w").textContent, x.querySelector("b.num").textContent]);
+    res.sel = document.querySelectorAll("#rivals .riv td.c.sel").length;
+    // clicking the same cell again closes it
+    document.querySelector('#rivals .riv td.c[data-a="a"][data-b="b"]').click();
+    await new Promise(r => setTimeout(r, 40));
+    res.closed = !document.querySelector("#rivals .riv-drill");
+    res.brag = [...document.querySelectorAll("#rivals .riv-brag")].map(x => [x.querySelector(".riv-t b").textContent, x.querySelector(".riv-n").textContent]);
+    res.feed = [...document.querySelectorAll("#rivals .riv-box:last-child .riv-bet .riv-nm b")].map(x => x.textContent);
+    return res;
+  }, RIVAL_BETS);
+  assert.deepEqual(out.shown, ["rivals"]);
+  assert.deepEqual(out.badge, [false, "1"], "one manager is up on you");
+  assert.deepEqual(out.mine, [["You own", "Bob", "+$35"], ["Owns you", "Cara", "−$20"]]);
+  assert.deepEqual(out.head, ["", "Cara", "Alice", "Bob", "Season"], "columns run richest season first");
+  assert.deepEqual(out.rows, [
+    ["Cara", "—", "+$20", "+$20", "+$40"],
+    ["Alice", "−$20", "—", "+$35", "+$15"],
+    ["Bob", "−$20", "−$35", "—", "−$55"]], "each cell is the row's money against the column, the last one the season");
+  assert.deepEqual(out.tot, ["+$40", "+$15", "−$55"]);
+  assert.equal(out.selfCells, 3, "the diagonal is blank");
+  assert.deepEqual(out.drill, [["WK 2", "Gun Slinger", "Alice won", "+$10"], ["WK 1", "Opener", "Alice won", "+$25"]], "newest first, from the row manager's side");
+  assert.equal(out.sel, 2, "both halves of the pair light up — it is one rivalry seen from either side");
+  assert.equal(out.closed, true, "a second click on the open cell closes it");
+  assert.deepEqual(out.brag, [["Biggest rivalry", "2–0"], ["Most lopsided", "$35"], ["The hammer", "2 W"], ["The nail", "3 L"], ["Biggest haul", "$40"]]);
+  assert.deepEqual(out.feed, ["Cara beat Alice, Bob", "Alice beat Bob", "Alice beat Bob"]);
+  assert.deepEqual(errors, []);
+  await p.close();
+});
+
+test("Rivals: nothing settled yet says so, and a bet opens from the grid with the Book's filters cleared", { skip }, async () => {
+  const { p, errors } = await page();
+  const out = await p.evaluate(async (BETS) => {
+    const { state } = await import("./state.js?v=dev"); const V = await import("./render.js?v=dev");
+    state.bets = []; state.tab = "rivals"; V.render();
+    const res = { empty: document.querySelector("#rivals .empty").textContent.slice(0, 22), badge: document.getElementById("tabN-rivals").hidden };
+    state.bets = BETS; state.filter.status = "open"; state.filter.week = "2"; V.render();
+    await new Promise(r => setTimeout(r, 30));
+    document.querySelector('#rivals .riv td.c[data-a="a"][data-b="b"]').click();
+    await new Promise(r => setTimeout(r, 40));
+    document.querySelector("#rivals .riv-drill .riv-bet").click();   // jump to that bet
+    await new Promise(r => setTimeout(r, 140));
+    res.after = { tab: state.tab, status: state.filter.status, week: state.filter.week,
+      shown: [...document.querySelectorAll("section[data-panel]")].filter(s => !s.hidden).map(s => s.getAttribute("data-panel")),
+      flashed: !!document.querySelector('article.ticket[data-bet="r2"].flash') };
+    return res;
+  }, RIVAL_BETS);
+  assert.equal(out.empty, "Nothing has settled ye");
+  assert.equal(out.badge, true, "no badge before anything settles");
+  assert.deepEqual(out.after, { tab: "book", status: "all", week: "all", shown: ["book"], flashed: true });
+  assert.deepEqual(errors, []);
+  await p.close();
+});
+
+test("phone: Rivals stacks the cards, keeps the names column pinned and the grid inside the screen", { skip }, async () => {
+  const { p, errors } = await page(null, PHONE);
+  const out = await p.evaluate(async (BETS) => {
+    const { state } = await import("./state.js?v=dev"); const V = await import("./render.js?v=dev");
+    state.bets = BETS; state.tab = "rivals"; state.local = false; state.connected = true; state.db = { doc() { return {}; } };
+    localStorage.setItem("smyrna.pushNudge", "x");
+    document.getElementById("login").hidden = true; document.getElementById("app").hidden = false;
+    V.render();
+    await new Promise(r => setTimeout(r, 40));
+    const cs = (el) => getComputedStyle(el), host = document.getElementById("rivals");
+    host.querySelector('.riv td.c[data-a="a"][data-b="b"]').click();
+    await new Promise(r => setTimeout(r, 40));
+    // the click redraws the panel, so everything measured has to be looked up again
+    const wrap = host.querySelector(".riv-wrap"), th = host.querySelector(".riv tbody th");
+    return {
+      mineCols: cs(host.querySelector(".riv-mine")).gridTemplateColumns.split(" ").length,
+      sideCols: cs(host.querySelector(".riv-side")).gridTemplateColumns.split(" ").length,
+      pinned: cs(th).position,
+      scrolls: wrap.scrollWidth >= wrap.clientWidth,
+      noBodyScroll: document.documentElement.scrollWidth <= innerWidth,
+      tabFits: [...document.querySelectorAll("#tabs .tab")].every(t => t.getBoundingClientRect().right <= innerWidth + 1),
+      tabs: document.querySelectorAll("#tabs .tab").length,
+      drill: !!host.querySelector(".riv-drill .riv-bet"),
+    };
+  }, RIVAL_BETS);
+  assert.equal(out.mineCols, 1, "your two rivalries stack");
+  assert.equal(out.sideCols, 1, "bragging rights and Latest stack");
+  assert.equal(out.pinned, "sticky", "the names column stays put while the grid scrolls");
+  assert.equal(out.noBodyScroll, true, "the page itself never scrolls sideways");
+  assert.equal(out.tabs, 5); assert.equal(out.tabFits, true, "five tabs still fit the bottom bar");
+  assert.equal(out.drill, true);
   assert.deepEqual(errors, []);
   await p.close();
 });
