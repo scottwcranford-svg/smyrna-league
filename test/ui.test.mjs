@@ -755,6 +755,9 @@ test("the propose form says which games have a line, prefills it, and lets you c
     await new Promise(r => setTimeout(r, 40));
     const res = {};
     res.options = [...document.querySelectorAll("#bGame option")].map(o => o.textContent).filter(t => /@/.test(t));
+    // with no game chosen there is nothing to bet on yet
+    res.beforeGame = { markets: document.getElementById("bMarket").hidden, rowHidden: document.getElementById("bLineRow").hidden,
+      src: document.getElementById("bLineSrc").hidden };
     // pick the game with a line
     const sel = document.getElementById("bGame");
     sel.value = "g5"; sel.dispatchEvent(new Event("change", { bubbles: true }));
@@ -763,10 +766,10 @@ test("the propose form says which games have a line, prefills it, and lets you c
     res.chipsOnPick = chips();
     document.querySelector('#bMarket [data-market="total"]').click();
     await new Promise(r => setTimeout(r, 40));
-    res.total = { line: document.getElementById("bLine").value, label: document.getElementById("bLineLbl").textContent, src: document.getElementById("bLineSrc").textContent };
+    res.total = { line: document.getElementById("bLine").value, label: document.getElementById("bLineLbl").textContent, ph: document.getElementById("bLine").placeholder, src: document.getElementById("bLineSrc").textContent };
     document.querySelector('#bMarket [data-market="spread"]').click();
     await new Promise(r => setTimeout(r, 40));
-    res.spread = { line: document.getElementById("bLine").value, label: document.getElementById("bLineLbl").textContent,
+    res.spread = { line: document.getElementById("bLine").value, label: document.getElementById("bLineLbl").textContent, ph: document.getElementById("bLine").placeholder,
       fav: [...document.querySelectorAll("#bLineSrc [data-act='dFav']")].map(b => [b.textContent, b.getAttribute("aria-pressed")]),
       sides: [...document.querySelectorAll("#bEntries .side-chips .chip")].map(c => c.textContent) };
     // flip the favourite and the handicap follows
@@ -785,11 +788,13 @@ test("the propose form says which games have a line, prefills it, and lets you c
   }, LINES);
   assert.deepEqual(out.options, ["NE @ SEA · Sat, Oct 11, 1:00 PM · SEA −3 · O/U 44.5", "KC @ DEN · Sat, Oct 11, 4:00 PM · no line yet"],
     "the picker says which games have a line before you choose one");
+  assert.deepEqual(out.beforeGame, { markets: true, rowHidden: true, src: true },
+    "before a game is picked the markets, the number and the hint are all out of the way");
   assert.deepEqual(out.chipsOnPick, [["Winner", false, "true"], ["Over / Under44.5", true, "false"], ["SpreadSEA −3", true, "false"]],
     "each market wears its published number");
-  assert.equal(out.total.line, "44.5"); assert.equal(out.total.label, "Total");
+  assert.equal(out.total.line, "44.5"); assert.equal(out.total.label, "Total"); assert.equal(out.total.ph, "45.5");
   assert.match(out.total.src, /^Vegas has this at 44\.5/);
-  assert.equal(out.spread.line, "3"); assert.equal(out.spread.label, "Points");
+  assert.equal(out.spread.line, "3"); assert.equal(out.spread.label, "Points"); assert.equal(out.spread.ph, "3.5");
   assert.deepEqual(out.spread.fav, [["NE", "false"], ["SEA", "true"]], "Seattle is the favourite Vegas named");
   assert.deepEqual(out.spread.sides, ["NE +3", "Seattle Seahawks −3"], "the fixture roster names Seattle but not New England");
   assert.deepEqual(out.flipped, ["NE −3", "Seattle Seahawks +3"], "flipping the favourite flips the handicap");

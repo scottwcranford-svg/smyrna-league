@@ -92,9 +92,13 @@ export function drawGameBox(){
     c.classList.toggle("has-line",!!got);
     c.innerHTML=esc(lbl)+(got?'<i class="n">'+esc(got)+"</i>":"");
   });
-  var wantsLine=mkt==="total"||mkt==="spread";
+  // Until a game is picked there is nothing to bet on: no markets, no number, no hint.
+  // And the example number has to belong to the market — a spread of 45.5 is nonsense.
+  document.getElementById("bMarket").hidden=!cur;
+  var wantsLine=!!cur&&(mkt==="total"||mkt==="spread");
   document.getElementById("bLineRow").hidden=!wantsLine;
   document.getElementById("bLineLbl").textContent=mkt==="spread"?"Points":"Total";
+  document.getElementById("bLine").placeholder=mkt==="spread"?"3.5":"45.5";
   document.getElementById("bLineHint").textContent=mkt==="spread"
     ?"how many the favourite gives up \u2014 your number"
     :"combined points \u2014 your number";
