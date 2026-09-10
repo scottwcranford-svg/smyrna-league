@@ -3,7 +3,7 @@
   "private": true,
   "description": "Smyrna League side-bet board",
   "scripts": {
-    "test": "node --test test/rules.test.mjs test/store.test.mjs test/auth.test.mjs test/sleeper.test.mjs test/ui.test.mjs",
+    "test": "node --test test/rules.test.mjs test/store.test.mjs test/auth.test.mjs test/sleeper.test.mjs test/notices.test.mjs test/ui.test.mjs",
     "e2e": "node test/e2e/flow.js"
   },
   "devDependencies": {

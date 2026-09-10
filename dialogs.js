@@ -6,9 +6,10 @@
 import * as R from "./rules.js?v=dev";
 import * as S from "./store.js?v=dev";
 import * as A from "./auth.js?v=dev";
-import { state, members, realMembers, teamOf } from "./state.js?v=dev";
+import { state, members, realMembers, teamOf, touch } from "./state.js?v=dev";
 import { toast, avatarHtml } from "./render.js?v=dev";
 import { guard, findBet } from "./book.js?v=dev";
+import * as Nf from "./notify.js?v=dev";
 
 const esc=R.esc, money=R.money, entriesOf=R.entriesOf, toLocalInput=R.toLocalInput, defaultPw=R.defaultPw, DEFAULT_KICKOFF=R.DEFAULT_KICKOFF;
 const member=function(id){ return R.member(id,members()); };
@@ -108,6 +109,33 @@ export function setPassword(memberId,pw){
 }
 
 /* ---- your own password ---- */
+// The Notifications button: on ↔ off where the browser allows it; a hand where it doesn't.
+export function pushToggle(){
+  var s=Nf.status();
+  if(s==="install"||s==="blocked") return openPushDlg(s);
+  if(s==="unsupported") return toast("This browser can't do notifications");
+  if(s==="on") return Nf.disable().then(function(){ toast("Notifications off on this device"); touch(); });
+  return Nf.enable().then(function(){ Nf.snooze(); toast("Notifications on — you'll get a buzz when the book moves"); touch(); })
+    .catch(function(e){ toast((e&&e.message)||"Couldn't turn notifications on"); touch(); });
+}
+export function openPushDlg(why){
+  var key=S.storedKey(), h="";
+  if(why==="install"){
+    h='<p class="bet-desc" style="margin:0 0 12px">iPhones only push to apps on the home screen. Once, in Safari:</p>'+
+      '<ol class="steps"><li>Tap <b>Share</b> (the square with the arrow), then <b>Add to Home Screen</b>, then <b>Add</b>.</li>'+
+      '<li>Open <b>Smyrna</b> from the home screen and sign in again'+(key?' — the passcode on this phone is <b>'+esc(key)+'</b>':'')+'.</li>'+
+      '<li>Open the menu behind your name, tap <b>Notifications off</b>, and tap <b>Allow</b>.</li></ol>'+
+      '<p class="hint" style="margin:12px 0 0">Needs iOS 16.4 or later. Nothing else changes: the home-screen app is this same page.</p>';
+  } else {
+    h='<p class="bet-desc" style="margin:0 0 12px">This browser has notifications for the site switched off, and only its settings can switch them back on.</p>'+
+      '<ol class="steps"><li><b>iPhone:</b> Settings → Notifications → Smyrna → Allow.</li>'+
+      '<li><b>Android:</b> Settings → Apps → Chrome → Notifications → this site.</li>'+
+      '<li><b>Desktop:</b> the lock icon left of the address → Notifications → Allow.</li></ol>'+
+      '<p class="hint" style="margin:12px 0 0">Then come back here and tap Notifications again.</p>';
+  }
+  document.getElementById("pushBody").innerHTML=h;
+  document.getElementById("pushDlg").showModal();
+}
 export function openPasswordDlg(){
   document.getElementById("pwCur").value=""; document.getElementById("pwNew").value=""; document.getElementById("pwHint").textContent="";
   document.getElementById("pwDlg").showModal(); document.getElementById("pwCur").focus();

@@ -9,6 +9,7 @@ import { toast, showBet } from "./render.js?v=dev";
 import * as B from "./book.js?v=dev";
 import * as F from "./forms.js?v=dev";
 import * as D from "./dialogs.js?v=dev";
+import * as Nf from "./notify.js?v=dev";
 
 const COLORS=R.COLORS, uid=R.uid, defaultPw=R.defaultPw, emailFor=R.emailFor;
 const member=function(id){ return R.member(id,members()); };
@@ -89,6 +90,9 @@ export const ACTIONS = {
   // the season table in Settle Up: drill through to the bets behind a cell, and jump to one
   drill:function(t){ D.openDrill(attr(t,"data-m"),attr(t,"data-row")); },
   goBet:function(t,id){ document.getElementById("drillDlg").close(); showBet(id); },
+  // notifications on this device: the nudge on the page, and "not now"
+  push:function(){ D.pushToggle(); },
+  pushLater:function(){ Nf.snooze(); touch(); },
 };
 
 // data-act changes on selects and checkboxes
@@ -191,6 +195,7 @@ export function bindEvents(hooks){
   on("betDlg","close",function(){ state.editId=null; });
   on("refreshBtn","click",B.requestRefresh);
   on("rosterBtn","click",D.openRoster);
+  on("pushBtn","click",D.pushToggle);
   on("bSave","click",function(e){ e.preventDefault(); F.submitBet(); });
   on("jSave","click",function(e){ e.preventDefault(); F.submitJoin(); });
   on("joinDlg","close",function(){ state.joinId=null; });

@@ -4,6 +4,7 @@
 
 import * as R from "./rules.js?v=dev";
 import { state, members, realMembers, teamOf, touch } from "./state.js?v=dev";
+import * as Nf from "./notify.js?v=dev";
 
 const esc=R.esc, money=R.money, signed=R.signed, initials=R.initials, weekLabel=R.weekLabel, isPlayoff=R.isPlayoff,
       kindLabel=R.kindLabel, entriesOf=R.entriesOf, fmtWhen=R.fmtWhen, countdown=R.countdown, lineText=R.lineText,
@@ -130,6 +131,10 @@ function head(){
   adm.hidden=!(signed&&state.isAdmin);
   adm.setAttribute("aria-pressed",String(!!state.admin));
   adm.textContent=state.admin?"Admin on":"Admin off";
+  // notifications on this device: the label says where they stand; the tap is in dialogs.pushToggle
+  var pb=document.getElementById("pushBtn"), ps=Nf.status();
+  pb.hidden=!signed||state.local||ps==="unsupported";
+  pb.setAttribute("data-push",ps); pb.textContent=Nf.label(ps);
 }
 
 // The tab row: which panel is open, and a badge where something needs a look.
@@ -175,6 +180,10 @@ function banner(){
   } else if(!state.me){
     h='<div class="banner"><span class="lbl">Read only</span><p>Sign in with your name and the password from the admin to take bets, post your own, and settle up. This device remembers you.</p>'+
       '<button class="btn pri" data-act="signin">Sign in</button></div>';
+  } else if(Nf.nudge()){
+    h='<div class="banner"><span class="lbl">Heads up</span><p>Get a buzz when a bet is proposed, taken or settled, and when the week’s high and low are in.'+
+      (Nf.status()==="install"?" On an iPhone that means adding the app to your home screen first.":"")+'</p>'+
+      '<span class="btns"><button class="btn pri" data-act="push">'+(Nf.status()==="install"?"Show me":"Turn on")+'</button><button class="btn" data-act="pushLater">Not now</button></span></div>';
   }
   el.innerHTML=h;
 }

@@ -1,0 +1,11 @@
+{
+  "name": "smyrna-league-functions",
+  "private": true,
+  "description": "Push notifications for the Smyrna League book: Firestore triggers that send through Firebase Cloud Messaging",
+  "main": "index.js",
+  "engines": { "node": "22" },
+  "dependencies": {
+    "firebase-admin": "^14.3.0",
+    "firebase-functions": "^7.3.2"
+  }
+}

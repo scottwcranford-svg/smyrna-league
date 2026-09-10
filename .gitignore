@@ -1,4 +1,6 @@
 .env
 data/
 node_modules/
+.firebase/
+*-debug.log
 test/e2e/*.png

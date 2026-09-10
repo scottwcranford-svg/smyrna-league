@@ -76,6 +76,40 @@ document reads and a few hundred writes, against 50,000 and 20,000 a day.
    in `.github/workflows/pages.yml` deploys every push to `master`, rewriting `?v=dev`
    in the module URLs to the commit hash so browsers fetch a whole build together.
 
+## Notifications
+
+A manager who turns them on (the menu behind their name → **Notifications off**, or
+the one-time nudge on the page) gets a push when a bet is proposed, taken, passed on,
+settled, cancelled or restored, when a payment is recorded, and when a week's high
+and low are in. Whoever made the change never hears about it. On an iPhone the app
+has to be on the home screen first (Safari only pushes to home-screen apps, iOS 16.4+);
+the app walks through that when it sees an iPhone in Safari.
+
+How it works: `notify.js` asks the browser, registers `firebase-messaging-sw.js` (from
+the site's own folder — on GitHub Pages the site lives under a path, so the SDK's
+default of the origin root would 404), gets a Firebase Cloud Messaging token and files
+it under `league/push` as `{ byToken: { <token>: { memberId, at, ua } } }`. The Cloud
+Function in `functions/` watches `bets/*`, `league/payments` and `league/highlow`,
+works out who should hear (`functions/notices.js`, pure and unit-tested in
+`test/notices.test.mjs`), and sends to every device those managers filed. Dead tokens
+are pruned as FCM reports them. A tap opens the app at `?bet=<id>`.
+
+Setting it up, once:
+
+1. Firebase console → Project settings → Cloud Messaging → Web configuration →
+   **Generate key pair**; paste the public key into `firebase-config.js` as `vapidKey`.
+2. Upgrade the project to the **Blaze** plan (Cloud Functions need it; at this
+   volume the bill is $0 — set a budget alert anyway).
+3. `npm install -g firebase-tools`, `firebase login`, then from the repo root:
+   `firebase deploy --only functions`. The first deploy enables Cloud Build,
+   Artifact Registry and Eventarc for the project and takes a few minutes.
+4. `firebase deploy --only firestore:rules` publishes `firestore.rules` from git, if
+   you'd rather not paste it in the console.
+
+`manifest.json` and the `icon-*.png` files make the site installable (home screen on
+iPhone and Android, "Install app" on desktop Chrome); `index.html` carries the
+viewport and Apple meta tags for the same reason.
+
 ## Working on it
 
 ```

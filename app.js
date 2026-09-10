@@ -7,11 +7,12 @@ import * as S from "./store.js?v=dev";
 import * as A from "./auth.js?v=dev";
 import * as N from "./sleeper.js?v=dev";
 import { state, members, onRender, touch } from "./state.js?v=dev";
-import { render, toast, ticker, statsBar } from "./render.js?v=dev";
+import { render, toast, ticker, statsBar, showBet } from "./render.js?v=dev";
 import { expireBets, settleFinished } from "./book.js?v=dev";
 import { drawScope, drawEntries } from "./forms.js?v=dev";
 import { showLogin, enforceFreshPassword, drawRoster } from "./dialogs.js?v=dev";
 import { bindEvents } from "./actions.js?v=dev";
+import * as Nf from "./notify.js?v=dev";
 
 const memberForEmail=function(email){ return R.memberForEmail(email,members()); };
 
@@ -28,6 +29,8 @@ function makeDb(key){ return S.makeDb(key,{ refresh:runRefresh }); }
 const ADMIN_LS="smyrna.adminMode";
 try{ state.adminMode=localStorage.getItem(ADMIN_LS)==="on"; }catch(e){}
 try{ var savedTab=localStorage.getItem("smyrna.tab"); if(["book","ledger","hl","settle"].indexOf(savedTab)>=0) state.tab=savedTab; }catch(e){}
+// A tapped notification opens the app at its bet: ?bet=<id>, read before storedKey() tidies the address.
+var openBet=null; try{ openBet=new URLSearchParams(location.search).get("bet"); if(openBet) history.replaceState(null,"",location.pathname); }catch(e){}
 function applyAuth(user){ var w=A.whoAmI(user,state.config); state.me=w.me; state.isAdmin=w.admin; state.admin=w.admin&&state.adminMode; stampSeen(); }
 // Once per visit, note that this manager opened the app: league/seen is { memberId: iso }.
 function stampSeen(){
@@ -152,6 +155,14 @@ function subscribeBook(db){
     touch();   // tickets show projections until something has been played
   },function(){ /* no projections, no harm */ });
 
+  // push, once the book is open: say what arrives while the page is up; refile a rotated token
+  var pushStarted=false;
+  var startPush=function(){
+    if(pushStarted||state.local||!state.me) return; pushStarted=true;
+    Nf.listen(function(title,body){ toast(title+(body?" · "+body:"")); });
+    setTimeout(function(){ Nf.refresh(); },8000);
+  };
+
   db.collection("bets").limit(1000).onSnapshot(function(snap){
     remoteBets=snap.docs.map(function(d){
       var v=R.clone(d.data())||{};
@@ -163,6 +174,8 @@ function subscribeBook(db){
     if(state.local) return;
     state.bets=remoteBets;
     touch();
+    startPush();
+    if(openBet){ var id=openBet; openBet=null; state.tab="book"; touch(); setTimeout(function(){ showBet(id); },300); }
   },function(e){ toast(S.dbMsg(e)); });
 }
 

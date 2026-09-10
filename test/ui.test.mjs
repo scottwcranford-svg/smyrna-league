@@ -36,10 +36,11 @@ test.before(async () => {
 test.after(async () => { if (browser) await browser.close(); if (server) server.close(); });
 
 // A fresh page with the app's modules loaded and a small league in state.
-async function page() {
+async function page(ua) {
   const p = await browser.newPage();
   const errors = [];
   p.on("pageerror", e => errors.push(e.message));
+  if (ua) await p.setUserAgent(ua);
   await p.goto(base, { waitUntil: "load" });
   await p.waitForSelector("#bEntries", { timeout: 20000 });
   await p.evaluate(async () => {
@@ -379,6 +380,53 @@ test("League dialog: when each manager was last in", { skip }, async () => {
     return [...document.querySelectorAll("#rosterList .rrow")].map(r => { const s = r.querySelector(".r-seen"); return [r.querySelector(".r-name").textContent, s.textContent, !!s.title]; });
   });
   assert.deepEqual(out, [["Alice", "Last in 5m ago", true], ["Bob", "Last in Sep 1", true], ["Cara", "Never signed in", false]]);
+  assert.deepEqual(errors, []);
+  await p.close();
+});
+
+test("notifications: the menu button says where they stand; the nudge shows once and takes 'not now'", { skip }, async () => {
+  const { p, errors } = await page();
+  const out = await p.evaluate(async () => {
+    const { state } = await import("./state.js?v=dev"); const V = await import("./render.js?v=dev"); const Nf = await import("./notify.js?v=dev");
+    state.local = false; state.connected = true; state.db = { doc() { return { update: () => Promise.resolve(), get: () => Promise.resolve({ exists: false }) }; } };
+    const btn = document.getElementById("pushBtn"), res = {};
+    V.render();
+    res.status = Nf.status(); res.btn = [btn.hidden, btn.textContent, btn.getAttribute("data-push")];
+    const nudge = document.querySelector("#banner .banner");
+    res.nudge = nudge ? [nudge.querySelector(".lbl").textContent, [...nudge.querySelectorAll("button")].map(b => b.textContent)] : null;
+    document.querySelector('#banner [data-act="pushLater"]').click();
+    await new Promise(r => setTimeout(r, 30));
+    res.afterLater = [!!document.querySelector("#banner .banner"), !!localStorage.getItem("smyrna.pushNudge")];
+    state.local = true; V.render(); res.localHidden = btn.hidden;
+    localStorage.removeItem("smyrna.pushNudge");   // pages share this origin's storage
+    return res;
+  });
+  assert.equal(out.status, "off", "headless Chrome on localhost supports push and hasn't been asked");
+  assert.deepEqual(out.btn, [false, "Notifications off", "off"]);
+  assert.deepEqual(out.nudge, ["Heads up", ["Turn on", "Not now"]]);
+  assert.deepEqual(out.afterLater, [false, true], "'not now' clears the nudge and is remembered on this device");
+  assert.equal(out.localHidden, true, "nothing to turn on while the book is only local");
+  assert.deepEqual(errors, []);
+  await p.close();
+});
+
+test("notifications on an iPhone in Safari: the button and the nudge lead to the home-screen steps, passcode included", { skip }, async () => {
+  const { p, errors } = await page("Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1");
+  const out = await p.evaluate(async () => {
+    const { state } = await import("./state.js?v=dev"); const V = await import("./render.js?v=dev"); const Nf = await import("./notify.js?v=dev");
+    localStorage.setItem("smyrna.sidebook.key.v1", "test-passcode-42"); localStorage.removeItem("smyrna.pushNudge");
+    state.local = false; state.connected = true; state.db = { doc() { return {}; } };
+    V.render();
+    const btn = document.getElementById("pushBtn"), res = { status: Nf.status(), btn: [btn.hidden, btn.textContent], nudgeBtn: document.querySelector('#banner [data-act="push"]').textContent };
+    btn.click();
+    await new Promise(r => setTimeout(r, 30));
+    const dlg = document.getElementById("pushDlg");
+    res.dlg = [dlg.open, dlg.querySelectorAll("#pushBody .steps li").length, /Add to Home Screen/.test(dlg.textContent), /test-passcode-42/.test(dlg.textContent)];
+    return res;
+  });
+  assert.equal(out.status, "install");
+  assert.deepEqual(out.btn, [false, "Get notifications"]); assert.equal(out.nudgeBtn, "Show me");
+  assert.deepEqual(out.dlg, [true, 3, true, true], "the dialog opens with the three steps and this phone's passcode");
   assert.deepEqual(errors, []);
   await p.close();
 });
