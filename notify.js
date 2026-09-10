@@ -41,7 +41,15 @@ export function snooze(){ lsSet(NUDGE_LS,new Date().toISOString()); }
 
 function messaging(){ return firebase.messaging(); }
 function vapid(){ return (window.FIREBASE_CONFIG&&window.FIREBASE_CONFIG.vapidKey)||""; }
-function register(){ return navigator.serviceWorker.register(SW); }
+// Registered, and active: the SDK subscribes straight away on the registration it's
+// handed, and a worker still installing can't subscribe. `ready` waits for the
+// activation; the race keeps a stuck install from hanging the tap forever.
+function register(){
+  return navigator.serviceWorker.register(SW).then(function(reg){
+    var wait=new Promise(function(res){ setTimeout(res,10000); });
+    return Promise.race([navigator.serviceWorker.ready,wait]).then(function(){ return reg; });
+  });
+}
 function fileToken(tok){
   var d={ byToken:{} };
   d.byToken[tok]={ memberId:state.me, at:new Date().toISOString(), ua:String(navigator.userAgent||"").slice(0,140) };
