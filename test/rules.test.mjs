@@ -195,6 +195,30 @@ test("weekly high / low: top score takes the stake from the bottom, ties share, 
   assert.deepEqual(R.finalWeeks({ games: [{ week: 1, status: "final" }, { week: 1, status: "final" }, { week: 2, status: "final" }, { week: 2, status: "live" }, { week: 3, status: "pre" }] }), [1], "only weeks with every game final");
 });
 
+test("balances: bets plus hi / low, minus payments; the transfers that clear everyone", () => {
+  const cfg = { members: [{ id: "a", name: "A" }, { id: "b", name: "B" }, { id: "c", name: "C" }, { id: "d", name: "D" }] };
+  const bets = [
+    { id: "s1", status: "settled", week: 0, amount: 25, winner: "a", entries: [{ memberId: "a" }, { memberId: "b" }], paid: [] },
+    { id: "w1", status: "settled", week: 2, amount: 10, winner: "c", entries: [{ memberId: "a" }, { memberId: "c" }], paid: [] },
+    { id: "w2", status: "settled", week: 3, amount: 10, winner: "d", entries: [{ memberId: "b" }, { memberId: "d" }], paid: ["b"] },   // b already paid d, the old way
+  ];
+  const hl = { weeks: { "1": { high: [{ id: "d", pts: 140 }], low: [{ id: "a", pts: 90 }] } } };
+  const B = R.balances(cfg, bets, hl, null, 5);
+  assert.deepEqual([B.byId.a.bets, B.byId.a.hl, B.byId.a.net], [15, -5, 10]);
+  assert.deepEqual([B.byId.b.bets, B.byId.b.paidOut, B.byId.b.net], [-35, 10, -25], "the legacy paid flag counts as a payment");
+  assert.deepEqual([B.byId.d.bets, B.byId.d.hl, B.byId.d.paidIn, B.byId.d.net], [10, 5, 10, 5]);
+  assert.equal(B.byId.c.net, 10);
+  assert.equal(Math.round(Object.values(B.byId).reduce((s, x) => s + x.net, 0) * 100) / 100, 0, "balances always net to zero");
+  assert.deepEqual(B.transfers, [{ from: "b", to: "a", amount: 10 }, { from: "b", to: "c", amount: 10 }, { from: "b", to: "d", amount: 5 }], "biggest debtor pays down the creditors, biggest first");
+  // a recorded payment moves two balances and shrinks the list
+  const B2 = R.balances(cfg, bets, hl, [{ id: "p1", from: "b", to: "a", amount: 10, at: "2027-01-05T00:00:00Z" }], 5);
+  assert.equal(B2.byId.b.net, -15); assert.equal(B2.byId.a.net, 0);
+  assert.deepEqual(B2.transfers.map((t) => [t.from, t.to, t.amount]), [["b", "c", 10], ["b", "d", 5]]);
+  const B3 = R.balances(cfg, bets, hl, [{ id: "p1", from: "b", to: "a", amount: 10, voided: true }], 5);
+  assert.equal(B3.byId.b.net, -25, "a voided payment doesn't count");
+  assert.equal(B3.payments.length, 2, "but it's still in the log, with the legacy one");
+});
+
 test("drillRows: what's behind a season-table cell, newest first", () => {
   const members = [{ id: "a", name: "Alice" }, { id: "b", name: "Bob" }, { id: "c", name: "Cara" }];
   const bets = [

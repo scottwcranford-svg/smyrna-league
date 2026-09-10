@@ -12,6 +12,7 @@ export const state = {
   proj:null,   // league/proj: Sleeper's weekly projections for the weeks in play
   sleeper:null,   // league/sleeper: each manager's Sleeper avatar and team name, by member id
   highlow:null,   // league/highlow: each finished week's top and bottom Sleeper scores
+  payments:null,  // league/payments: { list: [{ id, from, to, amount, at, by, voided? }] } — settled once, at the end
   tab:"book",     // which panel is open: book, ledger, hl, settle — remembered per device   // league/seen: when each manager last opened the app
   // the propose / join forms' draft
   draftScope:"", draftStats:[], editId:null,

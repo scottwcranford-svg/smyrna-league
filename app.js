@@ -131,6 +131,11 @@ function subscribeBook(db){
     touch();   // tickets show each pick's current status
   },function(){ /* picker falls back to free text */ });
 
+  db.doc("league/payments").onSnapshot(function(snap){
+    state.payments=snap.exists?R.clone(snap.data()):null;
+    touch();
+  },function(){ /* nothing paid yet */ });
+
   db.doc("league/highlow").onSnapshot(function(snap){
     state.highlow=snap.exists?snap.data():null;   // read-only
     touch();

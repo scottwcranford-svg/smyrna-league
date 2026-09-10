@@ -417,3 +417,24 @@ h1,h2,h3,.terms,.login-brand h1{font-family:"Poppins","Inter",system-ui,sans-ser
 .glance b{color:var(--ink)} .glance b.pos{color:var(--win)} .glance b.neg{color:var(--loss)} .glance b.warn{color:var(--gold)}
 .glance-r{margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 @media (max-width:640px){ .panel{padding:12px 10px 16px;border-radius:18px} .tab{padding:10px 14px;font-size:12px} .brand h1{font-size:22px} .brand .sub.gold{font-size:13px} .glance-r{margin-left:0} }
+
+/* ---- net settlement: your line, everyone's balance, the transfers, the payments made ---- */
+.you-line{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin:12px 0 4px;font-size:13px;color:var(--ink-3)}
+.you-line b{font-family:"Poppins","Inter",system-ui,sans-serif;font-size:18px;font-weight:800}
+.you-line b.pos{color:var(--win)} .you-line b.neg{color:var(--loss)} .you-line b.flat{color:var(--ink-2)}
+.bal-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:14px 0 9px}
+.bal-head .note{font-size:12px;color:var(--ink-3)}
+.balances{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px}
+.bal{display:grid;grid-template-columns:auto 1fr auto;grid-template-areas:"av name net" "av sub net";column-gap:8px;align-items:center;background:var(--surface-3);border:1px solid var(--rule);border-radius:12px;padding:8px 11px}
+.bal.me{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.bal .avatar{grid-area:av}
+.bal .bal-name{grid-area:name;font-weight:700;font-size:12.5px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bal small{grid-area:sub;font-size:10.5px;color:var(--ink-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.bal b{grid-area:net;font-size:15px;font-weight:800;font-variant-numeric:tabular-nums;padding-left:6px}
+.bal b.pos{color:var(--win)} .bal b.neg{color:var(--loss)} .bal b.flat{color:var(--ink-3)}
+.paylog{display:flex;flex-direction:column;gap:6px}
+.paid{display:flex;align-items:center;gap:12px;background:var(--surface-3);border:1px solid var(--rule);border-radius:12px;padding:8px 13px;font-size:13px}
+.paid .paid-when{color:var(--ink-3);font-size:12px;flex:none;min-width:130px}
+.paid .paid-txt{flex:1 1 auto;min-width:0;color:var(--ink)}
+.paid .paid-txt small{color:var(--ink-3)}
+.paid b.num{font-variant-numeric:tabular-nums;color:var(--gold)}

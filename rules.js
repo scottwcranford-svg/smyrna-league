@@ -216,6 +216,49 @@ export function drillRows(memberId,row,bets,highlow,stake,members){
   return out;
 }
 
+/* ---- balances and net settlement ----
+   Nothing is paid bet by bet. Everyone's balance is settled bets plus hi / low, plus what
+   they've paid, minus what they've been paid. Payments live in league/payments; the old
+   per-bet paid flags count as payments of the stake from loser to winner. The transfers
+   that clear everyone: the biggest debtor pays the biggest creditor, and so on. */
+function r2(n){ return Math.round(n*100)/100; }
+export function legacyPayments(bets){
+  var out=[];
+  (bets||[]).forEach(function(b){
+    if(b.status!=="settled"||!b.winner||b.winner==="push") return;
+    (Array.isArray(b.paid)?b.paid:[]).forEach(function(from){
+      if(from!==b.winner) out.push({ id:"bet:"+b.id+":"+from, from:from, to:b.winner, amount:Number(b.amount)||0, at:b.settledAt||"", legacy:true });
+    });
+  });
+  return out;
+}
+export function settleTransfers(byId){
+  var debt=[], cred=[];
+  Object.keys(byId).forEach(function(id){ var n=byId[id].net; if(n<-0.004) debt.push({ id:id, amt:-n }); else if(n>0.004) cred.push({ id:id, amt:n }); });
+  debt.sort(function(a,b){ return b.amt-a.amt; }); cred.sort(function(a,b){ return b.amt-a.amt; });
+  var out=[], i=0, j=0;
+  while(i<debt.length&&j<cred.length){
+    var a=r2(Math.min(debt[i].amt,cred[j].amt));
+    out.push({ from:debt[i].id, to:cred[j].id, amount:a });
+    debt[i].amt=r2(debt[i].amt-a); cred[j].amt=r2(cred[j].amt-a);
+    if(debt[i].amt<=0.004) i++; if(cred[j].amt<=0.004) j++;
+  }
+  return out;
+}
+export function balances(config,bets,highlow,payments,stake){
+  var members=config?config.members:[];
+  var L=computeLedger(config,bets), HL=hlTally(highlow,members,stake);
+  var byId={};
+  var touch=function(id){ if(id&&!byId[id]) byId[id]={ bets:0, hl:0, paidOut:0, paidIn:0, net:0 }; };
+  (members||[]).forEach(function(m){ touch(m.id); });
+  Object.keys(L.pnl).forEach(function(id){ touch(id); byId[id].bets=L.pnl[id].net; });
+  Object.keys(HL.byId).forEach(function(id){ touch(id); byId[id].hl=HL.byId[id].net; });
+  var all=legacyPayments(bets).concat(payments||[]);
+  all.forEach(function(p){ var a=Number(p.amount)||0; if(!(a>0)||!p.from||!p.to||p.voided) return; touch(p.from); touch(p.to); byId[p.from].paidOut+=a; byId[p.to].paidIn+=a; });
+  Object.keys(byId).forEach(function(id){ var b=byId[id]; b.bets=r2(b.bets); b.hl=r2(b.hl); b.paidOut=r2(b.paidOut); b.paidIn=r2(b.paidIn); b.net=r2(b.bets+b.hl+b.paidOut-b.paidIn); });
+  return { byId:byId, transfers:settleTransfers(byId), payments:all };
+}
+
 /* ---- projections ----
    Sleeper's weekly projections, trimmed to the roster and to the stats the app tracks,
    ride in league/proj as { weeks: { "5": "<json>" } }. A projection is read with the

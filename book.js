@@ -9,6 +9,7 @@ import { toast, statsBar } from "./render.js?v=dev";
 
 const entriesOf=R.entriesOf, openSeats=R.openSeats, clone=R.clone;
 const mName=function(id){ return R.mName(id,members()); };
+const money=R.money, uid=R.uid;
 const isLocked=function(b){ return R.isLocked(b,state.config); };
 const betLock=function(b){ return R.betLock(b,state.config); };
 
@@ -121,21 +122,27 @@ export function passSeat(id,i){
   toast("Passed — the seat is open to anyone");
 }
 
-export function markPaid(betId,memberId){
-  var b=findBet(betId); if(!b) return;
-  if(!Array.isArray(b.paid)) b.paid=[];
-  if(b.paid.indexOf(memberId)<0) b.paid.push(memberId);
-  saveBet(b);
-}
-export function markPairPaid(from,to){
+// A payment between two managers, against the season's balances. Recorded by whoever
+// marks it; an admin can void one that was marked by mistake.
+export function recordPayment(from,to,amount){
   if(!guard()) return;
-  state.bets.forEach(function(b){
-    if(b.status!=="settled"||b.winner!==to||b.winner==="push") return;
-    if(!entriesOf(b).some(function(e){ return e.memberId===from; })) return;
-    if(!Array.isArray(b.paid)) b.paid=[];
-    if(b.paid.indexOf(from)<0){ b.paid.push(from); saveBet(b); }
-  });
-  toast("Settled up");
+  amount=Math.round((Number(amount)||0)*100)/100;
+  if(!from||!to||from===to||!(amount>0)) return toast("Nothing to record");
+  var cur=state.payments||{ list:[] }, list=Array.isArray(cur.list)?cur.list.slice():[];
+  list.push({ id:uid(), from:from, to:to, amount:amount, at:new Date().toISOString(), by:state.me||null });
+  state.payments={ updatedAt:new Date().toISOString(), list:list };
+  touch();
+  if(state.db&&!state.local) state.db.doc("league/payments").set(state.payments).catch(function(e){ toast(dbMsg(e)); });
+  toast("Recorded · "+mName(from)+" paid "+mName(to)+" "+money(amount));
+}
+export function voidPayment(id){
+  if(!guard()) return;
+  if(!state.admin) return toast("Only the admin can undo a payment");
+  var cur=state.payments||{ list:[] }, list=(cur.list||[]).map(function(p){ return p.id===id?Object.assign({},p,{ voided:true, voidedBy:state.me||null, voidedAt:new Date().toISOString() }):p; });
+  state.payments={ updatedAt:new Date().toISOString(), list:list };
+  touch();
+  if(state.db&&!state.local) state.db.doc("league/payments").set(state.payments).catch(function(e){ toast(dbMsg(e)); });
+  toast("Payment undone");
 }
 
 export function recordWinner(id,w){

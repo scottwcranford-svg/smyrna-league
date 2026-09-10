@@ -298,7 +298,10 @@ test("Settle Up opens with the season table: managers across, hi/low, weekly, se
     const t = document.querySelector("#settle table.pivot");
     return { heads: [...t.querySelectorAll("thead th")].slice(1).map(h => [h.querySelector(".pv-head span:not(.avatar)").textContent, h.classList.contains("me")]),
       rows: [...t.querySelectorAll("tbody tr")].map(r => [r.querySelector("th").textContent, ...[...r.querySelectorAll("td")].map(d => d.textContent + ":" + d.className.replace("num ", "").replace(" total", ""))]),
-      scrolls: getComputedStyle(document.querySelector("#settle .pivot-wrap")).overflowX, debts: document.querySelectorAll("#settle .debt").length };
+      scrolls: getComputedStyle(document.querySelector("#settle .pivot-wrap")).overflowX,
+      you: document.querySelector("#settle .you-line").textContent,
+      balances: [...document.querySelectorAll("#settle .bal")].map(b => [b.querySelector(".bal-name").textContent, b.querySelector("b").textContent, b.classList.contains("me")]),
+      transfers: [...document.querySelectorAll("#settle .debt")].map(d => [d.querySelector(".debt-txt").textContent.replace(/^[A-Z]{2}/, "").replace(/→[A-Z]{2}/, "→"), d.querySelector(".debt-amt").textContent]) };
   });
   assert.deepEqual(out.heads, [["Alice", true], ["Bob", false], ["Cara", false]], "a column per manager, yours marked");
   assert.deepEqual(out.rows, [
@@ -307,7 +310,16 @@ test("Settle Up opens with the season table: managers across, hi/low, weekly, se
     ["Season bets", "+$25:pos", "−$25:neg", "$0:flat"],
     ["Total", "+$15:pos", "−$20:neg", "+$5:pos"]], "net all season, paid or not");
   assert.equal(out.scrolls, "auto", "wide tables scroll inside the section");
-  assert.equal(out.debts, 1, "the unpaid weekly bet still lists below it; the paid season one doesn't");
+  assert.match(out.you, /You.re down \$10/, "Alice: +25 on the season bet, already paid by Bob, −10 on the weekly one");
+  assert.deepEqual(out.balances, [["Bob", "+$5", false], ["Cara", "+$5", false], ["Alice", "−$10", true]], "balances, biggest first: the paid season bet already netted, week-1 high and low folded in");
+  assert.deepEqual(out.transfers, [["Alice→Bob", "$5"], ["Alice→Cara", "$5"]], "two transfers clear it");
+  // Mark paid records the payment: the transfer goes, the balances move, the log shows it
+  await p.evaluate(async () => { const { state } = await import("./state.js?v=dev"); state.local = false; });   // off preview mode; no db, so nothing is written
+  await p.$eval('#settle .debt [data-act="pay"]', el => el.click());
+  await new Promise(r => setTimeout(r, 30));
+  const afterPay = await p.evaluate(() => ({ transfers: document.querySelectorAll("#settle .debt").length, you: document.querySelector("#settle .you-line").textContent, log: [...document.querySelectorAll("#settle .paid")].map(x => x.querySelector(".paid-txt").textContent + " " + x.querySelector("b").textContent), head: document.querySelectorAll("#settle .bal-head")[1].textContent }));
+  assert.equal(afterPay.transfers, 1); assert.match(afterPay.you, /You.re down \$5/); assert.match(afterPay.head, /To clear it · 1 payment/);
+  assert.deepEqual(afterPay.log.map(l => l.replace(/ · marked by \w+/, "")), ["Alice → Bob $5", "Bob → Alice · from a bet marked paid $25"], "the new payment, then the old per-bet flag as a payment");
   // drill through: Alice's Total cell lists her three lines; the bet line jumps to its ticket
   await p.$eval('#settle td[data-act="drill"][data-m="a"][data-row="total"]', el => el.click());   // through the real click wiring
   await p.waitForFunction(() => document.getElementById("drillDlg").open, { timeout: 5000 });
@@ -348,9 +360,9 @@ test("tabs: Book open by default, the others behind their tabs, badges and the g
     return res;
   });
   assert.equal(out.line, "2026 · 10-Team Keeper SF PPR · side bets", "the league's settings from Sleeper");
-  assert.equal(out.glance, "1 bet running$10 on the tableyou −$25 settled · 1 seat waiting on takers");
+  assert.equal(out.glance, "1 bet running$10 on the tableyou −$25 net · 1 seat waiting on takers");
   assert.deepEqual(out.shown, ["book"]);
-  assert.deepEqual(out.badges, [["book", true, "1"], ["ledger", false, ""], ["hl", false, "1"], ["settle", false, "1"]], "a seat open, a week in, a debt unpaid");
+  assert.deepEqual(out.badges, [["book", true, "1"], ["ledger", false, ""], ["hl", false, "1"], ["settle", false, "2"]], "a seat open, a week in, two transfers to clear");
   assert.equal(out.me, "Alice"); assert.equal(out.dropHidden, true);
   assert.deepEqual(out.afterClick, { shown: ["settle"], on: ["settle"], saved: "settle" }, "the tab switches through the real click wiring and is remembered");
   assert.equal(out.dropOpen, true); assert.equal(out.dropClosed, true, "the menu opens on its button and closes on a click elsewhere");

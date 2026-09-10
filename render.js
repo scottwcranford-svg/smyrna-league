@@ -137,7 +137,8 @@ function tabs(){
   var L=computeLedger(), HL=R.hlTally(state.highlow,members(),R.hlStake(state.config));
   var seats=0;
   state.bets.forEach(function(b){ if(b.status==="open"&&!isLocked(b)) entriesOf(b).forEach(function(e){ if(!e.memberId&&(!e.invite||e.declined)) seats++; }); });
-  var badge={ book:seats, ledger:0, hl:HL.weeks.length, settle:L.debts.length };
+  var Bal=R.balances(state.config,state.bets,state.highlow,state.payments&&state.payments.list,R.hlStake(state.config));
+  var badge={ book:seats, ledger:0, hl:HL.weeks.length, settle:Bal.transfers.length };
   Object.keys(badge).forEach(function(k){ var n=document.getElementById("tabN-"+k); if(!n) return; n.hidden=!badge[k]; n.textContent=badge[k]; });
   var cur=state.tab||"book";
   document.querySelectorAll("#tabs .tab").forEach(function(t){ var on=t.getAttribute("data-tab")===cur; t.classList.toggle("on",on); t.setAttribute("aria-selected",String(on)); });
@@ -154,8 +155,9 @@ function glance(){
   });
   var parts=['<span><b>'+live+"</b> "+(live===1?"bet":"bets")+" running</span>",'<span><b>'+esc(money(pot))+"</b> on the table</span>"];
   if(state.me){
-    var net=(L.pnl[state.me]||{}).net||0;
-    parts.push('<span>you <b class="'+(net>0?"pos":net<0?"neg":"")+'">'+esc(signed(net))+"</b> settled"+
+    var Bg=R.balances(state.config,state.bets,state.highlow,state.payments&&state.payments.list,R.hlStake(state.config));
+    var net=(Bg.byId[state.me]||{}).net||0;
+    parts.push('<span>you <b class="'+(net>0?"pos":net<0?"neg":"")+'">'+esc(signed(net))+"</b> net"+
       (mineOpen?' · <b class="warn">'+mineOpen+(mineOpen===1?" seat":" seats")+"</b> waiting on takers":"")+"</span>");
   }
   document.getElementById("glanceTxt").innerHTML=parts.join("");
@@ -276,30 +278,45 @@ function seasonTable(L){
     "</tbody></table></div>";
 }
 
+// Settle Up: the season table, everyone's balance as it stands, the transfers that would
+// clear them, and the payments made so far. Nothing is paid bet by bet.
 function settle(){
   var L=computeLedger(), host=document.getElementById("settle");
-  var table=seasonTable(L);
-  if(!L.debts.length){
-    host.innerHTML=table+'<div class="empty">Nobody owes anybody yet.</div>'; return;
+  var B=R.balances(state.config,state.bets,state.highlow,state.payments&&state.payments.list,R.hlStake(state.config));
+  var cols=realMembers().filter(function(m){ return !m.test; });
+  var h=seasonTable(L);
+
+  // you, first
+  if(state.me&&B.byId[state.me]){
+    var me=B.byId[state.me], n=me.net;
+    h+='<div class="you-line"><b class="'+(n>0?"pos":n<0?"neg":"flat")+'">'+(n>0?"You\u2019re up "+money(n):n<0?"You\u2019re down "+money(-n):"You\u2019re square")+"</b>"+
+      '<span>bets '+esc(signed(me.bets))+" · hi / low "+esc(signed(me.hl))+(me.paidOut||me.paidIn?" · paid "+esc(money(me.paidOut))+", received "+esc(money(me.paidIn)):"")+"</span></div>";
   }
-  host.innerHTML=table+'<div class="settle">'+L.debts.map(function(d){
-    var n=0;
-    state.bets.forEach(function(b){
-      if(b.status!=="settled"||b.winner==="push") return;
-      var paid=Array.isArray(b.paid)?b.paid:[];
-      if(b.winner===d.to && paid.indexOf(d.from)<0 &&
-         entriesOf(b).some(function(e){ return e.memberId===d.from; })) n++;
-    });
-    return '<div class="debt">'+
-      '<div class="debt-txt">'+avatarHtml(d.from,24)+
-      "<b>"+esc(mName(d.from))+"</b>"+
-      '<span class="pay-arrow">→</span>'+avatarHtml(d.to,24)+
-      "<b>"+esc(mName(d.to))+"</b>"+
-      '<span class="debt-n">· '+n+(n===1?" bet":" bets")+"</span></div>"+
-      '<div class="debt-amt num">'+money(d.amount)+"</div>"+
-      '<button class="btn" data-act="paidPair" data-from="'+esc(d.from)+'" data-to="'+esc(d.to)+'">Mark paid</button>'+
-    "</div>";
-  }).join("")+"</div>";
+
+  // everyone's balance, biggest first
+  var rows=cols.map(function(m){ return { m:m, b:B.byId[m.id]||{ bets:0, hl:0, net:0 } }; }).sort(function(a,b){ return (b.b.net-a.b.net)||a.m.name.localeCompare(b.m.name); });
+  h+='<div class="bal-head"><span class="lbl">Balances · if the season ended now</span><span class="note">Settled bets and hi / low, minus anything already paid.</span></div>'+
+    '<div class="balances">'+rows.map(function(r){ var n=r.b.net;
+      return '<div class="bal'+(r.m.id===state.me?" me":"")+'">'+avatarHtml(r.m.id,26)+'<span class="bal-name">'+esc(r.m.name)+"</span>"+
+        '<b class="'+(n>0?"pos":n<0?"neg":"flat")+'">'+esc(signed(n))+"</b><small>bets "+esc(signed(r.b.bets))+" · hi/low "+esc(signed(r.b.hl))+"</small></div>"; }).join("")+"</div>";
+
+  // what would clear it
+  var T=B.transfers;
+  h+='<div class="bal-head" style="margin-top:16px"><span class="lbl">'+(T.length?"To clear it · "+T.length+(T.length===1?" payment":" payments"):"All square")+"</span>"+
+    '<span class="note">'+(T.length?"The fewest transfers that zero everyone out. Mark each one paid as the money moves.":"Nobody owes anybody.")+"</span></div>";
+  if(T.length) h+='<div class="settle">'+T.map(function(d){
+    return '<div class="debt"><div class="debt-txt">'+avatarHtml(d.from,24)+"<b>"+esc(mName(d.from))+'</b><span class="pay-arrow">\u2192</span>'+avatarHtml(d.to,24)+"<b>"+esc(mName(d.to))+"</b></div>"+
+      '<div class="debt-amt num">'+esc(money(d.amount))+"</div>"+
+      (state.me?'<button class="btn" data-act="pay" data-from="'+esc(d.from)+'" data-to="'+esc(d.to)+'" data-amount="'+d.amount+'">Mark paid</button>':"")+"</div>"; }).join("")+"</div>";
+
+  // paid so far
+  var paid=B.payments.filter(function(p){ return !p.voided; }).sort(function(a,b){ return String(b.at||"").localeCompare(String(a.at||"")); });
+  if(paid.length) h+='<div class="bal-head" style="margin-top:16px"><span class="lbl">Paid so far · '+paid.length+"</span></div>"+'<div class="paylog">'+paid.map(function(p){
+    return '<div class="paid"><span class="paid-when">'+esc(p.at?fmtWhen(Date.parse(p.at)):"")+"</span>"+
+      '<span class="paid-txt">'+esc(mName(p.from))+" \u2192 "+esc(mName(p.to))+(p.by?'<small> · marked by '+esc(mName(p.by))+"</small>":"")+(p.legacy?"<small> · from a bet marked paid</small>":"")+"</span>"+
+      '<b class="num">'+esc(money(p.amount))+"</b>"+
+      (state.admin&&!p.legacy?'<button class="btn" data-act="unpay" data-id="'+esc(p.id)+'" title="Admin: undo this payment">Undo</button>':"")+"</div>"; }).join("")+"</div>";
+  host.innerHTML=h;
 }
 
 function filters(){
@@ -444,7 +461,7 @@ function stripHtml(S,ents,week){
 }
 
 // The action row: what this manager can do to this bet right now.
-function actionsHtml(b,ents,live,mine,unpaid){
+function actionsHtml(b,ents,live,mine){
   var acts=[];
   // Pot-style bet you're not in yet? Add yourself.
   if(state.me&&R.canJoin(b)&&!isLocked(b)&&!mine)
@@ -460,9 +477,6 @@ function actionsHtml(b,ents,live,mine,unpaid){
   }
   // Results record themselves when the game or the period is done; an admin can still call one by hand.
   if(b.status==="active"&&state.admin) acts.push('<button class="btn" data-act="settle" data-id="'+esc(b.id)+'" title="Admin: record the result by hand">Settle</button>');
-  unpaid.forEach(function(e){
-    acts.push('<button class="btn" data-act="paidOne" data-id="'+esc(b.id)+'" data-m="'+esc(e.memberId)+'">'+esc(mName(e.memberId))+" paid</button>");
-  });
   if(b.status==="settled") acts.push('<button class="btn" data-act="reopen" data-id="'+esc(b.id)+'">Reopen</button>');
   // only the proposer can edit a bet
   if((b.status==="open"||b.status==="active")&&!isLocked(b)&&(!b.createdBy||b.createdBy===state.me)) acts.push('<button class="btn" data-act="edit" data-id="'+esc(b.id)+'">Edit</button>');
@@ -497,13 +511,10 @@ function ticketHtml(b){
     chip='<span class="status open">'+(anyone?anyone+" seat"+(anyone===1?"":"s")+" open":waiting.length?"Waiting on "+waiting.join(", "):"Open · join in")+"</span>";
   }
 
-  var paid=Array.isArray(b.paid)?b.paid:[];
-  var unpaid=(b.status==="settled"&&b.winner&&b.winner!=="push")
-    ? live.filter(function(e){ return e.memberId!==b.winner&&paid.indexOf(e.memberId)<0; }) : [];
-  var acts=actionsHtml(b,ents,live,mine,unpaid);
+  var acts=actionsHtml(b,ents,live,mine);
   var sides=ents.map(function(e,i){ return sideHtml(e,i,b); }).join('<span class="vs">VS</span>');
   var pot=(Number(b.amount)||0)*live.length;
-  var paidStamp=(b.status==="settled"&&b.winner!=="push"&&!unpaid.length)?'<span class="paid-stamp">Paid</span>':"";
+  var paidStamp="";   // nothing is paid bet by bet: balances net out at the end of the year
   // Still looking for people: a seat to fill, or a pot you could add yourself to.
   var seeking=!isLocked(b)&&(b.status==="open"||(state.me&&R.canJoin(b)&&!mine));
   return '<article class="ticket '+esc(b.status)+(seeking?" seeking":"")+'" data-bet="'+esc(b.id)+'">'+
