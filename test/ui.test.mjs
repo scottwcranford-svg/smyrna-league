@@ -847,3 +847,24 @@ test("a ticket says whether its line was Vegas's or the proposer's own", { skip 
   assert.deepEqual(errors, []);
   await p.close();
 });
+
+test("phone: the ticker stacks each game's line under the matchup", { skip }, async () => {
+  const { p, errors } = await page(null, PHONE);
+  const out = await p.evaluate(async (LINES) => {
+    const { state } = await import("./state.js?v=dev"); const V = await import("./render.js?v=dev");
+    state.lines = LINES;
+    state.games = { games: [{ id: "g1", week: 1, away: "NE", home: "SEA", date: "2036-09-10T00:20:00Z", status: "pre" }] };
+    state.local = false; state.connected = true; state.db = { doc() { return {}; } };
+    localStorage.setItem("smyrna.pushNudge", "x");
+    document.getElementById("login").hidden = true; document.getElementById("app").hidden = false;
+    V.render(); await new Promise(r => setTimeout(r, 40));
+    const g = document.querySelector("#ticker .ticker-track > .game"), o = g.querySelector(".odds"), t = g.querySelector(".tm");
+    return { odds: o.textContent, below: Math.round(o.getBoundingClientRect().top) > Math.round(t.getBoundingClientRect().top),
+      noBodyScroll: document.documentElement.scrollWidth <= innerWidth };
+  }, LINES);
+  assert.equal(out.odds, "SEA −3 · O/U 44.5");
+  assert.equal(out.below, true, "the line sits on its own row under the teams, not squeezed beside them");
+  assert.equal(out.noBodyScroll, true);
+  assert.deepEqual(errors, []);
+  await p.close();
+});
