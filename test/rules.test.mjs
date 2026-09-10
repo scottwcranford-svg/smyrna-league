@@ -409,3 +409,65 @@ test("seenAt and seenCount read both shapes of league/seen", () => {
   assert.equal(R.seenCount(seen, "a"), 0, "an old string entry has no count yet");
   assert.equal(R.seenCount(seen, "b"), 12);
 });
+
+const LINES_CSV = [
+  "game_id,season,game_type,week,gameday,gametime,away_team,away_score,home_team,home_score,spread_line,total_line",
+  "2026_01_NE_SEA,2026,REG,1,2026-09-09,20:20,NE,,SEA,,3,44.5",
+  "2026_01_SF_LA,2026,REG,1,2026-09-10,20:15,SF,,LA,,3.5,47.5",
+  "2026_01_CHI_CAR,2026,REG,1,2026-09-13,13:00,CHI,,CAR,,-3,46.5",
+  "2026_02_DAL_PHI,2026,REG,2,2026-09-20,13:00,DAL,,PHI,,0,41",
+  "2026_12_KC_DEN,2026,REG,12,2026-11-22,13:00,KC,,DEN,,,",
+  "2025_01_NE_SEA,2025,REG,1,2025-09-09,20:20,NE,,SEA,,7,40",
+  "2026_99_AFC_NFC,2026,POST,22,2027-02-07,18:30,AFC,,NFC,,2,45",
+].join("\n");
+
+test("betting lines: parsed from the schedule file, the Rams renamed, other seasons left out", () => {
+  const lines = R.linesFromCsv(LINES_CSV, "2026");
+  assert.deepEqual(Object.keys(lines).sort(), ["1|CHI|CAR", "1|NE|SEA", "1|SF|LAR", "2|DAL|PHI"],
+    "only 2026 regular-season games with a number, and LA is the app's LAR");
+  assert.deepEqual(lines["1|NE|SEA"], { spread: 3, total: 44.5 });
+  assert.equal(lines["12|KC|DEN"], undefined, "a game Vegas hasn't posted isn't stored");
+  assert.deepEqual(R.linesFromCsv("nothing,useful\n1,2", "2026"), {}, "a file without the columns is ignored, not guessed at");
+});
+
+test("lineFor: the spread is read from the home team's side and named for the favourite", () => {
+  const lines = R.linesFromCsv(LINES_CSV, "2026");
+  const seattle = R.lineFor({ week: 1, away: "NE", home: "SEA" }, lines);
+  assert.deepEqual(seattle, { total: 44.5, spread: 3, fav: "SEA", dog: "NE", pick: false }, "positive means the home team gives the points");
+  const chicago = R.lineFor({ week: 1, away: "CHI", home: "CAR" }, lines);
+  assert.deepEqual({ fav: chicago.fav, dog: chicago.dog, spread: chicago.spread }, { fav: "CHI", dog: "CAR", spread: 3 }, "negative means the away team is favoured");
+  const even = R.lineFor({ week: 2, away: "DAL", home: "PHI" }, lines);
+  assert.equal(even.pick, true, "a zero spread is a pick'em, not a missing line");
+  assert.equal(R.lineFor({ week: 12, away: "KC", home: "DEN" }, lines), null, "no line, nothing to show");
+  assert.equal(R.lineFor(null, lines), null);
+  assert.equal(R.lineFor({ week: 1, away: "NE", home: "SEA" }, null), null);
+  assert.deepEqual(R.lineFor({ week: 1, away: "SF", home: "LAR" }, { byGame: lines }).fav, "LAR", "reads the stored { byGame } shape too");
+});
+
+test("lineSummary: what the picker and the ticker print", () => {
+  const lines = R.linesFromCsv(LINES_CSV, "2026");
+  assert.equal(R.lineSummary(R.lineFor({ week: 1, away: "NE", home: "SEA" }, lines)), "SEA −3 · O/U 44.5");
+  assert.equal(R.lineSummary(R.lineFor({ week: 2, away: "DAL", home: "PHI" }, lines)), "pick'em · O/U 41");
+  assert.equal(R.lineSummary(null), "");
+});
+
+test("a spread bet settles from the final score, the favourite giving the points", () => {
+  const bet = { week: 1, status: "active", market: "spread", line: 9.5, fav: "KC",
+    game: { id: "g", week: 1, away: "KC", home: "CAR", date: "2026-09-13T17:00:00Z" },
+    entries: [{ memberId: "a", side: "KC" }, { memberId: "b", side: "CAR" }] };
+  const game = (aw, hm) => ({ id: "g", week: 1, away: "KC", home: "CAR", status: "final", awayScore: aw, homeScore: hm });
+  assert.equal(R.coverSide(bet, game(31, 17)), "away", "won by 14, covers 9.5");
+  assert.equal(R.coverSide(bet, game(24, 20)), "home", "won by 4, doesn't cover");
+  assert.equal(R.coverSide(bet, game(17, 31)), "home", "lost outright");
+  assert.equal(R.coverSide({ ...bet, line: 10 }, game(27, 17)), "push", "exactly the number is a push");
+  assert.equal(R.lineText(bet), "KC −9.5");
+});
+
+test("lineOrigin: a bet says whether its number was Vegas's or the proposer's own", () => {
+  const g = { id: "g", week: 1, away: "KC", home: "CAR", date: "2026-09-13T17:00:00Z" };
+  assert.equal(R.lineOrigin({ game: g, market: "total", line: 44.5, lineSrc: "vegas" }), "vegas");
+  assert.equal(R.lineOrigin({ game: g, market: "spread", line: 3, fav: "KC", lineSrc: "own" }), "own");
+  assert.equal(R.lineOrigin({ game: g, market: "total", line: 44.5 }), null, "a bet posted before this shipped doesn't guess");
+  assert.equal(R.lineOrigin({ game: g, market: "ml", lineSrc: "vegas" }), null, "a straight-up bet has no number");
+  assert.equal(R.lineOrigin(null), null);
+});

@@ -76,6 +76,27 @@ document reads and a few hundred writes, against 50,000 and 20,000 a day.
    in `.github/workflows/pages.yml` deploys every push to `master`, rewriting `?v=dev`
    in the module URLs to the commit hash so browsers fetch a whole build together.
 
+## Betting lines
+
+The nflverse `games.csv` the app already downloads once a day for week start times also
+carries Vegas's `spread_line` (from the home team's side — positive means the home team is
+favoured) and `total_line`. `rules.linesFromCsv()` reads both into `league/lines`
+(`{ byGame: { "<week>|AWAY|HOME": { spread, total } } }`), renaming nflverse's `LA` to the
+app's `LAR` — the only code that differs between the two feeds.
+
+Lines appear a few weeks ahead of kickoff and are simply missing for games Vegas hasn't
+posted, so **every number in the app stays editable**. The propose form says which games
+have one before you pick (`no line yet` in the list), each market chip wears its published
+number, and choosing a game prefills it. Pre-kickoff games carry the line on the ticker.
+
+Because the published line moves during the week, a bet records where its number came from
+**at the moment it was posted** — `lineSrc: "vegas" | "own"` — and the ticket says
+**Vegas** or **their number**. Bets posted before this shipped have no record and make no
+claim either way.
+
+The **Spread** market was written long ago (`coverSide` handles the handicap and pushes)
+but had no button until now.
+
 ## Badges
 
 Eighteen live titles on the Ledger — Biggest Degenerate, Biggest Winner, Hot Hand, Ghost

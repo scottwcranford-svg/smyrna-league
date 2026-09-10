@@ -105,8 +105,10 @@ export function ticker(){
         '<span class="at">·</span><span class="tm">'+logoHtml(g.home,14)+esc(g.home)+(scored?' <b class="sc">'+g.homeScore+"</b>":"")+poss(g.home)+"</span>"+
         '<span class="live">'+esc((qlabel+" "+(g.clock||"")).trim()||"Live")+"</span></span>";
     }
+    // before kickoff, what Vegas has on it — the same numbers the propose form prefills
+    var L=R.lineFor(g,state.lines), sm=L?R.lineSummary(L):"";
     return '<span class="game"><span class="tm">'+logoHtml(g.away,14)+esc(g.away)+'</span><span class="at">@</span><span class="tm">'+logoHtml(g.home,14)+esc(g.home)+"</span>"+
-      '<span class="when">'+esc(fmtKick(t))+"</span></span>";
+      '<span class="when">'+esc(fmtKick(t))+"</span>"+(sm?'<span class="odds">'+esc(sm)+"</span>":"")+"</span>";
   }).join("");
   // two copies make the loop seamless; speed scales with how much is on the strip
   el.style.setProperty("--tick",Math.max(30,slate.length*5)+"s");
@@ -588,7 +590,8 @@ function gamelineHtml(b){
     stateHtml='<span class="gl-state live">'+esc((q+" "+(g.clock||"")).trim())+(g.dd?" · "+esc(g.dd):"")+"</span>";
   } else stateHtml='<span class="gl-state">'+esc(fmtWhen(t))+"</span>";
   return '<div class="gameline">'+team(g.away,g.awayScore,hw)+'<span class="gl-at">@</span>'+team(g.home,g.homeScore,aw)+
-    (b.market&&b.market!=="ml"?'<span class="gl-line">'+esc(lineText(b))+"</span>":"")+stateHtml+"</div>";
+    (b.market&&b.market!=="ml"?'<span class="gl-line">'+esc(lineText(b))+
+      (function(){ var o=R.lineOrigin(b); return o?'<i class="src '+o+'">'+(o==="vegas"?"Vegas":"their number")+"</i>":""; })()+"</span>":"")+stateHtml+"</div>";
 }
 
 // The standings strip: a bet tracks one stat or several. Older bets carry a single

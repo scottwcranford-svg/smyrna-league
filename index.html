@@ -137,11 +137,13 @@
       <div class="filters" id="bMarket" style="margin-top:8px">
         <button type="button" class="chip" data-act="dMarket" data-market="ml" aria-pressed="true">Winner</button>
         <button type="button" class="chip" data-act="dMarket" data-market="total" aria-pressed="false">Over / Under</button>
+        <button type="button" class="chip" data-act="dMarket" data-market="spread" aria-pressed="false">Spread</button>
       </div>
+      <div class="hint line-src" id="bLineSrc" hidden></div>
       <div class="line-row" id="bLineRow" hidden>
-        <span class="lbl">Total</span>
+        <span class="lbl" id="bLineLbl">Total</span>
         <input class="field num w-auto" id="bLine" inputmode="decimal" placeholder="45.5" style="width:110px">
-        <span class="hint">combined points — your number</span>
+        <span class="hint" id="bLineHint">combined points — your number</span>
       </div>
     </div>
     <div class="filters" id="bStats" hidden></div>

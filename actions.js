@@ -47,10 +47,14 @@ export const ACTIONS = {
     F.drawScope(); F.drawEntries();
   },
   dMarket:function(t){
-    state.draftMarket=attr(t,"data-market")==="total"?"total":"ml";
+    var m=attr(t,"data-market");
+    state.draftMarket=(m==="total"||m==="spread")?m:"ml";
     state.draft.forEach(function(e){ e.side=""; });
+    F.prefillLine();   // whatever Vegas has published for this game and market
     F.drawGameBox(); F.drawEntries();
   },
+  // on a spread, which team is giving the points
+  dFav:function(t){ state.draftFav=attr(t,"data-fav")||""; state.draft.forEach(function(e){ e.side=""; }); F.drawGameBox(); F.drawEntries(); },
   dSide:function(t){
     var si=num(t,"data-i"), sv=attr(t,"data-side");
     state.draft.forEach(function(e,j){ if(j!==si&&e.side===sv) e.side=""; });   // one side per pick
@@ -191,6 +195,7 @@ export function bindEvents(hooks){
       allGames().forEach(function(g){ if(g.id===gid) pick=g; });
       state.draftGame=pick?{ id:pick.id, week:pick.week, away:pick.away, home:pick.home, date:pick.date }:null;
       state.draftFav=""; state.draftLine=""; state.draft.forEach(function(e){ e.side=""; });
+      F.prefillLine();
       var nm=document.getElementById("bName");
       if(pick&&!nm.value.trim()) nm.value=pick.away+" @ "+pick.home;
       F.drawGameBox(); F.drawEntries();

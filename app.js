@@ -9,7 +9,7 @@ import * as N from "./sleeper.js?v=dev";
 import { state, members, onRender, touch } from "./state.js?v=dev";
 import { render, toast, ticker, statsBar, showBet } from "./render.js?v=dev";
 import { expireBets, settleFinished, syncBadges } from "./book.js?v=dev";
-import { drawScope, drawEntries } from "./forms.js?v=dev";
+import { drawScope, drawEntries, drawGameBox } from "./forms.js?v=dev";
 import { showLogin, enforceFreshPassword, drawRoster } from "./dialogs.js?v=dev";
 import { bindEvents } from "./actions.js?v=dev";
 import * as Nf from "./notify.js?v=dev";
@@ -144,6 +144,11 @@ function subscribeBook(db){
     state.payments=snap.exists?R.clone(snap.data()):null;
     touch();
   },function(){ /* nothing paid yet */ });
+
+  db.doc("league/lines").onSnapshot(function(snap){
+    state.lines=snap.exists?snap.data():null;   // read-only; the form prefills from it
+    if(document.getElementById("betDlg").open) drawGameBox();
+  },function(){ /* no published lines, so every number is typed by hand */ });
 
   db.doc("league/badges").onSnapshot(function(snap){
     state.badges=snap.exists?R.clone(snap.data()):null;   // who has held what, and since when

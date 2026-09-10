@@ -739,3 +739,106 @@ test("phone: the badge case goes to one card per row", { skip }, async () => {
   assert.deepEqual(errors, []);
   await p.close();
 });
+
+const LINES = { byGame: { "5|NE|SEA": { spread: 3, total: 44.5 }, "1|NE|SEA": { spread: 3, total: 44.5 } } };
+
+test("the propose form says which games have a line, prefills it, and lets you change it", { skip }, async () => {
+  const { p, errors } = await page();
+  const out = await p.evaluate(async (LINES) => {
+    const { state } = await import("./state.js?v=dev"); const F = await import("./forms.js?v=dev");
+    state.lines = LINES;
+    state.games = { games: [
+      { id: "g5", week: 5, away: "NE", home: "SEA", date: "2036-10-11T17:00:00Z", status: "pre" },
+      { id: "g6", week: 5, away: "KC", home: "DEN", date: "2036-10-11T20:00:00Z", status: "pre" }] };
+    F.openBetDlg();
+    document.querySelector('#bScope [data-scope="game"]').click();
+    await new Promise(r => setTimeout(r, 40));
+    const res = {};
+    res.options = [...document.querySelectorAll("#bGame option")].map(o => o.textContent).filter(t => /@/.test(t));
+    // pick the game with a line
+    const sel = document.getElementById("bGame");
+    sel.value = "g5"; sel.dispatchEvent(new Event("change", { bubbles: true }));
+    await new Promise(r => setTimeout(r, 40));
+    const chips = () => [...document.querySelectorAll("#bMarket .chip")].map(c => [c.textContent, c.classList.contains("has-line"), c.getAttribute("aria-pressed")]);
+    res.chipsOnPick = chips();
+    document.querySelector('#bMarket [data-market="total"]').click();
+    await new Promise(r => setTimeout(r, 40));
+    res.total = { line: document.getElementById("bLine").value, label: document.getElementById("bLineLbl").textContent, src: document.getElementById("bLineSrc").textContent };
+    document.querySelector('#bMarket [data-market="spread"]').click();
+    await new Promise(r => setTimeout(r, 40));
+    res.spread = { line: document.getElementById("bLine").value, label: document.getElementById("bLineLbl").textContent,
+      fav: [...document.querySelectorAll("#bLineSrc [data-act='dFav']")].map(b => [b.textContent, b.getAttribute("aria-pressed")]),
+      sides: [...document.querySelectorAll("#bEntries .side-chips .chip")].map(c => c.textContent) };
+    // flip the favourite and the handicap follows
+    document.querySelector("#bLineSrc [data-act='dFav'][data-fav='NE']").click();
+    await new Promise(r => setTimeout(r, 40));
+    res.flipped = [...document.querySelectorAll("#bEntries .side-chips .chip")].map(c => c.textContent);
+    // a game with no published line leaves the boxes empty and says so
+    sel.value = "g6"; sel.dispatchEvent(new Event("change", { bubbles: true }));
+    await new Promise(r => setTimeout(r, 40));
+    document.querySelector('#bMarket [data-market="spread"]').click();
+    await new Promise(r => setTimeout(r, 40));
+    res.noLine = { line: document.getElementById("bLine").value, src: document.getElementById("bLineSrc").textContent,
+      chips: chips().map(c => c[1]) };
+    document.getElementById("betDlg").close();
+    return res;
+  }, LINES);
+  assert.deepEqual(out.options, ["NE @ SEA · Sat, Oct 11, 1:00 PM · SEA −3 · O/U 44.5", "KC @ DEN · Sat, Oct 11, 4:00 PM · no line yet"],
+    "the picker says which games have a line before you choose one");
+  assert.deepEqual(out.chipsOnPick, [["Winner", false, "true"], ["Over / Under44.5", true, "false"], ["SpreadSEA −3", true, "false"]],
+    "each market wears its published number");
+  assert.equal(out.total.line, "44.5"); assert.equal(out.total.label, "Total");
+  assert.match(out.total.src, /^Vegas has this at 44\.5/);
+  assert.equal(out.spread.line, "3"); assert.equal(out.spread.label, "Points");
+  assert.deepEqual(out.spread.fav, [["NE", "false"], ["SEA", "true"]], "Seattle is the favourite Vegas named");
+  assert.deepEqual(out.spread.sides, ["NE +3", "Seattle Seahawks −3"], "the fixture roster names Seattle but not New England");
+  assert.deepEqual(out.flipped, ["NE −3", "Seattle Seahawks +3"], "flipping the favourite flips the handicap");
+  assert.equal(out.noLine.line, "", "no number to prefill");
+  assert.match(out.noLine.src, /^No published line for this game yet/, "and the form says so instead of leaving it blank");
+  assert.deepEqual(out.noLine.chips, [false, false, false], "no market wears a number");
+  assert.deepEqual(errors, []);
+  await p.close();
+});
+
+test("the ticker carries the line for a game that hasn't kicked off", { skip }, async () => {
+  const { p, errors } = await page();
+  const out = await p.evaluate(async (LINES) => {
+    const { state } = await import("./state.js?v=dev"); const V = await import("./render.js?v=dev");
+    state.lines = LINES;
+    state.games = { games: [
+      { id: "g1", week: 1, away: "NE", home: "SEA", date: "2036-09-10T00:20:00Z", status: "pre" },
+      { id: "g2", week: 1, away: "KC", home: "DEN", date: "2036-09-13T17:00:00Z", status: "pre" },
+      { id: "g3", week: 1, away: "SF", home: "LAR", date: "2036-09-13T17:00:00Z", status: "live", awayScore: 7, homeScore: 3, q: 2, clock: "5:00" }] };
+    V.render();
+    const games = [...document.querySelectorAll("#ticker .ticker-track > .game")].slice(0, 3);
+    return games.map(g => [g.textContent.replace(/\s+/g, " ").trim(), (g.querySelector(".odds") || {}).textContent || null]);
+  }, LINES);
+  assert.equal(out[0][1], "SEA −3 · O/U 44.5", "a game with a line shows it");
+  assert.equal(out[1][1], null, "a game without one shows nothing extra");
+  assert.equal(out[2][1], null, "a game already under way shows the score, not the line");
+  assert.deepEqual(errors, []);
+  await p.close();
+});
+
+test("a ticket says whether its line was Vegas's or the proposer's own", { skip }, async () => {
+  const { p, errors } = await page();
+  const out = await p.evaluate(async () => {
+    const { state } = await import("./state.js?v=dev"); const V = await import("./render.js?v=dev");
+    const g = { id: "g5", week: 5, away: "NE", home: "SEA", date: "2026-10-11T17:00:00Z" };
+    const bet = (id, extra) => Object.assign({ id, status: "active", createdBy: "b", week: 5, kind: "matchup", amount: 10,
+      name: id, terms: "t", game: g, entries: [{ memberId: "b", side: "over" }, { memberId: "c", side: "under" }], paid: [] }, extra);
+    state.bets = [bet("v", { market: "total", line: 44.5, lineSrc: "vegas" }),
+                  bet("o", { market: "spread", line: 7, fav: "SEA", lineSrc: "own" }),
+                  bet("old", { market: "total", line: 44.5 }),
+                  bet("ml", { market: "ml" })];
+    V.render();
+    const src = (id) => { const el = document.querySelector('article.ticket[data-bet="' + id + '"] .gl-line'); return el ? [el.textContent, (el.querySelector(".src") || {}).className || null] : null; };
+    return { v: src("v"), o: src("o"), old: src("old"), ml: src("ml") };
+  });
+  assert.deepEqual(out.v, ["O/U 44.5Vegas", "src vegas"]);
+  assert.deepEqual(out.o, ["SEA −7their number", "src own"]);
+  assert.deepEqual(out.old, ["O/U 44.5", null], "a bet from before the change makes no claim");
+  assert.equal(out.ml, null, "a straight-up bet shows no line at all");
+  assert.deepEqual(errors, []);
+  await p.close();
+});

@@ -27,6 +27,21 @@ export function openGames(week){
   var now=Date.now();
   return allGames().filter(function(g){ return g.week===Number(week)&&now<Date.parse(g.date)-LOCK_LEAD; });
 }
+// What Vegas has published for a game, if anything (league/lines, from the schedule file).
+export function lineOf(g){ return R.lineFor(g,state.lines); }
+
+// Drop the published number into the form when a game or market is chosen. Everything
+// stays editable — this is a starting point, not a rule, and plenty of games have no line.
+export function prefillLine(){
+  var L=lineOf(state.draftGame);
+  if(state.draftMarket==="total"){ state.draftLine=(L&&L.total!=null)?String(L.total):""; state.draftFav=""; }
+  else if(state.draftMarket==="spread"){
+    state.draftLine=(L&&L.spread!=null)?String(L.spread):"";
+    state.draftFav=(L&&L.fav)||(state.draftGame?state.draftGame.home:"");
+  } else { state.draftLine=""; state.draftFav=""; }
+  var el=document.getElementById("bLine"); if(el) el.value=state.draftLine;
+}
+
 export function drawGameBox(){
   var scope=state.draftScope, box=document.getElementById("bGameBox");
   box.hidden=scope!=="game";
@@ -59,12 +74,45 @@ export function drawGameBox(){
   sel.innerHTML=weeks.length
     ? '<option value="">Pick a game…</option>'+weeks.map(function(w){
         return '<optgroup label="Week '+w+'">'+byWeek[w].map(function(g){
-          return '<option value="'+esc(g.id)+'"'+(cur&&cur.id===g.id?" selected":"")+">"+esc(g.away+" @ "+g.home)+" · "+esc(fmtWhen(Date.parse(g.date)))+"</option>"; }).join("")+"</optgroup>"; }).join("")
+          // say up front whether this game has a published line, so nobody picks a game
+          // expecting a spread and finds an empty box
+          var sm=R.lineSummary(lineOf(g));
+          return '<option value="'+esc(g.id)+'"'+(cur&&cur.id===g.id?" selected":"")+">"+esc(g.away+" @ "+g.home)+" · "+esc(fmtWhen(Date.parse(g.date)))+" · "+esc(sm||"no line yet")+"</option>"; }).join("")+"</optgroup>"; }).join("")
     : '<option value="">No games left to bet on</option>';
   if(cur) wk.value=String(cur.week);
-  document.querySelectorAll("#bMarket .chip").forEach(function(c){ c.setAttribute("aria-pressed",String(c.getAttribute("data-market")===state.draftMarket)); });
-  document.getElementById("bLineRow").hidden=state.draftMarket!=="total";
+  // Each market chip wears its published number, so what's available is visible before
+  // you commit; a market with nothing published just shows its name.
+  var L=lineOf(cur), mkt=state.draftMarket;
+  document.querySelectorAll("#bMarket .chip").forEach(function(c){
+    var m=c.getAttribute("data-market");
+    c.setAttribute("aria-pressed",String(m===mkt));
+    var lbl=m==="ml"?"Winner":m==="total"?"Over / Under":"Spread";
+    var got=m==="total"?(L&&L.total!=null?String(L.total):"")
+          :m==="spread"?(L&&L.spread!=null?(L.pick?"pick'em":L.fav+" \u2212"+L.spread):""):"";
+    c.classList.toggle("has-line",!!got);
+    c.innerHTML=esc(lbl)+(got?'<i class="n">'+esc(got)+"</i>":"");
+  });
+  var wantsLine=mkt==="total"||mkt==="spread";
+  document.getElementById("bLineRow").hidden=!wantsLine;
+  document.getElementById("bLineLbl").textContent=mkt==="spread"?"Points":"Total";
+  document.getElementById("bLineHint").textContent=mkt==="spread"
+    ?"how many the favourite gives up \u2014 your number"
+    :"combined points \u2014 your number";
   document.getElementById("bLine").value=state.draftLine;
+  // where the number came from, and the favourite picker on a spread
+  var src=document.getElementById("bLineSrc");
+  if(!cur||!wantsLine){ src.hidden=true; src.innerHTML=""; }
+  else {
+    var published=mkt==="total"?(L&&L.total!=null):(L&&L.spread!=null);
+    var h=published?"Vegas has this at <b>"+esc(mkt==="total"?String(L.total):(L.pick?"pick\u2019em":L.fav+" \u2212"+L.spread))+"</b> \u00b7 change it if you like"
+                   :"No published line for this game yet \u2014 set your own.";
+    if(mkt==="spread"){
+      var fav=state.draftFav||cur.home;
+      h+='<span class="fav-pick"><span class="lbl">Favourite</span>'+[cur.away,cur.home].map(function(code){
+        return '<button type="button" class="chip" data-act="dFav" data-fav="'+esc(code)+'" aria-pressed="'+(fav===code)+'">'+logoHtml(code,15)+esc(code)+"</button>"; }).join("")+"</span>";
+    }
+    src.innerHTML=h; src.hidden=false;
+  }
 }
 export function drawScope(){
   var scope=state.draftScope, box=document.getElementById("bStats"), hint=document.getElementById("bScopeHint");
@@ -116,6 +164,12 @@ export function drawEntries(hostId){
       var g=state.draftGame, choices;
       if(!g) choices=[];
       else if(state.draftMarket==="total") choices=[["over","Over"],["under","Under"]];
+      else if(state.draftMarket==="spread"){
+        // whoever is giving the points is shown with them, the other side getting them
+        var fv=state.draftFav||g.home, ln=state.draftLine||"";
+        choices=[g.away,g.home].map(function(code){
+          return [code,teamName(code)+(ln?(code===fv?" −"+ln:" +"+ln):"")]; });
+      }
       else choices=[[g.away,teamName(g.away)],[g.home,teamName(g.home)]];
       if(i===0){
         pickUi='<div class="side-chips">'+(choices.length?choices.map(function(c){
@@ -275,7 +329,13 @@ export function submitBet(){
     if(!G) return toast("Pick a game first");
     if(!name) name=G.away+" @ "+G.home;
     if(state.draftMarket==="total"&&!(parseFloat(state.draftLine)>0)) return toast("Set the total");
-    if(!terms) terms=state.draftMarket==="total"?"Combined points over or under "+state.draftLine+".":"Straight up — whoever wins.";
+    if(state.draftMarket==="spread"){
+      if(!(parseFloat(state.draftLine)>=0)) return toast("Set the points");
+      if(!state.draftFav) state.draftFav=G.home;
+    }
+    if(!terms) terms=state.draftMarket==="total"?"Combined points over or under "+state.draftLine+"."
+      :state.draftMarket==="spread"?(Number(state.draftLine)===0?"Pick’em — whoever wins.":state.draftFav+" gives "+state.draftLine+" points.")
+      :"Straight up — whoever wins.";
     if(!state.draft[0].side) return toast(state.draftMarket==="total"?"Take Over or Under":"Pick your team");
     // the opponent gets whatever you didn't take
     var opts0=state.draftMarket==="total"?["over","under"]:[G.away,G.home];
@@ -354,12 +414,21 @@ export function submitBet(){
   };
   if(isGame){
     bet.game={ id:G.id, week:G.week, away:G.away, home:G.home, date:G.date };
-    bet.market=state.draftMarket==="total"?"total":"ml";
+    bet.market=(state.draftMarket==="total"||state.draftMarket==="spread")?state.draftMarket:"ml";
   }
   // Pot-style: others can add themselves after posting. Never on a two-team game bet;
   // always on a stat bet with nobody named against you, or nobody ever could.
   bet.joinable=!isGame&&(document.getElementById("bJoin").checked||entries.length<2);
-  if(isGame&&bet.market==="total") bet.line=parseFloat(state.draftLine);
+  if(isGame&&(bet.market==="total"||bet.market==="spread")) bet.line=parseFloat(state.draftLine);
+  if(isGame&&bet.market==="spread") bet.fav=state.draftFav||G.home;
+  if(isGame&&bet.market!=="ml"){
+    // the proposer may have taken Vegas's number or typed their own; say which, once,
+    // here — the published line moves during the week and can't be re-derived later
+    var pub=lineOf(G), n=parseFloat(state.draftLine);
+    var matches=bet.market==="total"?(pub&&pub.total===n)
+      :(pub&&pub.spread===n&&(pub.pick||pub.fav===bet.fav));
+    bet.lineSrc=matches?"vegas":"own";
+  }
   var stats=buildStats(state.draft);
   if(statScope){
     // terms come from the stat, the period and the picks — even if the roster wasn't

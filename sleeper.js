@@ -113,7 +113,13 @@ export function runRefresh(db,by,forced,ctx){
           // and never from a phone (the player index is 10 MB)
           var roster=ctx.roster||{}, cfg=ctx.config||{};
           if(ageMin(cfg.scheduleUpdatedAt)>24*60) writes.push(fetch(NFLVERSE_GAMES).then(function(r){ return r.text(); }).then(function(csv){
-            var starts=R.weekStartsFromCsv(csv,season); if(Object.keys(starts).length) return db.doc("league/config").update({ weekStarts:starts, scheduleUpdatedAt:now }); }).catch(function(){}));
+            var starts=R.weekStartsFromCsv(csv,season);
+            // the same file carries Vegas's spread and total per game; they arrive a few
+            // weeks ahead of kickoff, so this is re-read every day for the new ones
+            var lines=R.linesFromCsv(csv,season), jobs=[];
+            if(Object.keys(lines).length) jobs.push(db.doc("league/lines").set({ updatedAt:now, season:String(season), byGame:lines }));
+            if(Object.keys(starts).length) jobs.push(db.doc("league/config").update({ weekStarts:starts, scheduleUpdatedAt:now }));
+            return Promise.all(jobs); }).catch(function(){}));
           if(!ctx.mobile&&ageMin(roster.updatedAt)>6*60) writes.push(sj(SLEEPER+"/v1/players/nfl").then(function(players){
             var rows=parseRoster(players);
             return db.doc("league/roster").set({ updatedAt:now, count:rows.length, players:rows }); }).catch(function(){}));
