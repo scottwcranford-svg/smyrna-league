@@ -36,8 +36,9 @@ service cloud.firestore {
       allow write: if isAdmin(key) || !exists(/databases/$(db)/documents/books/$(key)/league/config);
     }
 
-    // seen, refresh, roster, games, push (each device's notification token): any manager,
-    // since the app writes them from the browser.
+    // seen, refresh, roster, games, push (each device's notification token), badges
+    // (who holds which title, and since when): any manager, since the app writes them
+    // from the browser.
     // (Admin emails are the app's own <slug>@smyrna.league ids, always lowercase, so the
     // plain `in` comparison above is safe.)
     match /books/{key}/league/{doc} {

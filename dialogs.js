@@ -77,7 +77,7 @@ export function openDrill(memberId,row){
 }
 // When a manager last opened the app, from league/seen.
 function seenHtml(id){
-  var iso=state.seen&&state.seen[id], t=Date.parse(iso||"");
+  var iso=R.seenAt(state.seen,id), t=Date.parse(iso||"");
   if(isNaN(t)) return '<span class="r-seen never">Never signed in</span>';
   var when; try{ when=new Date(t).toLocaleDateString(undefined,{month:"short",day:"numeric"}); }catch(e){ when=R.ago(iso); }
   return '<span class="r-seen" title="'+esc(R.fmtWhen(t))+'">Last in '+esc(Date.now()-t<86400e3?R.ago(iso):when)+"</span>";

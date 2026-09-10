@@ -22,7 +22,7 @@ const gameOf=function(b){ return R.gameOf(b,state.games); };
 const currentWeek=function(){ return R.currentWeek(state.config,state.games); };
 const computeLedger=function(){ return R.computeLedger(state.config,state.bets); };
 
-export function render(){ head(); ticker(); banner(); tabs(); glance(); board(); highLow(); rivalsView(); settle(); filters(); tickets(); statsBar(); foot(); }
+export function render(){ head(); ticker(); banner(); tabs(); glance(); badgesView(); board(); highLow(); rivalsView(); settle(); filters(); tickets(); statsBar(); foot(); }
 
 var toastTimer=null;
 export function toast(msg){
@@ -237,6 +237,8 @@ function board(){
     var ra=(L.risk[b.id]||0)-(L.risk[a.id]||0); if(ra) return ra;
     return a.name.localeCompare(b.name);
   });
+  var worn={};
+  badgeList().forEach(function(b){ if(b.holder){ if(!worn[b.holder]) worn[b.holder]=[]; worn[b.holder].push(b); } });
   host.innerHTML=list.map(function(m){
     var p=L.pnl[m.id], played=p.w+p.l+p.p;
     var cls=p.net>0?"pos":p.net<0?"neg":"flat";
@@ -253,6 +255,8 @@ function board(){
         '<div class="fig net"><b class="'+cls+'">'+signed(p.net)+"</b><span>"+
           (played?p.w+"–"+p.l+(p.p?"–"+p.p:"")+" settled":"settled")+"</span></div>"+
       "</div>"+
+      ((worn[m.id]||[]).length?'<div class="seat-bdgs">'+worn[m.id].map(function(b){
+        return '<span class="bdg '+esc(b.fam)+' sm" title="'+esc(b.name+" · "+b.blurb)+'">'+badgeSvg(b.icon)+esc(b.name)+"</span>"; }).join("")+"</div>":"")+
       '<div class="seat-picks'+(mine.length?"":" none")+'">'+
         (mine.length?esc(mine.join(" · ")):"no action yet")+"</div>"+
     "</div>";
@@ -305,6 +309,60 @@ function seasonTableByManager(L,HL,cols){
   return '<div class="pivot-wrap"><table class="pivot by-manager"><thead><tr><th>Manager</th><th class="num">Hi/lo</th><th class="num">Weekly</th><th class="num">Season</th><th class="num">Total</th></tr></thead><tbody>'+
     cols.map(function(m){ return "<tr"+(m.id===state.me?' class="me"':"")+"><th>"+avatarHtml(m.id,20)+'<span>'+esc(m.name)+"</span></th>"+["hl","weekly","season","total"].map(function(r){ return cell(m,r); }).join("")+"</tr>"; }).join("")+
     "</tbody></table></div>";
+}
+
+/* ---- badges: live titles ----
+   rules.badges() works out who holds what from the book; league/badges remembers who
+   held it before, which is what lets a card say "took it from JPorch". */
+const BADGE_ICON={
+  dice:'<rect x="4" y="4" width="16" height="16" rx="3"/><circle cx="9" cy="9" r="1"/><circle cx="15" cy="15" r="1"/><circle cx="15" cy="9" r="1"/><circle cx="9" cy="15" r="1"/>',
+  chips:'<ellipse cx="12" cy="7" rx="7" ry="3"/><path d="M5 7v5c0 1.7 3.1 3 7 3s7-1.3 7-3V7"/><path d="M5 12v5c0 1.7 3.1 3 7 3s7-1.3 7-3v-5"/>',
+  wallet:'<path d="M4 7h13a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4z"/><path d="M4 7V5h11M17 13h.01"/>',
+  bank:'<path d="M3 9l9-5 9 5"/><path d="M5 9v9M10 9v9M14 9v9M19 9v9M3 19h18"/>',
+  trophy:'<path d="M8 4h8v5a4 4 0 0 1-8 0z"/><path d="M8 6H5a3 3 0 0 0 3 3M16 6h3a3 3 0 0 1-3 3"/><path d="M12 13v4M9 20h6"/>',
+  flame:'<path d="M12 3c3 4 5 6 5 9a5 5 0 0 1-10 0c0-2 1-3 2-4 .5 1.5 1.5 2 2 2 0-2-1-4 1-7z"/>',
+  shield:'<path d="M12 3l7 3v6c0 4-3 7-7 9-4-2-7-5-7-9V6z"/><path d="M9 12l2 2 4-4"/>',
+  crown:'<path d="M4 8l3 4 5-6 5 6 3-4v10H4z"/>',
+  star:'<path d="M12 3l2.6 5.6 6.1.8-4.5 4.3 1.2 6.1L12 16.9 6.6 19.8l1.2-6.1L3.3 9.4l6.1-.8z"/>',
+  anchor:'<circle cx="12" cy="5" r="2"/><path d="M12 7v13M5 13a7 7 0 0 0 14 0M8 10H5M19 10h-3"/>',
+  snow:'<path d="M12 3v18M4.5 7.5l15 9M19.5 7.5l-15 9"/><path d="M9 5l3 2 3-2M9 19l3-2 3 2"/>',
+  stairs:'<path d="M4 20h4v-4h4v-4h4V8h4"/><path d="M4 20V4"/>',
+  boots:'<path d="M7 4v9l-2 3v4h7v-4l-2-2V4z"/><path d="M17 8v5l2 3v4h-5"/>',
+  bolt:'<path d="M13 3L5 14h6l-1 7 8-11h-6z"/>',
+  horn:'<path d="M4 10v4h3l8 4V6L7 10z"/><path d="M18 9a4 4 0 0 1 0 6"/>',
+  ghost:'<path d="M5 20V10a7 7 0 0 1 14 0v10l-2.3-2-2.3 2-2.4-2-2.3 2L7.3 18z"/><circle cx="9.5" cy="10.5" r=".9"/><circle cx="14.5" cy="10.5" r=".9"/>',
+  target:'<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="1"/>',
+  door:'<path d="M6 3h9v18H6z"/><path d="M15 3l3 2v14l-3 2M12 12h.01"/>'
+};
+const badgeSvg=function(k){ return '<svg viewBox="0 0 24 24" aria-hidden="true">'+(BADGE_ICON[k]||"")+"</svg>"; };
+// The badges as they stand, with whatever history the book has recorded.
+function badgeList(){
+  return R.badges(state.config,state.bets,state.highlow,state.seen,state.payments&&state.payments.list,Date.now());
+}
+function badgesView(){
+  var host=document.getElementById("badges"), list=badgeList();
+  var recs=(state.badges&&state.badges.byKey)||{};
+  var held=list.filter(function(b){ return b.holder; });
+  if(!held.length){
+    host.innerHTML='<div class="empty">Eighteen titles up for grabs — biggest winner, biggest degenerate, hot hand, ghost. They land as soon as bets start settling.</div>';
+    return;
+  }
+  var mine=state.me?held.filter(function(b){ return b.holder===state.me; }):[];
+  var chip=function(b,small){ return '<span class="bdg '+esc(b.fam)+(small?" sm":"")+'" title="'+esc(b.blurb)+'">'+badgeSvg(b.icon)+esc(b.name)+(small?"":" · "+esc(b.text))+"</span>"; };
+  var h="";
+  if(state.me) h+='<div class="bdg-mine"><span class="lbl">You hold</span>'+
+    (mine.length?mine.map(function(b){ return chip(b); }).join("")
+                :'<span class="note">Nothing yet — go win something.</span>')+"</div>";
+  h+='<div class="bdg-case">'+list.map(function(b){
+    var rec=recs[b.key];
+    return '<div class="bdg-card '+(b.holder?esc(b.fam):"vacant")+(b.holder===state.me?" me":"")+'">'+
+      '<span class="bdg-ic">'+badgeSvg(b.icon)+"</span>"+
+      "<span>"+'<span class="bdg-nm">'+esc(b.name)+"</span>"+
+      (b.holder?'<span class="bdg-who">'+avatarHtml(b.holder,26)+"<b>"+esc(b.holderName)+'</b><b class="bdg-v">'+esc(b.text)+"</b></span>"
+               :'<span class="bdg-who"><b class="bdg-none">Nobody yet</b></span>')+
+      '<span class="bdg-sub">'+(function(){ var st=R.badgeStory(rec,members(),b.holder); return st?'<span class="took">'+esc(st)+"</span> · ":""; })()+esc(b.blurb)+"</span></span></div>";
+  }).join("")+"</div>";
+  host.innerHTML=h;
 }
 
 /* ---- Rivals: who took whose money ----

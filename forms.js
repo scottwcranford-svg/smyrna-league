@@ -422,7 +422,7 @@ export function submitJoin(){
     if(off) return toast(off.name+" is off in week "+bet.week+" — pick someone who's playing");
   } else if(!(d.pick||"").trim()) return toast("Say what you're taking");
 
-  var entry={ memberId:state.me, pick:(d.pick||"").trim() };
+  var entry={ memberId:state.me, pick:(d.pick||"").trim(), takenAt:new Date().toISOString() };
   if(d.picks&&d.picks.length) entry.picks=d.picks.map(function(p){ return { id:p.id, name:p.name, pos:p.pos, team:p.team }; });
 
   // Same lease as taking a seat: re-read, append, write — so two joiners can't clobber each other.

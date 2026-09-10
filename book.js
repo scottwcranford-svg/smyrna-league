@@ -67,6 +67,26 @@ export function settleFinished(){
   });
 }
 
+// Badges are worked out from the book every draw; this records who holds what, so the
+// case can say "took it from JPorch" instead of just naming today's holder. Like
+// expireBets: whichever open page notices first writes it, and the write is a merge, so
+// two pages noticing at once is harmless.
+export function syncBadges(){
+  if(!state.db||state.local||!state.config) return;
+  // This runs on the way to every draw, so nothing in here may throw: a failed
+  // bookkeeping write must never stop the page from rendering.
+  try{
+    var list=R.badges(state.config,state.bets,state.highlow,state.seen,state.payments&&state.payments.list,Date.now());
+    var chg=R.badgeChanges(list,state.badges,state.config,state.games,Date.now());
+    if(!chg) return;
+    var cur=(state.badges&&state.badges.byKey)||{};
+    state.badges={ updatedAt:new Date().toISOString(), byKey:Object.assign({},cur,chg) };
+    var ref=state.db.doc("league/badges");
+    if(ref&&typeof ref.update==="function") ref.update(state.badges)
+      .catch(function(){ /* another page got there first, or offline — the snapshot settles it */ });
+  }catch(e){ console.warn("badges:",e&&e.message); }
+}
+
 export function publishLeague(){
   if(!state.db) return toast("Not connected");
   var cfg=state.config, bets=state.bets.slice();
@@ -89,7 +109,7 @@ export function takeSeat(id,i){
 
   var ref=state.db?state.db.doc("bets/"+id):null;
   if(!ref){
-    bet.entries[i].memberId=state.me; delete bet.entries[i].invite;
+    bet.entries[i].memberId=state.me; bet.entries[i].takenAt=new Date().toISOString(); delete bet.entries[i].invite;
     if(!openSeats(bet)) bet.status="active";
     saveBet(bet); return;
   }
@@ -103,7 +123,8 @@ export function takeSeat(id,i){
         toast("That seat is gone"); return;
       }
       if(cur.entries[i].invite&&!cur.entries[i].declined&&cur.entries[i].invite!==state.me){ toast("That seat is held for "+mName(cur.entries[i].invite)); return; }
-      cur.entries[i].memberId=state.me; delete cur.entries[i].invite; delete cur.entries[i].declined;
+      cur.entries[i].memberId=state.me; cur.entries[i].takenAt=new Date().toISOString();
+      delete cur.entries[i].invite; delete cur.entries[i].declined;
       if(!cur.entries.some(function(e){ return !e.memberId; })) cur.status="active";
       return ref.set(cur).then(function(){ toast("You’re in"); });
     });

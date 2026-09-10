@@ -8,7 +8,7 @@ import * as A from "./auth.js?v=dev";
 import * as N from "./sleeper.js?v=dev";
 import { state, members, onRender, touch } from "./state.js?v=dev";
 import { render, toast, ticker, statsBar, showBet } from "./render.js?v=dev";
-import { expireBets, settleFinished } from "./book.js?v=dev";
+import { expireBets, settleFinished, syncBadges } from "./book.js?v=dev";
 import { drawScope, drawEntries } from "./forms.js?v=dev";
 import { showLogin, enforceFreshPassword, drawRoster } from "./dialogs.js?v=dev";
 import { bindEvents } from "./actions.js?v=dev";
@@ -34,11 +34,14 @@ try{ var savedTab=localStorage.getItem("smyrna.tab"); if(["book","ledger","hl","
 // A tapped notification opens the app at its bet: ?bet=<id>, read before storedKey() tidies the address.
 var openBet=null; try{ openBet=new URLSearchParams(location.search).get("bet"); if(openBet) history.replaceState(null,"",location.pathname); }catch(e){}
 function applyAuth(user){ var w=A.whoAmI(user,state.config); state.me=w.me; state.isAdmin=w.admin; state.admin=w.admin&&state.adminMode; stampSeen(); }
-// Once per visit, note that this manager opened the app: league/seen is { memberId: iso }.
+// Once per visit, note that this manager opened the app. league/seen was { memberId: iso };
+// it is now { memberId: { at, n } } so the book can also say who opens it most. Old string
+// entries still read fine (rules.seenAt / rules.seenCount), and the first visit after this
+// shipped converts that manager's entry.
 function stampSeen(){
   if(!state.me||!state.db||state.local||state.seenStamped===state.me) return;
   state.seenStamped=state.me;
-  var d={}; d[state.me]=new Date().toISOString();
+  var d={}; d[state.me]={ at:new Date().toISOString(), n:R.seenCount(state.seen,state.me)+1 };
   state.db.doc("league/seen").update(d).catch(function(){ /* a missed stamp is no loss */ });
 }
 export function toggleAdmin(){
@@ -142,6 +145,11 @@ function subscribeBook(db){
     touch();
   },function(){ /* nothing paid yet */ });
 
+  db.doc("league/badges").onSnapshot(function(snap){
+    state.badges=snap.exists?R.clone(snap.data()):null;   // who has held what, and since when
+    touch();
+  },function(){ /* the case still shows today's holders, just no history */ });
+
   db.doc("league/highlow").onSnapshot(function(snap){
     state.highlow=snap.exists?snap.data():null;   // read-only
     touch();
@@ -183,7 +191,7 @@ function subscribeBook(db){
 }
 
 /* ---- boot ---- */
-onRender(function(){ expireBets(); settleFinished(); render(); });
+onRender(function(){ expireBets(); settleFinished(); syncBadges(); render(); });
 try{ window.matchMedia("(max-width: 600px)").addEventListener("change",function(){ touch(); }); }catch(e){}
 bindEvents({ enterBook:enterBook, toggleAdmin:toggleAdmin });
 state.config={ leagueName:"Smyrna League", season:"2026", stake:25, kickoff:R.DEFAULT_KICKOFF, members:[] };

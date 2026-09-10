@@ -526,6 +526,44 @@ h1,h2,h3,.terms,.login-brand h1{font-family:"Poppins","Inter",system-ui,sans-ser
 .riv-brag .riv-n{font-size:14px}
 .riv-box .riv-bet{grid-template-columns:auto 1fr auto}
 
+/* ---- badges: live titles, on the Ledger ---- */
+.bdg{display:inline-flex;align-items:center;gap:6px;border-radius:99px;padding:5px 11px 5px 7px;font-size:11.5px;font-weight:800;background:var(--surface-2);color:var(--ink-2);white-space:nowrap}
+.bdg svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.bdg.sm{font-size:10.5px;padding:3px 8px 3px 5px}
+.bdg.sm svg{width:12px;height:12px}
+.bdg.good{background:var(--win-bg);color:var(--win)}
+.bdg.bad{background:var(--loss-bg);color:var(--loss)}
+.bdg.money{background:var(--gold-bg);color:var(--gold)}
+.bdg.act{background:var(--open-bg);color:var(--open)}
+.bdg-mine{display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:var(--surface-3);border:1px solid var(--rule);border-radius:14px;padding:10px 13px;margin-bottom:12px}
+.bdg-case{display:grid;grid-template-columns:repeat(auto-fill,minmax(268px,1fr));gap:9px}
+.bdg-card{background:var(--surface-3);border:1px solid var(--rule);border-left:3px solid var(--rule-2);border-radius:14px;padding:10px 12px;display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:start}
+.bdg-card>span:last-child{min-width:0;display:block}
+.bdg-card.good{border-left-color:var(--win)}
+.bdg-card.bad{border-left-color:var(--loss)}
+.bdg-card.money{border-left-color:var(--gold)}
+.bdg-card.act{border-left-color:var(--open)}
+.bdg-card.vacant{opacity:.65}
+.bdg-card.me{box-shadow:0 0 0 1px var(--accent)}
+.bdg-ic{width:32px;height:32px;border-radius:10px;display:grid;place-items:center;background:var(--surface-2);color:var(--ink-3)}
+.bdg-ic svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.bdg-card.good .bdg-ic{color:var(--win);background:var(--win-bg)}
+.bdg-card.bad .bdg-ic{color:var(--loss);background:var(--loss-bg)}
+.bdg-card.money .bdg-ic{color:var(--gold);background:var(--gold-bg)}
+.bdg-card.act .bdg-ic{color:var(--open);background:var(--open-bg)}
+.bdg-nm{display:block;font-size:12px;font-weight:800;letter-spacing:.02em;margin-bottom:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bdg-who{display:flex;align-items:center;gap:7px;min-width:0}
+.bdg-who b{font-family:"Poppins","Inter",system-ui,sans-serif;font-size:14px;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.bdg-who .bdg-none{color:var(--ink-3);font-size:13px}
+.bdg-v{margin-left:auto;flex:none;font-variant-numeric:tabular-nums;font-size:13.5px}
+.bdg-card.good .bdg-v{color:var(--win)}
+.bdg-card.bad .bdg-v{color:var(--loss)}
+.bdg-card.money .bdg-v{color:var(--gold)}
+.bdg-card.act .bdg-v{color:var(--open)}
+.bdg-sub{display:block;font-size:11px;color:var(--ink-3);margin-top:4px;line-height:1.35}
+.bdg-sub .took{color:var(--ink-2)}
+.seat-bdgs{display:flex;gap:5px;flex-wrap:wrap}
+
 /* ---- phones: the same page in a phone shape. Desktop is untouched above 600px. ---- */
 .t-fold{display:none}
 @media(max-width:600px){
@@ -619,6 +657,11 @@ h1,h2,h3,.terms,.login-brand h1{font-family:"Poppins","Inter",system-ui,sans-ser
   .form-foot .btn.lg{flex:1 1 auto;padding:13px 16px}
   #betDlg .grid.c3{grid-template-columns:1.2fr 1fr 1fr;gap:8px}
   .foot{font-size:11.5px}
+  /* badges on a phone: one card per row, and the ledger's chips stay on one line each */
+  .bdg-case{grid-template-columns:1fr;gap:7px}
+  .bdg-card{padding:9px 11px}
+  .bdg-mine{padding:9px 11px}
+  .seat-bdgs .bdg.sm{font-size:10px}
   /* Rivals on a phone: the cards stack, the grid scrolls sideways with the names pinned */
   .riv-mine{grid-template-columns:1fr;gap:8px;margin-bottom:12px}
   .riv-you{padding:10px 12px}

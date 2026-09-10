@@ -76,6 +76,24 @@ document reads and a few hundred writes, against 50,000 and 20,000 a day.
    in `.github/workflows/pages.yml` deploys every push to `master`, rewriting `?v=dev`
    in the module URLs to the commit hash so browsers fetch a whole build together.
 
+## Badges
+
+Eighteen live titles on the Ledger — Biggest Degenerate, Biggest Winner, Hot Hand, Ghost
+and the rest. They are not trophies you keep: `rules.badges()` recomputes every holder
+from the book on each draw, so a title changes hands the moment the standings do. Ties go
+to the name that sorts first, so every browser agrees on the holder. Test accounts are
+never in the running.
+
+`league/badges` (`{ byKey: { <badge>: { holder, value, at, week, from, since } } }`) is the
+history, and it is the only reason a card can say "took it from JPorch" rather than just
+naming today's holder. `book.syncBadges()` writes it the same way bets settle themselves:
+whichever open page notices a change first saves it, the write is a merge, and it never
+throws — a failed bookkeeping write must not stop the page drawing.
+
+Two badges needed new data and so only count from the day they shipped: **Most Logged In**
+(league/seen went from `{ id: iso }` to `{ id: { at, n } }`; `rules.seenAt` / `seenCount`
+read both shapes) and **Quick Draw** (a `takenAt` stamp when a seat is claimed).
+
 ## Notifications
 
 A manager who turns them on (the menu behind their name → **Notifications off**, or

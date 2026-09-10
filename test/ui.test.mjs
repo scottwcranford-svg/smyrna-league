@@ -674,3 +674,68 @@ test("phone: Rivals stacks the cards, keeps the names column pinned and the grid
   assert.deepEqual(errors, []);
   await p.close();
 });
+
+// Alice staked the most and lost the most; Bob has won three straight.
+const BADGE_BETS = [
+  { id: "n1", status: "settled", week: 1, name: "Opener", amount: 25, winner: "b", createdBy: "a", settledAt: "2026-09-11T00:00:00Z", entries: [{ memberId: "a" }, { memberId: "b" }], paid: [] },
+  { id: "n2", status: "settled", week: 2, name: "Two", amount: 10, winner: "b", createdBy: "b", settledAt: "2026-09-18T00:00:00Z", entries: [{ memberId: "a" }, { memberId: "b" }], paid: [] },
+  { id: "n3", status: "settled", week: 0, name: "Pot", amount: 20, winner: "b", createdBy: "b", settledAt: "2026-09-25T00:00:00Z", entries: [{ memberId: "a" }, { memberId: "b" }, { memberId: "c" }], paid: [] },
+];
+
+test("Badges: the case on the Ledger, what you hold, and the chips each manager wears", { skip }, async () => {
+  const { p, errors } = await page();
+  const out = await p.evaluate(async (BETS) => {
+    const { state } = await import("./state.js?v=dev"); const V = await import("./render.js?v=dev");
+    state.bets = BETS; state.tab = "ledger";
+    state.badges = { byKey: { winner: { holder: "b", value: 55, at: "2026-09-25T00:00:00Z", week: 2, from: "a" } } };
+    V.render();
+    const res = {}, host = document.getElementById("badges");
+    res.cards = host.querySelectorAll(".bdg-card").length;
+    res.held = [...host.querySelectorAll(".bdg-card:not(.vacant)")].map(c =>
+      [c.querySelector(".bdg-nm").textContent, c.querySelector(".bdg-who b").textContent, c.querySelector(".bdg-v").textContent]);
+    res.vacant = host.querySelectorAll(".bdg-card.vacant").length;
+    res.story = host.querySelector(".bdg-card.good .bdg-sub .took").textContent;
+    res.noStory = !host.querySelector(".bdg-card.money .bdg-sub .took");   // no record for it yet
+    res.mine = [...host.querySelectorAll(".bdg-mine .bdg")].map(x => x.textContent);
+    res.mineNote = (host.querySelector(".bdg-mine .note") || {}).textContent || "";
+    // the ledger rows below wear the same titles
+    res.worn = [...document.querySelectorAll("#board .seat")].map(s =>
+      [s.querySelector(".seat-name").textContent, [...s.querySelectorAll(".seat-bdgs .bdg")].map(b => b.textContent)]);
+    state.bets = []; V.render();
+    res.empty = document.querySelector("#badges .empty").textContent.slice(0, 23);
+    return res;
+  }, BADGE_BETS);
+  assert.equal(out.cards, 18, "every badge shows, held or up for grabs");
+  assert.deepEqual(out.held, [
+    ["Biggest Degenerate", "Alice", "$55"], ["High Roller", "Alice", "$60"], ["Deadbeat", "Alice", "owes $55"],
+    ["The Bank", "Bob", "owed $75"], ["Biggest Winner", "Bob", "+$75"], ["Hot Hand", "Bob", "3 in a row"],
+    ["Untouchable", "Bob", "3–0"], ["Kingmaker", "Bob", "$40"], ["Biggest Loser", "Alice", "−$55"],
+    ["Ice Cold", "Alice", "3 in a row"], ["Most Active", "Alice", "3 bets"], ["The Instigator", "Bob", "2 posted"]]);
+  assert.equal(out.vacant, 6, "the rest are still up for grabs");
+  assert.equal(out.story, "took it from Alice · wk 2", "the case remembers who lost a title");
+  assert.equal(out.noStory, true, "a badge the book hasn't recorded yet shows its blurb, not a wrong story");
+  assert.deepEqual(out.mine, ["Biggest Degenerate · $55", "High Roller · $60", "Deadbeat · owes $55", "Biggest Loser · −$55", "Ice Cold · 3 in a row", "Most Active · 3 bets"], "you are Alice in this fixture");
+  assert.deepEqual(out.worn, [["Bob", ["The Bank", "Biggest Winner", "Hot Hand", "Untouchable", "Kingmaker", "The Instigator"]],
+    ["Cara", []], ["Alice", ["Biggest Degenerate", "High Roller", "Deadbeat", "Biggest Loser", "Ice Cold", "Most Active"]]]);
+  assert.equal(out.empty, "Eighteen titles up for ");
+  assert.deepEqual(errors, []);
+  await p.close();
+});
+
+test("phone: the badge case goes to one card per row", { skip }, async () => {
+  const { p, errors } = await page(null, PHONE);
+  const out = await p.evaluate(async (BETS) => {
+    const { state } = await import("./state.js?v=dev"); const V = await import("./render.js?v=dev");
+    state.bets = BETS; state.tab = "ledger"; state.local = false; state.connected = true; state.db = { doc() { return {}; } };
+    localStorage.setItem("smyrna.pushNudge", "x");
+    document.getElementById("login").hidden = true; document.getElementById("app").hidden = false;
+    V.render(); await new Promise(r => setTimeout(r, 40));
+    const host = document.getElementById("badges");
+    return { cols: getComputedStyle(host.querySelector(".bdg-case")).gridTemplateColumns.split(" ").length,
+      noBodyScroll: document.documentElement.scrollWidth <= innerWidth,
+      cards: host.querySelectorAll(".bdg-card").length };
+  }, BADGE_BETS);
+  assert.deepEqual(out, { cols: 1, noBodyScroll: true, cards: 18 });
+  assert.deepEqual(errors, []);
+  await p.close();
+});
