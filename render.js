@@ -448,36 +448,71 @@ function stripHtml(S,ents,week){
     var pre=!anyPlayed&&!!P&&S.rows.some(function(r){ return projOf(r); });
     if(pre) anyPre=true;
     var shownOf=function(r){ return pre?projOf(r):valueOf(r,t); };
-    var max=0, min=Infinity;
-    S.rows.forEach(function(r){ var v=shownOf(r); if(v>max) max=v; if(v<min) min=v; });
-    // Bars are scaled so the projection tick fits too, once actuals are showing.
-    var barMax=max; if(!pre&&P) S.rows.forEach(function(r){ var q=projOf(r)||0; if(q>barMax) barMax=q; });
+    var better=function(a,b){ return t.lower?a<b:a>b; };
     // On a weekly bet, a row whose team sits out the week says so (a combined pick: any of its teams).
     var playing=R.teamsPlaying(week,state.games);
     var onBye=function(r){ return !!r.team&&String(r.team).split(" · ").some(function(tm){ return R.onBye(tm,playing); }); };
-    // "lower is better" stats (points allowed) lead from the bottom; nobody leads at 0–0.
-    var best=t.lower?min:max;
-    return (multiTrack?'<div class="track-title">'+esc(t.metric||t.stat||"")+"</div>":"")+
-      '<div class="stat-rows">'+S.rows.map(function(r){
-        var v=shownOf(r), pv=projOf(r), lead=(anyPlayed||pre)&&v===best&&(pre?v>0:true);
-        // Each row is a player or team; the dot, tag and bar colour say whose side it's on.
-        // A row made in the form points at its entry, so a seat taken later still colours it.
-        var owner=r.memberId||((r.entry!=null&&ents[r.entry])?ents[r.entry].memberId:null);
-        var own=owner?mColor(owner):"var(--ink-3)";
-        return '<div class="srow'+(lead?" lead":"")+'">'+
-          '<span class="sname">'+
-            (owner?'<span class="dot" style="background:'+esc(own)+'"></span>':"")+
-            '<span class="s-lab">'+esc(r.label||(owner?mName(owner):"Open seat"))+"</span>"+
-            (r.team?'<span class="s-team">'+teamLogos(r.team,12)+esc(r.team)+"</span>":"")+
-            statusTagsHtml(r.id||r.key)+
-            (onBye(r)?'<span class="s-bye" title="Off this week">bye</span>':"")+
-            (owner&&r.label?'<span class="s-own">'+esc(mName(owner))+"</span>":"")+
-          "</span>"+
-          '<span class="sbar"><i style="width:'+(barMax>0?Math.round(v/barMax*100):0)+'%;background:'+esc(own)+'"></i>'+
-            (!pre&&pv?'<u class="ptick" style="left:'+Math.round(pv/barMax*100)+'%" title="Sleeper projected '+esc(String(pv))+'"></u>':"")+"</span>"+
-          (pre?'<b class="proj" title="Sleeper projection">'+esc(String(v))+"<small>proj</small></b>"
-              :"<b>"+esc(String(v))+(pv!=null?'<small class="proj-was" title="Sleeper projected '+esc(String(pv))+'">p '+esc(String(pv))+"</small>":"")+"</b>")+"</div>";
+    var ownerOf=function(r){ return r.memberId||((r.entry!=null&&ents[r.entry])?ents[r.entry].memberId:null); };
+    // The name cell: the dot, tag and bar colour say whose side a row is on.
+    var nameHtml=function(r,owner,label){
+      var own=owner?mColor(owner):"var(--ink-3)";
+      return '<span class="sname">'+
+        (owner?'<span class="dot" style="background:'+esc(own)+'"></span>':"")+
+        '<span class="s-lab">'+esc(label||r.label||(owner?mName(owner):"Open seat"))+"</span>"+
+        (r.team?'<span class="s-team">'+teamLogos(r.team,12)+esc(r.team)+"</span>":"")+
+        statusTagsHtml(r.id||r.key)+
+        (onBye(r)?'<span class="s-bye" title="Off this week">bye</span>':"")+
+        (owner&&(label||r.label)?'<span class="s-own">'+esc(mName(owner))+"</span>":"")+
+      "</span>";
+    };
+    var barHtml=function(v,pv,owner,barMax){
+      return '<span class="sbar"><i style="width:'+(barMax>0?Math.round(v/barMax*100):0)+'%;background:'+esc(owner?mColor(owner):"var(--ink-3)")+'"></i>'+
+        (!pre&&pv?'<u class="ptick" style="left:'+Math.round(pv/barMax*100)+'%" title="Sleeper projected '+esc(String(pv))+'"></u>':"")+"</span>";
+    };
+    var valHtml=function(v,pv){
+      return pre?'<b class="proj" title="Sleeper projection">'+esc(String(v))+"<small>proj</small></b>"
+                :"<b>"+esc(String(v))+(pv!=null?'<small class="proj-was" title="Sleeper projected '+esc(String(pv))+'">p '+esc(String(pv))+"</small>":"")+"</b>";
+    };
+    var title=multiTrack?'<div class="track-title">'+esc(t.metric||t.stat||"")+"</div>":"";
+
+    // Rows that share a seat are one side — a player against the field. The side's
+    // number is its best row (what settles the bet); the players sit under it, best first.
+    var groups=[], byKey={};
+    S.rows.forEach(function(r,i){ var k=r.entry!=null?"e"+r.entry:(r.memberId?"m"+r.memberId:"r"+i); if(!byKey[k]){ byKey[k]={ rows:[] }; groups.push(byKey[k]); } byKey[k].rows.push(r); });
+    var grouped=groups.some(function(g){ return g.rows.length>1; });
+
+    if(!grouped){
+      var max=0, min=Infinity;
+      S.rows.forEach(function(r){ var v=shownOf(r); if(v>max) max=v; if(v<min) min=v; });
+      // Bars are scaled so the projection tick fits too, once actuals are showing.
+      var barMax=max; if(!pre&&P) S.rows.forEach(function(r){ var q=projOf(r)||0; if(q>barMax) barMax=q; });
+      // "lower is better" stats (points allowed) lead from the bottom; nobody leads at 0–0.
+      var best=t.lower?min:max;
+      return title+'<div class="stat-rows">'+S.rows.map(function(r){
+        var v=shownOf(r), pv=projOf(r), lead=(anyPlayed||pre)&&v===best&&(pre?v>0:true), owner=ownerOf(r);
+        return '<div class="srow'+(lead?" lead":"")+'">'+nameHtml(r,owner)+barHtml(v,pv,owner,barMax)+valHtml(v,pv)+"</div>";
       }).join("")+"</div>";
+    }
+
+    groups.forEach(function(g){
+      g.rows=g.rows.slice().sort(function(a,b){ var va=shownOf(a), vb=shownOf(b); return va===vb?0:(better(va,vb)?-1:1); });
+      g.top=g.rows[0]; g.v=shownOf(g.top); g.owner=ownerOf(g.top);
+      var pvs=g.rows.map(projOf).filter(function(x){ return x!=null; });
+      g.pv=pvs.length?pvs.reduce(function(a,b){ return better(a,b)?a:b; }):null;
+    });
+    var gmax=0, gmin=Infinity, gbar=0;
+    groups.forEach(function(g){ if(g.v>gmax) gmax=g.v; if(g.v<gmin) gmin=g.v; if(g.v>gbar) gbar=g.v; if(!pre&&g.pv>gbar) gbar=g.pv; });
+    var gbest=t.lower?gmin:gmax;
+    return title+'<div class="stat-rows grouped">'+groups.map(function(g){
+      var lead=(anyPlayed||pre)&&g.v===gbest&&(pre?g.v>0:true), many=g.rows.length>1;
+      var head=many?{ label:"The field", team:"", id:null, key:null }:g.top;
+      var h='<div class="srow side-row'+(lead?" lead":"")+(many?" many":"")+'">'+nameHtml(head,g.owner,many?"The field · best of "+g.rows.length:null)+barHtml(g.v,g.pv,g.owner,gbar)+valHtml(g.v,g.pv)+"</div>";
+      if(many) h+=g.rows.map(function(r,i){
+        var v=shownOf(r), pv=projOf(r);
+        return '<div class="srow sub'+(i===0&&(anyPlayed||pre)&&(pre?v>0:true)?" counts":"")+'">'+nameHtml(r,null)+valHtml(v,pv)+"</div>";
+      }).join("");
+      return h;
+    }).join("")+"</div>";
   }).join("");
   if(anyPre) blocks='<div class="proj-note">Projected by Sleeper · nothing played yet</div>'+blocks;
   return '<div class="statline">'+

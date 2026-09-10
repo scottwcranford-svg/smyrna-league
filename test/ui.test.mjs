@@ -509,3 +509,49 @@ test("desktop is untouched: no folding, tabs in the panel, the season table with
   assert.deepEqual(errors, []);
   await p.close();
 });
+
+// A player against the field: the four field rows share one seat.
+const FIELD = { id: "f", status: "active", createdBy: "b", week: 0, kind: "prop", amount: 25, name: "White Men Can Catch", terms: "McConkey vs the field.",
+  stats: { scope: "player", tracks: [{ stat: "pts_ppr", metric: "PPR points · best of each side", lower: false }], rows: [
+    { key: "1", label: "McConkey", team: "LAC", memberId: "b", entry: 0, values: { pts_ppr: 0 } },
+    { key: "2", label: "Pierce", team: "IND", memberId: "c", entry: 1, values: { pts_ppr: 0 } },
+    { key: "3", label: "Kupp", team: "SEA", memberId: "c", entry: 1, values: { pts_ppr: 5.5 } },
+    { key: "4", label: "Bech", team: "LV", memberId: "c", entry: 1, values: { pts_ppr: 0 } },
+    { key: "5", label: "TeSlaa", team: "DET", memberId: "c", entry: 1, values: { pts_ppr: 2 } }], through: "Through week 1", source: "Sleeper" },
+  entries: [{ memberId: "b", picks: [{ id: "1", name: "Ladd McConkey", pos: "WR", team: "LAC" }] },
+            { memberId: "c", picks: [{ id: "2", name: "Alec Pierce" }, { id: "3", name: "Cooper Kupp" }, { id: "4", name: "Jack Bech" }, { id: "5", name: "Isaac TeSlaa" }] }], paid: [] };
+
+test("a player against the field: one row per side with the side's best, the field's players under it, best first", { skip }, async () => {
+  const { p, errors } = await page();
+  const out = await p.evaluate(async (FIELD) => {
+    const { state } = await import("./state.js?v=dev"); const V = await import("./render.js?v=dev");
+    state.bets = [FIELD]; V.render();
+    const t = document.querySelector('article.ticket[data-bet="f"]');
+    const sides = [...t.querySelectorAll(".srow.side-row")].map(r => [r.querySelector(".s-lab").textContent, r.querySelector("b").firstChild.textContent, r.classList.contains("lead"), !!r.querySelector(".sbar")]);
+    const subs = [...t.querySelectorAll(".srow.sub")].map(r => [r.querySelector(".s-lab").textContent, r.querySelector("b").firstChild.textContent, r.classList.contains("counts"), !!r.querySelector(".sbar")]);
+    return { sides, subs, plain: t.querySelectorAll(".srow:not(.side-row):not(.sub)").length };
+  }, FIELD);
+  assert.deepEqual(out.sides, [["McConkey", "0", false, true], ["The field · best of 4", "5.5", true, true]], "two sides, the field scored by its best player, and leading");
+  assert.deepEqual(out.subs, [["Kupp", "5.5", true, false], ["TeSlaa", "2", false, false], ["Pierce", "0", false, false], ["Bech", "0", false, false]], "the field's players best first, the one counting marked, no bars");
+  assert.equal(out.plain, 0);
+  assert.deepEqual(errors, []);
+  await p.close();
+});
+
+test("phone: a folded field bet shows the two sides and hides the field's players", { skip }, async () => {
+  const { p, errors } = await page(null, PHONE);
+  await p.evaluate(async (FIELD) => {
+    const { state } = await import("./state.js?v=dev"); const V = await import("./render.js?v=dev");
+    state.bets = [FIELD]; state.local = false; state.connected = true; state.db = { doc() { return {}; } };
+    localStorage.setItem("smyrna.pushNudge", "x");
+    document.getElementById("login").hidden = true; document.getElementById("app").hidden = false;
+    V.render();
+  }, FIELD);
+  const out = await p.evaluate(() => {
+    const t = document.querySelector('article.ticket[data-bet="f"]'), cs = (el) => getComputedStyle(el).display;
+    return { fold: t.classList.contains("fold"), sides: [...t.querySelectorAll(".srow.side-row")].map(cs), subs: [...t.querySelectorAll(".srow.sub")].map(cs) };
+  });
+  assert.deepEqual(out, { fold: true, sides: ["grid", "grid"], subs: ["none", "none", "none", "none"] });
+  assert.deepEqual(errors, []);
+  await p.close();
+});

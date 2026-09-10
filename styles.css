@@ -213,6 +213,16 @@ img.avatar{object-fit:cover;background:var(--surface-2);vertical-align:middle}
 .srow b small{display:block;font-size:8.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);line-height:1.1;margin-top:2px}
 .srow b small.proj-was{text-transform:none;letter-spacing:0;font-size:9.5px}
 .srow.lead b.proj{color:var(--gold)}
+/* A player against the field: the side's row carries the bar and the number that
+   settles it; the field's players sit under it, best first, the one counting marked. */
+.srow.sub{grid-template-columns:minmax(0,1fr) auto;padding-left:22px;font-size:12px}
+.srow.sub .s-lab{color:var(--ink-3)}
+.srow.sub b{font-size:12.5px;font-weight:700;color:var(--ink-3)}
+.srow.sub.counts .s-lab{color:var(--ink-2);font-weight:700}
+.srow.sub.counts b{color:var(--ink-2)}
+.srow.sub.counts .s-lab::after{content:"counting";margin-left:7px;font-size:8.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--gold);background:var(--gold-bg);padding:1px 5px;border-radius:4px;vertical-align:1px}
+.srow.side-row.many .s-lab{font-weight:700}
+.stat-rows.grouped .srow.side-row+.srow.side-row{margin-top:2px}
 .proj-note{font-size:11px;color:var(--ink-3)}
 .sugg .proj{margin-left:auto;font-size:11px;font-weight:700;color:var(--ink-3);white-space:nowrap}
 .sugg .proj + .team{margin-left:8px}
@@ -499,6 +509,8 @@ h1,h2,h3,.terms,.login-brand h1{font-family:"Poppins","Inter",system-ui,sans-ser
   .ticket.fold .bet-desc,.ticket.fold .t-actions,.ticket.fold .sbar,.ticket.fold .stat-head,.ticket.fold .proj-note,.ticket.fold .track-title{display:none}
   .ticket.fold.has-stats .sides,.ticket.fold.has-stats .vs{display:none}
   .ticket.fold .statline{border-top:0;padding-top:0}
+  .ticket.fold .srow.sub{display:none}
+  .srow.sub{padding-left:16px}
   /* ledger: one row per manager; proposed and cancelled only when there's something in them; a tap opens the bet names */
   .board{grid-template-columns:1fr;gap:6px}
   .seat{display:grid;grid-template-columns:1fr auto;grid-template-areas:"top figs" "team figs" "picks picks";column-gap:10px;row-gap:1px;padding:9px 11px;border-radius:12px;cursor:pointer}
