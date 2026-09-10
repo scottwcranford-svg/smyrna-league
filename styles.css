@@ -506,7 +506,9 @@ h1,h2,h3,.terms,.login-brand h1{font-family:"Poppins","Inter",system-ui,sans-ser
   .seat-team{grid-area:team;padding-left:39px;min-height:0;font-size:11px}
   .seat-team:empty{display:none}
   .figs{grid-area:figs;align-self:center;gap:14px;flex-wrap:nowrap}
-  .fig{min-width:62px;text-align:right}
+  .seat-name{white-space:normal;line-height:1.2}
+  .figs{gap:10px}
+  .fig{min-width:56px;text-align:right}
   .fig b{font-size:16px} .fig span{font-size:8.5px;margin-top:3px}
   .fig.prop.zero,.fig.gone.zero{display:none}
   .seat-picks{grid-area:picks;display:none;padding:6px 0 0 39px}
