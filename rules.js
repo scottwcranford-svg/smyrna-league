@@ -376,13 +376,13 @@ function top(vals,least){
   return { v:best, ids:tied.map(function(r){ return r.id; }), names:tied.map(function(r){ return r.name; }) };
 }
 
-// "Alice", "Alice and Bob", "Alice, Bob and Cara", then "Alice, Bob and 2 others".
+// "Alice", "Alice and Bob", "Alice, Bob and Cara" — everyone named, however many.
+// A shared title is the whole point; hiding half the holders defeats it.
 export function nameList(names){
   names=(names||[]).filter(Boolean);
   if(!names.length) return "";
   if(names.length===1) return names[0];
-  if(names.length<=3) return names.slice(0,-1).join(", ")+" and "+names[names.length-1];
-  return names.slice(0,2).join(", ")+" and "+(names.length-2)+" others";
+  return names.slice(0,-1).join(", ")+" and "+names[names.length-1];
 }
 
 export function badges(config,bets,highlow,seen,payments,now){

@@ -552,13 +552,13 @@ h1,h2,h3,.terms,.login-brand h1{font-family:"Poppins","Inter",system-ui,sans-ser
 .bdg-card.money .bdg-ic{color:var(--gold);background:var(--gold-bg)}
 .bdg-card.act .bdg-ic{color:var(--open);background:var(--open-bg)}
 .bdg-nm{display:block;font-size:12px;font-weight:800;letter-spacing:.02em;margin-bottom:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.bdg-who{display:flex;align-items:center;gap:7px;min-width:0}
-.bdg-faces{display:inline-flex;align-items:center;flex:none}
+.bdg-who{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:4px 7px;min-width:0}
+.bdg-faces{display:inline-flex;align-items:center;flex:none;align-self:center}
 .bdg-faces .avatar+.avatar{margin-left:-9px;box-shadow:0 0 0 2px var(--surface-3)}
 .bdg-share{font-style:normal;font-size:9px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;margin-left:7px;padding:1px 6px;border-radius:5px;background:var(--surface-2);color:var(--ink-3)}
-.bdg-who b{font-family:"Poppins","Inter",system-ui,sans-serif;font-size:14px;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.bdg-who b{font-family:"Poppins","Inter",system-ui,sans-serif;font-size:14px;font-weight:800;min-width:0;overflow-wrap:anywhere}
 .bdg-who .bdg-none{color:var(--ink-3);font-size:13px}
-.bdg-v{margin-left:auto;flex:none;font-variant-numeric:tabular-nums;font-size:13.5px}
+.bdg-v{flex:none;font-variant-numeric:tabular-nums;font-size:13.5px;white-space:nowrap}
 .bdg-card.good .bdg-v{color:var(--win)}
 .bdg-card.bad .bdg-v{color:var(--loss)}
 .bdg-card.money .bdg-v{color:var(--gold)}

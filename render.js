@@ -363,7 +363,7 @@ function badgesView(){
     var rec=recs[b.key], n=b.holders.length;
     // a tie is shared: every holder's face, then the names, and the title goes plural
     var who=n
-      ? '<span class="bdg-who"><span class="bdg-faces">'+b.holders.slice(0,3).map(function(id){ return avatarHtml(id,26); }).join("")+"</span>"+
+      ? '<span class="bdg-who"><span class="bdg-faces">'+b.holders.slice(0,4).map(function(id){ return avatarHtml(id,22); }).join("")+"</span>"+
         "<b>"+esc(R.nameList(b.holderNames))+'</b><b class="bdg-v">'+esc(b.text)+"</b></span>"
       : '<span class="bdg-who"><b class="bdg-none">Nobody yet</b></span>';
     return '<div class="bdg-card '+(n?esc(b.fam):"vacant")+(isMine(b)?" me":"")+'">'+

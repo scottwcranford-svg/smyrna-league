@@ -483,10 +483,10 @@ test("lineOrigin: a bet says whether its number was Vegas's or the proposer's ow
   assert.equal(R.lineOrigin(null), null);
 });
 
-test("nameList: one, two, three, then and-so-many-others", () => {
+test("nameList: everyone named, however many hold it", () => {
   assert.equal(R.nameList([]), "");
   assert.equal(R.nameList(["Alice"]), "Alice");
   assert.equal(R.nameList(["Alice", "Bob"]), "Alice and Bob");
   assert.equal(R.nameList(["Alice", "Bob", "Cara"]), "Alice, Bob and Cara");
-  assert.equal(R.nameList(["Alice", "Bob", "Cara", "Dan"]), "Alice, Bob and 2 others");
+  assert.equal(R.nameList(["Alice", "Bob", "Cara", "Dan"]), "Alice, Bob, Cara and Dan", "everyone is named, however many share it");
 });
