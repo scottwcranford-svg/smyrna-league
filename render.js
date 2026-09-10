@@ -584,5 +584,13 @@ export function statsBar(){
 function foot(){
   document.getElementById("foot").textContent = state.local
     ? "Local preview — changes are not saved."
-    : "Shared book, live for everyone with the link and the passcode. Settling is on the honor system — this tracks the money, it doesn’t hold it.";
+    : "Shared book, live for everyone with the link and the passcode. Settling is on the honor system — this tracks the money, it doesn’t hold it."+signInTime();
+}
+// How long this visit's sign-in took, stage by stage — so a slow one says where it waited.
+function signInTime(){
+  var t=state.timing||{}; if(!t.open) return "";
+  var s=function(ms){ return (Math.max(ms,0)/1000).toFixed(1)+"s"; };
+  var parts=[["scripts",t.boot],["auth",t.auth-t.boot],["passcode",t.click?t.key-t.click:null],["sign-in",t.click?t.signed-t.key:null],["book",t.open-(t.signed||t.auth)]]
+    .filter(function(p){ return p[1]!=null&&!isNaN(p[1]); }).map(function(p){ return p[0]+" "+s(p[1]); });
+  return " Opened in "+s(t.open)+(t.click?" (typing not counted)":"")+": "+parts.join(" · ")+".";
 }

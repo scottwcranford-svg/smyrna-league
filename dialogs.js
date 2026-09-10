@@ -121,11 +121,16 @@ export function pushToggle(){
 export function openPushDlg(why){
   var key=S.storedKey(), h="";
   if(why==="install"){
-    h='<p class="bet-desc" style="margin:0 0 12px">iPhones only push to apps on the home screen. Once, in Safari:</p>'+
-      '<ol class="steps"><li>Tap <b>Share</b> (the square with the arrow), then <b>Add to Home Screen</b>, then <b>Add</b>.</li>'+
-      '<li>Open <b>Smyrna</b> from the home screen and sign in again'+(key?' — the passcode on this phone is <b>'+esc(key)+'</b>':'')+'.</li>'+
-      '<li>Open the menu behind your name, tap <b>Notifications off</b>, and tap <b>Allow</b>.</li></ol>'+
-      '<p class="hint" style="margin:12px 0 0">Needs iOS 16.4 or later. Nothing else changes: the home-screen app is this same page.</p>';
+    var share='<svg class="ios-share" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12M8 7l4-4 4 4"/><path d="M5 11v9h14v-9"/></svg>';
+    h='<p class="bet-desc" style="margin:0 0 12px">An iPhone only buzzes for apps that sit on its home screen, so this page has to go there first. It takes about a minute, once.</p>'+
+      '<ol class="steps">'+
+      '<li><b>Put it on the home screen.</b> In Safari, tap the share button '+share+' in the bar at the bottom of the screen (the square with an arrow pointing up). '+
+        'A sheet slides up; scroll its list down until you see <b>Add to Home Screen</b> and tap it, then tap <b>Add</b> in the top right. A <b>Smyrna</b> icon appears on your home screen.</li>'+
+      '<li><b>Open it from the home screen</b> (not from Safari). It asks you to sign in again — that is normal, the home-screen app keeps its own memory. Your name and password as usual'+
+        (key?', and when it asks for the league passcode: <b>'+esc(key)+'</b>':', plus the league passcode from the chat')+'.</li>'+
+      '<li><b>Turn them on.</b> Tap your name in the top right, tap <b>Notifications off</b>, and when the iPhone asks whether Smyrna may send notifications, tap <b>Allow</b>. The button changes to <b>Notifications on</b>.</li>'+
+      '</ol>'+
+      '<p class="hint" style="margin:12px 0 0">From then on use the home-screen icon. It is the same app as this tab. If there is no Add to Home Screen in the share sheet, the phone is on an iOS older than 16.4 (Settings → General → Software Update).</p>';
   } else {
     h='<p class="bet-desc" style="margin:0 0 12px">This browser has notifications for the site switched off, and only its settings can switch them back on.</p>'+
       '<ol class="steps"><li><b>iPhone:</b> Settings → Notifications → Smyrna → Allow.</li>'+
@@ -188,11 +193,15 @@ export function submitLogin(enterBook){
   if(!pw) return toast("Enter your password");
   if(!key){ document.getElementById("siKeyRow").hidden=false; return toast("Enter the league passcode"); }
   hint.textContent="Signing in…";
+  var mark=function(k){ if(!state.timing[k]) state.timing[k]=Math.round(performance.now()); };
+  mark("click");
   S.tryKey(key).then(function(ok){
+    mark("key");
     if(!ok){ document.getElementById("siKeyRow").hidden=false; S.forgetKey(); hint.textContent="That passcode isn't right"; return; }
     S.setKey(key);
     return A.signIn(name,pw)
       .then(function(cred){
+        mark("signed");
         hint.textContent="Opening the book…";
         state.typedPw=pw;
         // if this browser was already signed in, auth state won't "change" — open the book directly

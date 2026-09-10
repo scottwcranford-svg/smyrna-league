@@ -15,6 +15,8 @@ import { bindEvents } from "./actions.js?v=dev";
 import * as Nf from "./notify.js?v=dev";
 
 const memberForEmail=function(email){ return R.memberForEmail(email,members()); };
+const mark=function(k){ if(!state.timing[k]) state.timing[k]=Math.round(performance.now()); };
+mark("boot");
 
 /* ---- keeping the book current ----
    The loops need a snapshot of what this page knows; nothing in sleeper.js reads state. */
@@ -102,6 +104,7 @@ function subscribeBook(db){
         if(u&&state.typedPw&&memberForEmail(u.email)){ enforceFreshPassword(u,state.typedPw); state.typedPw=null; }
         // the book is here and you're signed in: show the app
         clearTimeout(state.bookTimer);
+        mark("open");
         document.getElementById("login").hidden=true;
         document.getElementById("app").hidden=false;
       } else {
@@ -208,6 +211,7 @@ if(!window.FIREBASE_CONFIG||!window.FIREBASE_CONFIG.projectId||!window.firebase)
     // The login card is plain HTML and shows before Firebase is ready; a sign-in
     // started before this first callback can hang. The button opens here.
     document.getElementById("siGo").disabled=false;
+    mark("auth");
     applyAuth(user);
     if(user) enterBook(user);
     else { if(state.db){ location.reload(); return; } showLogin(); }
