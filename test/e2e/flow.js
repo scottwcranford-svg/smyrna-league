@@ -68,7 +68,9 @@ let browser; const errors = [], checks = {};
     // tickets still looking for people carry a glow (computed shadow, not just the class)
     seeking: document.querySelectorAll("article.ticket.seeking").length,
     seekingGlow: (a => a ? getComputedStyle(a).boxShadow !== getComputedStyle(document.querySelector("article.ticket:not(.seeking)") || a).boxShadow : false)(document.querySelector("article.ticket.seeking")),
-    // Join shows on stat bets this manager isn't in; never on game bets or player-vs-field bets
+    // Join shows on stat bets this manager isn't in; never on a game bet or a player-vs-field
+    // bet. Whether anything joinable is open depends on what the league has posted, so the
+    // check is that nothing wrong carries Join — not that something does.
     joinOn: [...document.querySelectorAll("article.ticket")].filter(a => a.querySelector('[data-act="join"]')).map(a => a.querySelector(".terms").textContent),
   })));
   // a forced password change (test account still on its default) sits on top; close it without changing anything
@@ -139,7 +141,7 @@ let browser; const errors = [], checks = {};
   await browser.close();
 
   const ok = checks.appDisplay !== "none" && checks.me === USER && checks.tickets >= 1 && checks.seats >= 1 && checks.liveOnly === true
-    && (checks.unlocked === 0 || (checks.joinOn.length >= 1 && !checks.joinOn.some(t => /White Men Can Catch|NE @ SEA/.test(t)))) && (process.env.E2E_ADMIN ? checks.adminSwitchShown === true && checks.adminSwitchOff === true : checks.adminSwitchHidden === true && checks.adminSwitchShown === false)
+    && checks.joinOn.every(t => !/White Men Can Catch|@/.test(t)) && (process.env.E2E_ADMIN ? checks.adminSwitchShown === true && checks.adminSwitchOff === true : checks.adminSwitchHidden === true && checks.adminSwitchShown === false)
     && /Book/.test(checks.tabOn) && checks.panelsShown.join() === "book" && /bets running/.test(checks.glance) && /side bets/.test(checks.leagueLine)
     && checks.ledgerTab.board === true && checks.ledgerTab.book === true && checks.ledgerTab.saved === "ledger" && (checks.unlocked === 0 || (checks.seeking >= 1 && checks.seekingGlow === true))
     && checks.rosterRows >= 1 && checks.rosterReadOnly === true && /Last in/.test(checks.seenSelf) && checks.onBoard === !checks.selfIsTest
