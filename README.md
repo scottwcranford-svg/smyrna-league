@@ -99,11 +99,15 @@ but had no button until now.
 
 ## Badges
 
-Eighteen live titles on the Ledger — Biggest Degenerate, Biggest Winner, Hot Hand, Ghost
+Eighteen live titles on their own tab — Biggest Degenerate, Biggest Winner, Hot Hand, Ghost
 and the rest. They are not trophies you keep: `rules.badges()` recomputes every holder
-from the book on each draw, so a title changes hands the moment the standings do. Ties go
-to the name that sorts first, so every browser agrees on the holder. Test accounts are
-never in the running.
+from the book on each draw, so a title changes hands the moment the standings do. **A tie
+is shared** — everyone level on the number holds it together, listed in name order so every
+browser agrees, and the title itself goes plural (two Biggest Degenerates, five High
+Rollers). Titles with no sensible plural (Ice Cold, Most Active, Cold Feet) keep their
+name. Test accounts are never in the running.
+
+Each holder also wears their titles as chips on their row in the Ledger.
 
 `league/badges` (`{ byKey: { <badge>: { holder, value, at, week, from, since } } }`) is the
 history, and it is the only reason a card can say "took it from JPorch" rather than just

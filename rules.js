@@ -339,23 +339,23 @@ export function statsKey(S){
    grabs. `seen` accepts both shapes: an ISO string, or { at, n } once visits are counted. */
 
 export const BADGES=[
-  { key:"degenerate", fam:"money", icon:"dice",   name:"Biggest Degenerate", blurb:"Most money staked all season, win or lose" },
-  { key:"highroller", fam:"money", icon:"chips",  name:"High Roller",        blurb:"Biggest single pot they have money in" },
-  { key:"deadbeat",   fam:"money", icon:"wallet", name:"Deadbeat",           blurb:"Owes the most right now" },
-  { key:"bank",       fam:"money", icon:"bank",   name:"The Bank",           blurb:"Owed the most right now" },
-  { key:"winner",     fam:"good",  icon:"trophy", name:"Biggest Winner",     blurb:"Best net across every settled bet" },
-  { key:"hothand",    fam:"good",  icon:"flame",  name:"Hot Hand",           blurb:"Longest run of wins that hasn't ended" },
-  { key:"untouchable",fam:"good",  icon:"shield", name:"Untouchable",        blurb:"Unbeaten, three settled bets or more" },
-  { key:"kingmaker",  fam:"good",  icon:"crown",  name:"Kingmaker",          blurb:"Biggest haul off one bet" },
-  { key:"weeklyking", fam:"good",  icon:"star",   name:"Weekly King",        blurb:"Most weeks as the top Sleeper score" },
-  { key:"loser",      fam:"bad",   icon:"anchor", name:"Biggest Loser",      blurb:"Worst net across every settled bet" },
+  { key:"degenerate", fam:"money", icon:"dice",   name:"Biggest Degenerate", blurb:"Most money staked all season, win or lose", plural:"Biggest Degenerates" },
+  { key:"highroller", fam:"money", icon:"chips",  name:"High Roller",        blurb:"Biggest single pot they have money in", plural:"High Rollers" },
+  { key:"deadbeat",   fam:"money", icon:"wallet", name:"Deadbeat",           blurb:"Owes the most right now", plural:"Deadbeats" },
+  { key:"bank",       fam:"money", icon:"bank",   name:"The Bank",           blurb:"Owed the most right now", plural:"The Banks" },
+  { key:"winner",     fam:"good",  icon:"trophy", name:"Biggest Winner",     blurb:"Best net across every settled bet", plural:"Biggest Winners" },
+  { key:"hothand",    fam:"good",  icon:"flame",  name:"Hot Hand",           blurb:"Longest run of wins that hasn't ended", plural:"Hot Hands" },
+  { key:"untouchable",fam:"good",  icon:"shield", name:"Untouchable",        blurb:"Unbeaten, three settled bets or more", plural:"Untouchables" },
+  { key:"kingmaker",  fam:"good",  icon:"crown",  name:"Kingmaker",          blurb:"Biggest haul off one bet", plural:"Kingmakers" },
+  { key:"weeklyking", fam:"good",  icon:"star",   name:"Weekly King",        blurb:"Most weeks as the top Sleeper score", plural:"Weekly Kings" },
+  { key:"loser",      fam:"bad",   icon:"anchor", name:"Biggest Loser",      blurb:"Worst net across every settled bet", plural:"Biggest Losers" },
   { key:"icecold",    fam:"bad",   icon:"snow",   name:"Ice Cold",           blurb:"Longest run of losses that hasn't ended" },
-  { key:"basement",   fam:"bad",   icon:"stairs", name:"Basement Dweller",   blurb:"Most weeks as the bottom Sleeper score" },
+  { key:"basement",   fam:"bad",   icon:"stairs", name:"Basement Dweller",   blurb:"Most weeks as the bottom Sleeper score", plural:"Basement Dwellers" },
   { key:"coldfeet",   fam:"bad",   icon:"boots",  name:"Cold Feet",          blurb:"Most bets of theirs cancelled with no takers" },
   { key:"active",     fam:"act",   icon:"bolt",   name:"Most Active",        blurb:"In the most bets this season" },
-  { key:"instigator", fam:"act",   icon:"horn",   name:"The Instigator",     blurb:"Proposed the most bets" },
-  { key:"ghost",      fam:"act",   icon:"ghost",  name:"Ghost",              blurb:"Longest since they last opened the app" },
-  { key:"quickdraw",  fam:"act",   icon:"target", name:"Quick Draw",         blurb:"Fastest to take an open seat after it's posted" },
+  { key:"instigator", fam:"act",   icon:"horn",   name:"The Instigator",     blurb:"Proposed the most bets", plural:"The Instigators" },
+  { key:"ghost",      fam:"act",   icon:"ghost",  name:"Ghost",              blurb:"Longest since they last opened the app", plural:"Ghosts" },
+  { key:"quickdraw",  fam:"act",   icon:"target", name:"Quick Draw",         blurb:"Fastest to take an open seat after it's posted", plural:"Quick Draws" },
   { key:"logins",     fam:"act",   icon:"door",   name:"Most Logged In",     blurb:"Opened the app the most times" }
 ];
 
@@ -363,20 +363,26 @@ export const BADGES=[
 export function seenAt(seen,id){ var v=seen&&seen[id]; if(!v) return ""; return typeof v==="string"?v:(v.at||""); }
 export function seenCount(seen,id){ var v=seen&&seen[id]; return (v&&typeof v==="object"&&Number(v.n))||0; }
 
-function bestOf(rows,cmp){
-  var best=null;
-  rows.forEach(function(r){ if(best===null||cmp(r,best)>0) best=r; });
-  return best;
-}
-// Highest value wins; a tie goes to the name that sorts first, so two pages agree.
+// Highest value takes it — and everyone level on that value holds it together, in name
+// order so every browser lists them the same way. Nobody loses a title to alphabetics.
 function top(vals,least){
   var rows=Object.keys(vals).map(function(id){ return { id:id, v:vals[id].v, name:vals[id].name }; })
     .filter(function(r){ return r.v!=null; });
   if(!rows.length) return null;
-  return bestOf(rows,function(a,b){
-    if(a.v!==b.v) return (least?a.v<b.v:a.v>b.v)?1:-1;
-    return a.name.localeCompare(b.name)<0?1:-1;
-  });
+  var best=null;
+  rows.forEach(function(r){ if(best===null||(least?r.v<best:r.v>best)) best=r.v; });
+  var tied=rows.filter(function(r){ return r.v===best; })
+    .sort(function(a,b){ return a.name.localeCompare(b.name); });
+  return { v:best, ids:tied.map(function(r){ return r.id; }), names:tied.map(function(r){ return r.name; }) };
+}
+
+// "Alice", "Alice and Bob", "Alice, Bob and Cara", then "Alice, Bob and 2 others".
+export function nameList(names){
+  names=(names||[]).filter(Boolean);
+  if(!names.length) return "";
+  if(names.length===1) return names[0];
+  if(names.length<=3) return names.slice(0,-1).join(", ")+" and "+names[names.length-1];
+  return names.slice(0,2).join(", ")+" and "+(names.length-2)+" others";
 }
 
 export function badges(config,bets,highlow,seen,payments,now){
@@ -453,8 +459,13 @@ export function badges(config,bets,highlow,seen,payments,now){
     else if(B.key==="ghost"){ hit=pick(function(id){ var t=Date.parse(seenAt(seen,id)||""); return isNaN(t)?null:Math.floor((now-t)/86400000); }); if(hit) text=hit.v+"d away"; }
     else if(B.key==="quickdraw"){ hit=pick(function(id){ return drawn[id]; },true); if(hit) text=quickText(hit.v); }
     else if(B.key==="logins"){ hit=pick(function(id){ var n=seenCount(seen,id); return n>1?n:null; }); if(hit) text=hit.v+" visits"; }
+    var ids=hit?hit.ids:[];
+    // shared, so the title itself goes plural: two Biggest Degenerates
     return { key:B.key, fam:B.fam, icon:B.icon, name:B.name, blurb:B.blurb,
-             holder:hit?hit.id:null, value:hit?r2(hit.v):null, text:hit?text:"" , holderName:hit?nm(hit.id):"" };
+             label:(ids.length>1&&B.plural)?B.plural:B.name,
+             holders:ids, holderNames:ids.map(nm), shared:ids.length>1,
+             holder:ids[0]||null, holderName:ids.length?nm(ids[0]):"",
+             value:hit?r2(hit.v):null, text:hit?text:"" };
   });
   return out;
 }
@@ -474,18 +485,22 @@ function quickText(ms){
 export function badgeChanges(list,stored,config,games,now){
   var was=(stored&&stored.byKey)||{}, out={}, any=false;
   var wk=currentWeek(config,games);
+  var key=function(a){ return (a||[]).join(","); };
   (list||[]).forEach(function(b){
-    var prev=was[b.key];
-    var same=prev&&((prev.holder||null)===(b.holder||null))&&(prev.text||"")===(b.text||"");
+    var prev=was[b.key], had=prev?(prev.holders||(prev.holder?[prev.holder]:[])):[];
+    var now2=b.holders||[];
+    var same=prev&&key(had)===key(now2)&&(prev.text||"")===(b.text||"");
     if(same) return;
     // a badge nobody holds and nobody held is not news
-    if(!b.holder&&!(prev&&prev.holder)) return;
+    if(!now2.length&&!had.length) return;
     any=true;
-    var handover=prev&&prev.holder&&b.holder&&prev.holder!==b.holder;
-    out[b.key]={ holder:b.holder||null, value:b.value, text:b.text||"",
+    // whoever was on it before and isn't any more lost it
+    var lost=had.filter(function(id){ return now2.indexOf(id)<0; });
+    var kept=had.length&&key(had)===key(now2);
+    out[b.key]={ holders:now2, holder:now2[0]||null, value:b.value, text:b.text||"",
                  at:new Date(now||Date.now()).toISOString(), week:wk,
-                 from:handover?prev.holder:((prev&&prev.holder===b.holder)?(prev.from||null):null),
-                 since:(prev&&prev.holder===b.holder)?(prev.since||prev.at||null):null };
+                 from:lost.length?lost:null,
+                 since:kept?(prev.since||prev.at||null):null };
   });
   return any?out:null;
 }
@@ -493,12 +508,15 @@ export function badgeChanges(list,stored,config,games,now){
 // The line under a badge: who it was taken from, or how long they've held it. `holder`
 // is who holds it right now — the book's record can lag a moment behind on a fresh page,
 // and until it lands there is simply no story to tell, not "nobody yet".
-export function badgeStory(rec,members,holder){
-  if(arguments.length>2&&!holder) return "nobody yet";
-  if(!rec||!rec.holder) return arguments.length>2?"":"nobody yet";
-  if(arguments.length>2&&rec.holder!==holder) return "";
+export function badgeStory(rec,members,holders){
+  var now=Array.isArray(holders)?holders:(holders?[holders]:[]);
+  if(arguments.length>2&&!now.length) return "nobody yet";
+  var had=rec?(rec.holders||(rec.holder?[rec.holder]:[])):[];
+  if(!had.length) return arguments.length>2?"":"nobody yet";
+  if(arguments.length>2&&had.join(",")!==now.join(",")) return "";
   var wk=rec.week?weekLabel(rec.week).toLowerCase():"";
-  if(rec.from) return "took it from "+mName(rec.from,members)+(wk?" \u00b7 "+wk:"");
+  var from=Array.isArray(rec.from)?rec.from:(rec.from?[rec.from]:[]);
+  if(from.length) return "took it from "+nameList(from.map(function(id){ return mName(id,members); }))+(wk?" \u00b7 "+wk:"");
   var since=rec.since||rec.at;
   var t=Date.parse(since||"");
   return isNaN(t)?"held it all season":"held since "+(rec.sinceWeek?weekLabel(rec.sinceWeek).toLowerCase():fmtDay(t));

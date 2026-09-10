@@ -364,7 +364,7 @@ test("tabs: Book open by default, the others behind their tabs, badges and the g
   assert.equal(out.line, "2026 · 10-Team Keeper SF PPR · side bets", "the league's settings from Sleeper");
   assert.equal(out.glance, "1 bet running$10 on the tableyou −$25 net · 1 seat waiting on takers");
   assert.deepEqual(out.shown, ["book"]);
-  assert.deepEqual(out.badges, [["book", true, "1"], ["ledger", false, ""], ["hl", false, "1"], ["rivals", false, "1"], ["settle", false, "2"]], "a seat open, a week in, a rivalry you're behind on, two transfers to clear");
+  assert.deepEqual(out.badges, [["book", true, "1"], ["ledger", false, ""], ["badges", false, "6"], ["hl", false, "1"], ["rivals", false, "1"], ["settle", false, "2"]], "a seat open, six titles held, a week in, a rivalry you're behind on, two transfers to clear");
   assert.equal(out.me, "Alice"); assert.equal(out.dropHidden, true);
   assert.deepEqual(out.afterClick, { shown: ["settle"], on: ["settle"], saved: "settle" }, "the tab switches through the real click wiring and is remembered");
   assert.equal(out.dropOpen, true); assert.equal(out.dropClosed, true, "the menu opens on its button and closes on a click elsewhere");
@@ -486,7 +486,7 @@ test("phone: tabs sit in a bar at the bottom, Propose floats, tickets fold and o
     dlg.close();
     return res;
   });
-  assert.deepEqual(out.tabs, { position: "fixed", atBottom: true, fits: true, oneRow: true, count: 5 }, "all five tabs on one fixed row at the bottom");
+  assert.deepEqual(out.tabs, { position: "fixed", atBottom: true, fits: true, oneRow: true, count: 6 }, "all six tabs on one fixed row at the bottom");
   assert.equal(out.fab, "fixed"); assert.equal(out.refresh, "\u21bb"); assert.equal(out.filtersNoWrap, "nowrap");
   assert.deepEqual(out.open, { fold: false, foldBtn: false }, "a ticket still looking for people never folds");
   assert.deepEqual(out.pot, { fold: true, desc: "none", sides: "none", rows: 2, bar: "none", btn: "Details" }, "folded: the stat rows carry the sides and their numbers, no bars, no terms");
@@ -669,7 +669,7 @@ test("phone: Rivals stacks the cards, keeps the names column pinned and the grid
   assert.equal(out.sideCols, 1, "bragging rights and Latest stack");
   assert.equal(out.pinned, "sticky", "the names column stays put while the grid scrolls");
   assert.equal(out.noBodyScroll, true, "the page itself never scrolls sideways");
-  assert.equal(out.tabs, 5); assert.equal(out.tabFits, true, "five tabs still fit the bottom bar");
+  assert.equal(out.tabs, 6); assert.equal(out.tabFits, true, "six tabs still fit the bottom bar");
   assert.equal(out.drill, true);
   assert.deepEqual(errors, []);
   await p.close();
@@ -682,12 +682,12 @@ const BADGE_BETS = [
   { id: "n3", status: "settled", week: 0, name: "Pot", amount: 20, winner: "b", createdBy: "b", settledAt: "2026-09-25T00:00:00Z", entries: [{ memberId: "a" }, { memberId: "b" }, { memberId: "c" }], paid: [] },
 ];
 
-test("Badges: the case on the Ledger, what you hold, and the chips each manager wears", { skip }, async () => {
+test("Badges: its own tab, what you hold, shared titles, and the chips each manager wears on the Ledger", { skip }, async () => {
   const { p, errors } = await page();
   const out = await p.evaluate(async (BETS) => {
     const { state } = await import("./state.js?v=dev"); const V = await import("./render.js?v=dev");
-    state.bets = BETS; state.tab = "ledger";
-    state.badges = { byKey: { winner: { holder: "b", value: 55, at: "2026-09-25T00:00:00Z", week: 2, from: "a" } } };
+    state.bets = BETS; state.tab = "badges";
+    state.badges = { byKey: { winner: { holders: ["b"], holder: "b", value: 55, text: "+$75", at: "2026-09-25T00:00:00Z", week: 2, from: ["a"] } } };
     V.render();
     const res = {}, host = document.getElementById("badges");
     res.cards = host.querySelectorAll(".bdg-card").length;
@@ -698,25 +698,30 @@ test("Badges: the case on the Ledger, what you hold, and the chips each manager 
     res.noStory = !host.querySelector(".bdg-card.money .bdg-sub .took");   // no record for it yet
     res.mine = [...host.querySelectorAll(".bdg-mine .bdg")].map(x => x.textContent);
     res.mineNote = (host.querySelector(".bdg-mine .note") || {}).textContent || "";
-    // the ledger rows below wear the same titles
+    // the Ledger tab's rows wear the same titles
+    document.querySelector('#tabs .tab[data-tab="ledger"]').click();
+    await new Promise(r => setTimeout(r, 40));
     res.worn = [...document.querySelectorAll("#board .seat")].map(s =>
       [s.querySelector(".seat-name").textContent, [...s.querySelectorAll(".seat-bdgs .bdg")].map(b => b.textContent)]);
-    state.bets = []; V.render();
+    state.tab = "badges"; state.bets = []; V.render();
     res.empty = document.querySelector("#badges .empty").textContent.slice(0, 23);
     return res;
   }, BADGE_BETS);
   assert.equal(out.cards, 18, "every badge shows, held or up for grabs");
   assert.deepEqual(out.held, [
-    ["Biggest Degenerate", "Alice", "$55"], ["High Roller", "Alice", "$60"], ["Deadbeat", "Alice", "owes $55"],
-    ["The Bank", "Bob", "owed $75"], ["Biggest Winner", "Bob", "+$75"], ["Hot Hand", "Bob", "3 in a row"],
-    ["Untouchable", "Bob", "3–0"], ["Kingmaker", "Bob", "$40"], ["Biggest Loser", "Alice", "−$55"],
-    ["Ice Cold", "Alice", "3 in a row"], ["Most Active", "Alice", "3 bets"], ["The Instigator", "Bob", "2 posted"]]);
+    ["Biggest Degeneratesshared · 2", "Alice and Bob", "$55"], ["High Rollersshared · 3", "Alice, Bob and Cara", "$60"],
+    ["Deadbeat", "Alice", "owes $55"], ["The Bank", "Bob", "owed $75"], ["Biggest Winner", "Bob", "+$75"],
+    ["Hot Hand", "Bob", "3 in a row"], ["Untouchable", "Bob", "3–0"], ["Kingmaker", "Bob", "$40"],
+    ["Biggest Loser", "Alice", "−$55"], ["Ice Cold", "Alice", "3 in a row"],
+    ["Most Activeshared · 2", "Alice and Bob", "3 bets"], ["The Instigator", "Bob", "2 posted"]],
+    "level on the number means both hold it, and the title goes plural");
   assert.equal(out.vacant, 6, "the rest are still up for grabs");
   assert.equal(out.story, "took it from Alice · wk 2", "the case remembers who lost a title");
   assert.equal(out.noStory, true, "a badge the book hasn't recorded yet shows its blurb, not a wrong story");
-  assert.deepEqual(out.mine, ["Biggest Degenerate · $55", "High Roller · $60", "Deadbeat · owes $55", "Biggest Loser · −$55", "Ice Cold · 3 in a row", "Most Active · 3 bets"], "you are Alice in this fixture");
-  assert.deepEqual(out.worn, [["Bob", ["The Bank", "Biggest Winner", "Hot Hand", "Untouchable", "Kingmaker", "The Instigator"]],
-    ["Cara", []], ["Alice", ["Biggest Degenerate", "High Roller", "Deadbeat", "Biggest Loser", "Ice Cold", "Most Active"]]]);
+  assert.deepEqual(out.mine, ["Biggest Degenerates · $55", "High Rollers · $60", "Deadbeat · owes $55", "Biggest Loser · −$55", "Ice Cold · 3 in a row", "Most Active · 3 bets"], "you are Alice in this fixture, and a shared title reads plural");
+  assert.deepEqual(out.worn, [["Bob", ["Biggest Degenerates", "High Rollers", "The Bank", "Biggest Winner", "Hot Hand", "Untouchable", "Kingmaker", "Most Active", "The Instigator"]],
+    ["Cara", ["High Rollers"]], ["Alice", ["Biggest Degenerates", "High Rollers", "Deadbeat", "Biggest Loser", "Ice Cold", "Most Active"]]],
+    "both holders of a shared title wear it");
   assert.equal(out.empty, "Eighteen titles up for ");
   assert.deepEqual(errors, []);
   await p.close();
@@ -726,7 +731,7 @@ test("phone: the badge case goes to one card per row", { skip }, async () => {
   const { p, errors } = await page(null, PHONE);
   const out = await p.evaluate(async (BETS) => {
     const { state } = await import("./state.js?v=dev"); const V = await import("./render.js?v=dev");
-    state.bets = BETS; state.tab = "ledger"; state.local = false; state.connected = true; state.db = { doc() { return {}; } };
+    state.bets = BETS; state.tab = "badges"; state.local = false; state.connected = true; state.db = { doc() { return {}; } };
     localStorage.setItem("smyrna.pushNudge", "x");
     document.getElementById("login").hidden = true; document.getElementById("app").hidden = false;
     V.render(); await new Promise(r => setTimeout(r, 40));

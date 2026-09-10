@@ -553,6 +553,9 @@ h1,h2,h3,.terms,.login-brand h1{font-family:"Poppins","Inter",system-ui,sans-ser
 .bdg-card.act .bdg-ic{color:var(--open);background:var(--open-bg)}
 .bdg-nm{display:block;font-size:12px;font-weight:800;letter-spacing:.02em;margin-bottom:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .bdg-who{display:flex;align-items:center;gap:7px;min-width:0}
+.bdg-faces{display:inline-flex;align-items:center;flex:none}
+.bdg-faces .avatar+.avatar{margin-left:-9px;box-shadow:0 0 0 2px var(--surface-3)}
+.bdg-share{font-style:normal;font-size:9px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;margin-left:7px;padding:1px 6px;border-radius:5px;background:var(--surface-2);color:var(--ink-3)}
 .bdg-who b{font-family:"Poppins","Inter",system-ui,sans-serif;font-size:14px;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
 .bdg-who .bdg-none{color:var(--ink-3);font-size:13px}
 .bdg-v{margin-left:auto;flex:none;font-variant-numeric:tabular-nums;font-size:13.5px}
@@ -596,12 +599,12 @@ h1,h2,h3,.terms,.login-brand h1{font-family:"Poppins","Inter",system-ui,sans-ser
   /* the panel hugs the edges; the tabs leave it for a bar at the bottom of the screen */
   .panel{padding:10px 10px 14px;border-radius:16px;margin-top:10px}
   .panel section{margin-top:0}
-  .tabs{position:fixed;left:0;right:0;bottom:0;z-index:8;display:grid;grid-template-columns:repeat(5,1fr);gap:0;overflow:visible;padding:6px 6px calc(8px + env(safe-area-inset-bottom));background:var(--surface);border-top:1px solid var(--rule);box-shadow:0 -10px 30px -12px rgba(0,0,0,.5)}
-  .tab{flex-direction:column;gap:4px;padding:6px 1px 4px;font-size:9px;letter-spacing:.03em;background:none;color:var(--ink-3);border-radius:10px;position:relative;white-space:nowrap}
-  .tab svg{width:21px;height:21px;stroke-width:1.7}
+  .tabs{position:fixed;left:0;right:0;bottom:0;z-index:8;display:grid;grid-template-columns:repeat(6,1fr);gap:0;overflow:visible;padding:6px 6px calc(8px + env(safe-area-inset-bottom));background:var(--surface);border-top:1px solid var(--rule);box-shadow:0 -10px 30px -12px rgba(0,0,0,.5)}
+  .tab{flex-direction:column;gap:3px;padding:6px 1px 4px;font-size:8.5px;letter-spacing:0;background:none;color:var(--ink-3);border-radius:10px;position:relative;white-space:nowrap}
+  .tab svg{width:19px;height:19px;stroke-width:1.7}
   .tab span{overflow:hidden;text-overflow:ellipsis;max-width:100%}
   .tab.on{background:none;color:var(--accent)}
-  .tab .n,.tab:not(.on) .n{position:absolute;top:0;right:calc(50% - 24px);background:var(--gold);color:#1a1200;font-size:10px;min-width:16px;padding:1px 5px}
+  .tab .n,.tab:not(.on) .n{position:absolute;top:0;right:calc(50% - 21px);background:var(--gold);color:#1a1200;font-size:10px;min-width:16px;padding:1px 5px}
   /* Book: the glance line, a floating Propose button, filters on one scrolling row */
   .glance{gap:6px 12px;padding:8px 10px;font-size:12px;margin-bottom:10px}
   .glance-txt{gap:6px 12px}

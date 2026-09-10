@@ -152,7 +152,10 @@ function tabs(){
   // Rivals badges the pairs you're behind on — the rivalries to fix.
   var RV=R.rivals(realMembers().filter(function(m){ return !m.test; }),state.bets), owed=0;
   if(state.me&&RV.byId[state.me]) Object.keys(RV.byId[state.me]).forEach(function(b){ if(RV.byId[state.me][b].net<0) owed++; });
-  var badge={ book:seats, ledger:0, hl:HL.weeks.length, rivals:owed, settle:Bal.transfers.length };
+  // Badges badges how many titles you're holding right now
+  var mineBadges=0;
+  if(state.me) badgeList().forEach(function(b){ if((b.holders||[]).indexOf(state.me)>=0) mineBadges++; });
+  var badge={ book:seats, ledger:0, badges:mineBadges, hl:HL.weeks.length, rivals:owed, settle:Bal.transfers.length };
   Object.keys(badge).forEach(function(k){ var n=document.getElementById("tabN-"+k); if(!n) return; n.hidden=!badge[k]; n.textContent=badge[k]; });
   var cur=state.tab||"book";
   document.querySelectorAll("#tabs .tab").forEach(function(t){ var on=t.getAttribute("data-tab")===cur; t.classList.toggle("on",on); t.setAttribute("aria-selected",String(on)); });
@@ -240,7 +243,7 @@ function board(){
     return a.name.localeCompare(b.name);
   });
   var worn={};
-  badgeList().forEach(function(b){ if(b.holder){ if(!worn[b.holder]) worn[b.holder]=[]; worn[b.holder].push(b); } });
+  badgeList().forEach(function(b){ (b.holders||[]).forEach(function(id){ if(!worn[id]) worn[id]=[]; worn[id].push(b); }); });
   host.innerHTML=list.map(function(m){
     var p=L.pnl[m.id], played=p.w+p.l+p.p;
     var cls=p.net>0?"pos":p.net<0?"neg":"flat";
@@ -258,7 +261,7 @@ function board(){
           (played?p.w+"–"+p.l+(p.p?"–"+p.p:"")+" settled":"settled")+"</span></div>"+
       "</div>"+
       ((worn[m.id]||[]).length?'<div class="seat-bdgs">'+worn[m.id].map(function(b){
-        return '<span class="bdg '+esc(b.fam)+' sm" title="'+esc(b.name+" · "+b.blurb)+'">'+badgeSvg(b.icon)+esc(b.name)+"</span>"; }).join("")+"</div>":"")+
+        return '<span class="bdg '+esc(b.fam)+' sm" title="'+esc(b.label+" · "+b.blurb)+'">'+badgeSvg(b.icon)+esc(b.label)+"</span>"; }).join("")+"</div>":"")+
       '<div class="seat-picks'+(mine.length?"":" none")+'">'+
         (mine.length?esc(mine.join(" · ")):"no action yet")+"</div>"+
     "</div>";
@@ -344,25 +347,29 @@ function badgeList(){
 function badgesView(){
   var host=document.getElementById("badges"), list=badgeList();
   var recs=(state.badges&&state.badges.byKey)||{};
-  var held=list.filter(function(b){ return b.holder; });
+  var held=list.filter(function(b){ return b.holders.length; });
   if(!held.length){
     host.innerHTML='<div class="empty">Eighteen titles up for grabs — biggest winner, biggest degenerate, hot hand, ghost. They land as soon as bets start settling.</div>';
     return;
   }
-  var mine=state.me?held.filter(function(b){ return b.holder===state.me; }):[];
-  var chip=function(b,small){ return '<span class="bdg '+esc(b.fam)+(small?" sm":"")+'" title="'+esc(b.blurb)+'">'+badgeSvg(b.icon)+esc(b.name)+(small?"":" · "+esc(b.text))+"</span>"; };
+  var isMine=function(b){ return !!state.me&&b.holders.indexOf(state.me)>=0; };
+  var mine=held.filter(isMine);
+  var chip=function(b,small){ return '<span class="bdg '+esc(b.fam)+(small?" sm":"")+'" title="'+esc(b.blurb)+'">'+badgeSvg(b.icon)+esc(b.label)+(small?"":" · "+esc(b.text))+"</span>"; };
   var h="";
   if(state.me) h+='<div class="bdg-mine"><span class="lbl">You hold</span>'+
     (mine.length?mine.map(function(b){ return chip(b); }).join("")
                 :'<span class="note">Nothing yet — go win something.</span>')+"</div>";
   h+='<div class="bdg-case">'+list.map(function(b){
-    var rec=recs[b.key];
-    return '<div class="bdg-card '+(b.holder?esc(b.fam):"vacant")+(b.holder===state.me?" me":"")+'">'+
+    var rec=recs[b.key], n=b.holders.length;
+    // a tie is shared: every holder's face, then the names, and the title goes plural
+    var who=n
+      ? '<span class="bdg-who"><span class="bdg-faces">'+b.holders.slice(0,3).map(function(id){ return avatarHtml(id,26); }).join("")+"</span>"+
+        "<b>"+esc(R.nameList(b.holderNames))+'</b><b class="bdg-v">'+esc(b.text)+"</b></span>"
+      : '<span class="bdg-who"><b class="bdg-none">Nobody yet</b></span>';
+    return '<div class="bdg-card '+(n?esc(b.fam):"vacant")+(isMine(b)?" me":"")+'">'+
       '<span class="bdg-ic">'+badgeSvg(b.icon)+"</span>"+
-      "<span>"+'<span class="bdg-nm">'+esc(b.name)+"</span>"+
-      (b.holder?'<span class="bdg-who">'+avatarHtml(b.holder,26)+"<b>"+esc(b.holderName)+'</b><b class="bdg-v">'+esc(b.text)+"</b></span>"
-               :'<span class="bdg-who"><b class="bdg-none">Nobody yet</b></span>')+
-      '<span class="bdg-sub">'+(function(){ var st=R.badgeStory(rec,members(),b.holder); return st?'<span class="took">'+esc(st)+"</span> · ":""; })()+esc(b.blurb)+"</span></span></div>";
+      "<span>"+'<span class="bdg-nm">'+esc(b.label)+(b.shared?'<i class="bdg-share">shared · '+n+"</i>":"")+"</span>"+who+
+      '<span class="bdg-sub">'+(function(){ var st=R.badgeStory(rec,members(),b.holders); return st?'<span class="took">'+esc(st)+"</span> · ":""; })()+esc(b.blurb)+"</span></span></div>";
   }).join("")+"</div>";
   host.innerHTML=h;
 }

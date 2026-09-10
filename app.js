@@ -30,7 +30,7 @@ function makeDb(key){ return S.makeDb(key,{ refresh:runRefresh }); }
 // looks and behaves as it does for everyone else. The switch is remembered per device.
 const ADMIN_LS="smyrna.adminMode";
 try{ state.adminMode=localStorage.getItem(ADMIN_LS)==="on"; }catch(e){}
-try{ var savedTab=localStorage.getItem("smyrna.tab"); if(["book","ledger","hl","rivals","settle"].indexOf(savedTab)>=0) state.tab=savedTab; }catch(e){}
+try{ var savedTab=localStorage.getItem("smyrna.tab"); if(["book","ledger","badges","hl","rivals","settle"].indexOf(savedTab)>=0) state.tab=savedTab; }catch(e){}
 // A tapped notification opens the app at its bet: ?bet=<id>, read before storedKey() tidies the address.
 var openBet=null; try{ openBet=new URLSearchParams(location.search).get("bet"); if(openBet) history.replaceState(null,"",location.pathname); }catch(e){}
 function applyAuth(user){ var w=A.whoAmI(user,state.config); state.me=w.me; state.isAdmin=w.admin; state.admin=w.admin&&state.adminMode; stampSeen(); }

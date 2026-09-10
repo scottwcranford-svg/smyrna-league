@@ -331,37 +331,47 @@ const bbets = [
 const bhl = { weeks: { "1": { high: [{ id: "c", name: "Cara", pts: 150 }], low: [{ id: "a", name: "Alice", pts: 80 }] } } };
 const bseen = { a: "2026-09-25T00:00:00Z", b: { at: "2026-09-30T00:00:00Z", n: 12 }, c: "2026-08-01T00:00:00Z" };
 const bnow = Date.parse("2026-10-01T00:00:00Z");
-const held = (list) => Object.fromEntries(list.filter(x => x.holder).map(x => [x.key, [x.holder, x.text]]));
+const held = (list) => Object.fromEntries(list.filter(x => x.holders.length).map(x => [x.key, [x.holders.join("+"), x.text]]));
 
 test("badges: eighteen live titles, worked out from the book", () => {
   const list = R.badges(bconfig, bbets, bhl, bseen, null, bnow);
   assert.equal(list.length, 18, "every badge comes back, held or not");
   assert.deepEqual(held(list), {
-    degenerate: ["a", "$70"], highroller: ["a", "$80"], deadbeat: ["a", "owes $60"], bank: ["b", "owed $95"],
+    degenerate: ["a", "$70"], highroller: ["a+b+c+d", "$80"], deadbeat: ["a", "owes $60"], bank: ["b", "owed $95"],
     winner: ["b", "+$95"], hothand: ["b", "3 in a row"], untouchable: ["b", "3–0"], kingmaker: ["b", "$60"],
     weeklyking: ["c", "1 high"], loser: ["a", "−$55"], icecold: ["a", "3 in a row"], basement: ["a", "1 low"],
-    coldfeet: ["c", "1 pulled"], active: ["a", "4 bets"], instigator: ["a", "2 posted"], ghost: ["c", "61d away"],
+    coldfeet: ["c", "1 pulled"], active: ["a", "4 bets"], instigator: ["a+b", "2 posted"], ghost: ["c", "61d away"],
     quickdraw: ["d", "45s"], logins: ["b", "12 visits"],
   });
+  // the four in the same $20 pot all have the same biggest pot, so they hold High Roller together
+  const hr = list.find(x => x.key === "highroller");
+  assert.equal(hr.shared, true);
+  assert.equal(hr.label, "High Rollers", "and the title reads plural");
+  assert.equal(list.find(x => x.key === "winner").label, "Biggest Winner", "one holder keeps the singular");
 });
 
 test("badges: nobody qualifies on an empty book, and test accounts never hold one", () => {
   const list = R.badges(bconfig, [], null, null, null, bnow);
-  assert.deepEqual(list.filter(x => x.holder), [], "every badge is up for grabs");
+  assert.deepEqual(list.filter(x => x.holders.length), [], "every badge is up for grabs");
   assert.equal(list.length, 18);
   const only = R.badges(bconfig, [{ id: "9", status: "settled", week: 1, amount: 10, winner: "t", createdBy: "t", settledAt: "2026-09-11T00:00:00Z", entries: [{ memberId: "t" }, { memberId: "a" }] }], null, null, null, bnow);
-  assert.equal(only.find(x => x.key === "winner").holder, null, "a test account is not in the running");
-  assert.equal(only.find(x => x.key === "loser").holder, "a", "the real manager still gets theirs");
+  assert.deepEqual(only.find(x => x.key === "winner").holders, [], "a test account is not in the running");
+  assert.deepEqual(only.find(x => x.key === "loser").holders, ["a"], "the real manager still gets theirs");
 });
 
-test("badges: a tie goes to the first name, so two browsers agree on the holder", () => {
+test("badges: a tie is shared by everyone level on it, and the title goes plural", () => {
   const cfg = { ...bconfig, members: [{ id: "z", name: "Zoe" }, { id: "a", name: "Alice" }] };
   const tie = [
     { id: "1", status: "settled", week: 1, amount: 10, winner: "z", createdBy: "z", settledAt: "2026-09-11T00:00:00Z", entries: [{ memberId: "z" }, { memberId: "a" }] },
     { id: "2", status: "settled", week: 2, amount: 10, winner: "a", createdBy: "a", settledAt: "2026-09-18T00:00:00Z", entries: [{ memberId: "z" }, { memberId: "a" }] },
   ];
   const list = R.badges(cfg, tie, null, null, null, bnow);
-  assert.equal(list.find(x => x.key === "degenerate").holder, "a", "both staked $20; Alice sorts first");
+  const d = list.find(x => x.key === "degenerate");
+  assert.deepEqual(d.holders, ["a", "z"], "both staked $20, so both hold it, in name order");
+  assert.deepEqual(d.holderNames, ["Alice", "Zoe"]);
+  assert.equal(d.shared, true);
+  assert.equal(d.label, "Biggest Degenerates", "and the title goes plural");
+  assert.equal(list.find(x => x.key === "icecold").label, "Ice Cold", "a title with no sensible plural keeps its name");
 });
 
 test("badgeChanges: only what moved, and it remembers who it came from", () => {
@@ -369,13 +379,14 @@ test("badgeChanges: only what moved, and it remembers who it came from", () => {
   const first = R.badgeChanges(list, null, bconfig, null, bnow);
   assert.equal(Object.keys(first).length, 18, "the first run records every held badge");
   assert.equal(first.winner.from, null, "nobody to take it from yet");
+  assert.deepEqual(first.winner.holders, ["b"], "holders is always a list");
   const stored = { byKey: first };
   assert.equal(R.badgeChanges(list, stored, bconfig, null, bnow), null, "nothing moved, nothing written");
   // Cara wins one big enough to take Biggest Winner off Bob
   const moved = bbets.concat([{ id: "6", status: "settled", week: 4, amount: 200, winner: "c", createdBy: "c", settledAt: "2026-09-28T00:00:00Z", entries: [{ memberId: "c" }, { memberId: "d" }] }]);
   const chg = R.badgeChanges(R.badges(bconfig, moved, bhl, bseen, null, bnow), stored, bconfig, null, bnow);
   assert.equal(chg.winner.holder, "c");
-  assert.equal(chg.winner.from, "b", "it says who lost it");
+  assert.deepEqual(chg.winner.from, ["b"], "it says who lost it — a list, since a shared title can lose several at once");
   assert.equal(chg.weeklyking, undefined, "a badge that didn't move isn't rewritten");
 });
 
@@ -392,13 +403,13 @@ test("badgeChanges: a draw a second later writes nothing — no value may drift 
 test("badgeStory: took it from, or held since", () => {
   const members = bconfig.members;
   assert.equal(R.badgeStory(null, members), "nobody yet");
-  assert.equal(R.badgeStory({ holder: "c", from: "b", week: 4 }, members), "took it from Bob · wk 4");
+  assert.equal(R.badgeStory({ holder: "c", holders: ["c"], from: ["b"], week: 4 }, members), "took it from Bob · wk 4");
   assert.match(R.badgeStory({ holder: "b", from: null, week: 2, at: "2026-09-18T00:00:00Z" }, members), /^held since /);
   // with a holder passed in, the record can lag a fresh page: no story beats a wrong one
-  assert.equal(R.badgeStory(null, members, "c"), "", "a holder on screen with no record yet says nothing");
-  assert.equal(R.badgeStory(null, members, null), "nobody yet");
-  assert.equal(R.badgeStory({ holder: "b", from: "a", week: 4 }, members, "c"), "", "a stale record for someone else is not shown");
-  assert.equal(R.badgeStory({ holder: "c", from: "b", week: 4 }, members, "c"), "took it from Bob · wk 4");
+  assert.equal(R.badgeStory(null, members, ["c"]), "", "a holder on screen with no record yet says nothing");
+  assert.equal(R.badgeStory(null, members, []), "nobody yet");
+  assert.equal(R.badgeStory({ holder: "b", holders: ["b"], from: ["a"], week: 4 }, members, ["c"]), "", "a stale record for someone else is not shown");
+  assert.equal(R.badgeStory({ holder: "c", holders: ["c"], from: ["b"], week: 4 }, members, ["c"]), "took it from Bob · wk 4");
 });
 
 test("seenAt and seenCount read both shapes of league/seen", () => {
@@ -470,4 +481,12 @@ test("lineOrigin: a bet says whether its number was Vegas's or the proposer's ow
   assert.equal(R.lineOrigin({ game: g, market: "total", line: 44.5 }), null, "a bet posted before this shipped doesn't guess");
   assert.equal(R.lineOrigin({ game: g, market: "ml", lineSrc: "vegas" }), null, "a straight-up bet has no number");
   assert.equal(R.lineOrigin(null), null);
+});
+
+test("nameList: one, two, three, then and-so-many-others", () => {
+  assert.equal(R.nameList([]), "");
+  assert.equal(R.nameList(["Alice"]), "Alice");
+  assert.equal(R.nameList(["Alice", "Bob"]), "Alice and Bob");
+  assert.equal(R.nameList(["Alice", "Bob", "Cara"]), "Alice, Bob and Cara");
+  assert.equal(R.nameList(["Alice", "Bob", "Cara", "Dan"]), "Alice, Bob and 2 others");
 });
