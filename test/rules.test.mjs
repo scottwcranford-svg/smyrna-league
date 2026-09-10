@@ -340,7 +340,7 @@ test("badges: eighteen live titles, worked out from the book", () => {
     degenerate: ["a", "$70"], highroller: ["a", "$80"], deadbeat: ["a", "owes $60"], bank: ["b", "owed $95"],
     winner: ["b", "+$95"], hothand: ["b", "3 in a row"], untouchable: ["b", "3–0"], kingmaker: ["b", "$60"],
     weeklyking: ["c", "1 high"], loser: ["a", "−$55"], icecold: ["a", "3 in a row"], basement: ["a", "1 low"],
-    coldfeet: ["c", "1 pulled"], active: ["a", "4 bets"], instigator: ["a", "2 posted"], ghost: ["c", "41d"],
+    coldfeet: ["c", "1 pulled"], active: ["a", "4 bets"], instigator: ["a", "2 posted"], ghost: ["c", "61d away"],
     quickdraw: ["d", "45s"], logins: ["b", "12 visits"],
   });
 });
@@ -377,6 +377,16 @@ test("badgeChanges: only what moved, and it remembers who it came from", () => {
   assert.equal(chg.winner.holder, "c");
   assert.equal(chg.winner.from, "b", "it says who lost it");
   assert.equal(chg.weeklyking, undefined, "a badge that didn't move isn't rewritten");
+});
+
+test("badgeChanges: a draw a second later writes nothing — no value may drift with the clock", () => {
+  const list = R.badges(bconfig, bbets, bhl, bseen, null, bnow);
+  const stored = { byKey: R.badgeChanges(list, null, bconfig, null, bnow) };
+  const later = R.badges(bconfig, bbets, bhl, bseen, null, bnow + 1500);
+  assert.equal(R.badgeChanges(later, stored, bconfig, null, bnow + 1500), null,
+    "otherwise every render writes to the book, which loops through the snapshot");
+  const nextDay = R.badges(bconfig, bbets, bhl, bseen, null, bnow + 86400e3);
+  assert.equal(R.badgeChanges(nextDay, stored, bconfig, null, bnow + 86400e3).ghost.text, "62d away", "a day later it does move");
 });
 
 test("badgeStory: took it from, or held since", () => {

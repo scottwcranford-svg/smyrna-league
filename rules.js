@@ -448,7 +448,9 @@ export function badges(config,bets,highlow,seen,payments,now){
     else if(B.key==="coldfeet"){ hit=pick(function(id){ return pulled[id]>0?pulled[id]:null; }); if(hit) text=hit.v+" pulled"; }
     else if(B.key==="active"){ hit=pick(function(id){ return mine[id]>0?mine[id]:null; }); if(hit) text=hit.v+(hit.v===1?" bet":" bets"); }
     else if(B.key==="instigator"){ hit=pick(function(id){ return made[id]>0?made[id]:null; }); if(hit) text=hit.v+" posted"; }
-    else if(B.key==="ghost"){ hit=pick(function(id){ var t=Date.parse(seenAt(seen,id)||""); return isNaN(t)?null:(now-t); }); if(hit) text=ago(new Date(now-hit.v).toISOString()).replace(" ago",""); }
+    // whole days, not milliseconds: a badge's value has to be the same on two draws a
+    // second apart, or badgeChanges() sees a change every time and writes forever.
+    else if(B.key==="ghost"){ hit=pick(function(id){ var t=Date.parse(seenAt(seen,id)||""); return isNaN(t)?null:Math.floor((now-t)/86400000); }); if(hit) text=hit.v+"d away"; }
     else if(B.key==="quickdraw"){ hit=pick(function(id){ return drawn[id]; },true); if(hit) text=quickText(hit.v); }
     else if(B.key==="logins"){ hit=pick(function(id){ var n=seenCount(seen,id); return n>1?n:null; }); if(hit) text=hit.v+" visits"; }
     return { key:B.key, fam:B.fam, icon:B.icon, name:B.name, blurb:B.blurb,
@@ -474,7 +476,7 @@ export function badgeChanges(list,stored,config,games,now){
   var wk=currentWeek(config,games);
   (list||[]).forEach(function(b){
     var prev=was[b.key];
-    var same=prev&&((prev.holder||null)===(b.holder||null))&&(prev.value===b.value);
+    var same=prev&&((prev.holder||null)===(b.holder||null))&&(prev.text||"")===(b.text||"");
     if(same) return;
     // a badge nobody holds and nobody held is not news
     if(!b.holder&&!(prev&&prev.holder)) return;
