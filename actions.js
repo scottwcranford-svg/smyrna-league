@@ -93,6 +93,9 @@ export const ACTIONS = {
   // notifications on this device: the nudge on the page, and "not now"
   push:function(){ D.pushToggle(); },
   pushLater:function(){ Nf.snooze(); touch(); },
+  // phones: a ticket's Details / Less, and a ledger row's bet names
+  fold:function(t,id){ state.unfolded[id]=!state.unfolded[id]; touch(); },
+  seat:function(t,id){ state.unfolded["m:"+id]=!state.unfolded["m:"+id]; touch(); },
 };
 
 // data-act changes on selects and checkboxes
@@ -151,7 +154,12 @@ export function bindEvents(hooks){
   var on=function(id,ev,fn){ document.getElementById(id).addEventListener(ev,fn); };
 
   document.addEventListener("click",function(ev){
-    var t=ev.target.closest("[data-act]"); if(!t) return;
+    var t=ev.target.closest("[data-act]");
+    if(!t){   // a tap on a folded ticket, away from any control, opens it
+      var tk=ev.target.closest("article.ticket.fold");
+      if(tk&&!ev.target.closest("button,a,select,input,label")){ state.unfolded[attr(tk,"data-bet")]=true; touch(); }
+      return;
+    }
     var fn=ACTIONS[attr(t,"data-act")];
     if(fn) fn(t,attr(t,"data-id"));
   });

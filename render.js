@@ -6,6 +6,10 @@ import * as R from "./rules.js?v=dev";
 import { state, members, realMembers, teamOf, touch } from "./state.js?v=dev";
 import * as Nf from "./notify.js?v=dev";
 
+// Under 600px the page takes its phone shape (styles.css does most of it; this is the
+// markup that differs: folded tickets and ledger rows, the season table by manager).
+export function phone(){ try{ return window.matchMedia("(max-width: 600px)").matches; }catch(e){ return false; } }
+
 const esc=R.esc, money=R.money, signed=R.signed, initials=R.initials, weekLabel=R.weekLabel, isPlayoff=R.isPlayoff,
       kindLabel=R.kindLabel, entriesOf=R.entriesOf, fmtWhen=R.fmtWhen, countdown=R.countdown, lineText=R.lineText,
       coverSide=R.coverSide, ago=R.ago;
@@ -235,8 +239,9 @@ function board(){
     var cls=p.net>0?"pos":p.net<0?"neg":"flat";
     var inPlay=L.risk[m.id]||0, proposed=L.offered[m.id]||0, gone=L.cancelled[m.id]||0;
     var mine=L.picks[m.id]||[];
-    var fig=function(cls,v,lab){ return '<div class="fig '+cls+'"><b class="'+(v?"":"zero")+'">'+money(v)+"</b><span>"+lab+"</span></div>"; };
-    return '<div class="seat'+(m.id===state.me?" me":"")+((played||inPlay||proposed)?"":" idle")+'">'+
+    var fig=function(cls,v,lab){ return '<div class="fig '+cls+(v?"":" zero")+'"><b class="'+(v?"":"zero")+'">'+money(v)+"</b><span>"+lab+"</span></div>"; };
+    // on a phone the row folds; the tap opens its bet names
+    return '<div class="seat'+(m.id===state.me?" me":"")+((played||inPlay||proposed)?"":" idle")+(state.unfolded["m:"+m.id]?" open":"")+'" data-act="seat" data-id="'+esc(m.id)+'">'+
       '<div class="seat-top">'+avatarHtml(m.id,30)+
       '<span class="seat-name">'+esc(m.name)+"</span></div>"+
       '<div class="seat-team">'+esc(teamOf(m))+"</div>"+
@@ -275,6 +280,7 @@ function seasonTable(L){
   var HL=R.hlTally(state.highlow,members(),R.hlStake(state.config));
   var cols=realMembers().filter(function(m){ return !m.test; });
   if(!cols.length) return "";
+  if(phone()) return seasonTableByManager(L,HL,cols);
   var val=function(m,row){ var p=L.pnl[m.id]||{}, h=HL.byId[m.id]||{};
     return row==="hl"?(h.net||0):row==="weekly"?(p.weekly||0):row==="season"?(p.season||0):(h.net||0)+(p.weekly||0)+(p.season||0); };
   var cell=function(v,total,m,row){ v=Math.round(v*100)/100;
@@ -284,6 +290,17 @@ function seasonTable(L){
       return '<th'+(m.id===state.me?' class="me"':"")+'><span class="pv-head">'+avatarHtml(m.id,22)+'<span>'+esc(m.name)+"</span></span></th>"; }).join("")+"</tr></thead><tbody>"+
     rows.map(function(r){ var total=r[0]==="total";
       return "<tr"+(total?' class="total"':"")+"><th>"+esc(r[1])+"</th>"+cols.map(function(m){ return cell(val(m,r[0]),total,m,r[0]); }).join("")+"</tr>"; }).join("")+
+    "</tbody></table></div>";
+}
+
+// The same table on a phone: a row per manager, the four pools across, so all ten fit.
+function seasonTableByManager(L,HL,cols){
+  var val=function(m,row){ var p=L.pnl[m.id]||{}, h=HL.byId[m.id]||{};
+    return row==="hl"?(h.net||0):row==="weekly"?(p.weekly||0):row==="season"?(p.season||0):(h.net||0)+(p.weekly||0)+(p.season||0); };
+  var cell=function(m,row){ var v=Math.round(val(m,row)*100)/100;
+    return '<td class="num '+(v>0?"pos":v<0?"neg":"flat")+(row==="total"?" total":"")+'" data-act="drill" data-m="'+esc(m.id)+'" data-row="'+row+'" tabindex="0">'+signed(v)+"</td>"; };
+  return '<div class="pivot-wrap"><table class="pivot by-manager"><thead><tr><th>Manager</th><th class="num">Hi/lo</th><th class="num">Weekly</th><th class="num">Season</th><th class="num">Total</th></tr></thead><tbody>'+
+    cols.map(function(m){ return "<tr"+(m.id===state.me?' class="me"':"")+"><th>"+avatarHtml(m.id,20)+'<span>'+esc(m.name)+"</span></th>"+["hl","weekly","season","total"].map(function(r){ return cell(m,r); }).join("")+"</tr>"; }).join("")+
     "</tbody></table></div>";
 }
 
@@ -526,7 +543,11 @@ function ticketHtml(b){
   var paidStamp="";   // nothing is paid bet by bet: balances net out at the end of the year
   // Still looking for people: a seat to fill, or a pot you could add yourself to.
   var seeking=!isLocked(b)&&(b.status==="open"||(state.me&&R.canJoin(b)&&!mine));
-  return '<article class="ticket '+esc(b.status)+(seeking?" seeking":"")+'" data-bet="'+esc(b.id)+'">'+
+  var strip=stripHtml(b.stats,ents,b.week);
+  // On a phone a ticket folds to its name, sides and numbers; a tap opens the rest.
+  // One still looking for people stays fully drawn, its button in reach.
+  var fold=phone()&&!seeking&&!state.unfolded[b.id];
+  return '<article class="ticket '+esc(b.status)+(seeking?" seeking":"")+(fold?" fold":"")+(strip?" has-stats":"")+'" data-bet="'+esc(b.id)+'">'+
     '<div class="t-meta"><div class="t-meta-l">'+
       '<span class="wk'+(isPlayoff(b.week)?" po":"")+'">'+weekLabel(b.week)+"</span>"+
       '<span class="kind">'+esc(kindLabel(b.kind))+(live.length>2?" · "+live.length+"-way":"")+"</span>"+
@@ -540,11 +561,12 @@ function ticketHtml(b){
     (b.name?'<p class="bet-desc">'+esc(b.terms)+"</p>":"")+
     (b.game?gamelineHtml(b):"")+
     '<div class="sides">'+sides+"</div>"+
-    stripHtml(b.stats,ents,b.week)+
+    strip+
     '<div class="t-foot">'+
       '<div class="t-stake"><b>'+money(b.amount)+"</b> a side"+
         (live.length>2?' <span class="pot">· '+money(pot)+" pot</span>":"")+"</div>"+
       (acts.length||paidStamp?'<div class="t-actions">'+paidStamp+acts.join("")+"</div>":"")+
+      (seeking?"":'<button class="btn t-fold" data-act="fold" data-id="'+esc(b.id)+'" aria-expanded="'+(!fold)+'">'+(fold?"Details":"Less")+"</button>")+
     "</div>"+
   "</article>";
 }
@@ -578,7 +600,8 @@ export function statsBar(){
   bar.innerHTML=h;
   btn.hidden=!(state.db&&!state.local);
   btn.disabled=pending&&!stale;
-  btn.textContent=pending&&!stale?"Requested":"Refresh stats";
+  btn.textContent=pending&&!stale?(phone()?"…":"Requested"):(phone()?"↻":"Refresh stats");
+  btn.title=pending&&!stale?"Refresh requested":"Refresh stats";
 }
 
 function foot(){

@@ -184,6 +184,7 @@ function subscribeBook(db){
 
 /* ---- boot ---- */
 onRender(function(){ expireBets(); settleFinished(); render(); });
+try{ window.matchMedia("(max-width: 600px)").addEventListener("change",function(){ touch(); }); }catch(e){}
 bindEvents({ enterBook:enterBook, toggleAdmin:toggleAdmin });
 state.config={ leagueName:"Smyrna League", season:"2026", stake:25, kickoff:R.DEFAULT_KICKOFF, members:[] };
 state.bets=[];

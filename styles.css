@@ -447,3 +447,93 @@ h1,h2,h3,.terms,.login-brand h1{font-family:"Poppins","Inter",system-ui,sans-ser
 .paid .paid-txt{flex:1 1 auto;min-width:0;color:var(--ink)}
 .paid .paid-txt small{color:var(--ink-3)}
 .paid b.num{font-variant-numeric:tabular-nums;color:var(--gold)}
+
+/* ---- phones: the same page in a phone shape. Desktop is untouched above 600px. ---- */
+.t-fold{display:none}
+@media(max-width:600px){
+  .wrap{padding:10px 12px calc(96px + env(safe-area-inset-bottom))}
+  /* one-row header: mark, name, settings line, your avatar */
+  header.top{flex-wrap:nowrap;gap:9px;padding-bottom:9px}
+  .league-mark{width:34px;height:34px;border-radius:10px}
+  .league-mark svg{width:20px;height:20px}
+  .brand{gap:9px}
+  .brand h1{font-size:17px}
+  .brand .sub.gold{font-size:10.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .me-btn{padding:2px;border-radius:50%;gap:0;max-width:none}
+  .me-btn b,.me-btn i{display:none}
+  .me-avatar .avatar{width:32px;height:32px;font-size:11px}
+  .ticker{padding:7px 0;font-size:12px}
+  /* the panel hugs the edges; the tabs leave it for a bar at the bottom of the screen */
+  .panel{padding:10px 10px 14px;border-radius:16px;margin-top:10px}
+  .panel section{margin-top:0}
+  .tabs{position:fixed;left:0;right:0;bottom:0;z-index:8;display:grid;grid-template-columns:repeat(4,1fr);gap:0;overflow:visible;padding:6px 6px calc(8px + env(safe-area-inset-bottom));background:var(--surface);border-top:1px solid var(--rule);box-shadow:0 -10px 30px -12px rgba(0,0,0,.5)}
+  .tab{flex-direction:column;gap:4px;padding:6px 0 4px;font-size:9.5px;letter-spacing:.06em;background:none;color:var(--ink-3);border-radius:10px;position:relative;white-space:nowrap}
+  .tab svg{width:22px;height:22px;stroke-width:1.7}
+  .tab.on{background:none;color:var(--accent)}
+  .tab .n,.tab:not(.on) .n{position:absolute;top:0;right:calc(50% - 26px);background:var(--gold);color:#1a1200;font-size:10px;min-width:16px;padding:1px 5px}
+  /* Book: the glance line, a floating Propose button, filters on one scrolling row */
+  .glance{gap:6px 12px;padding:8px 10px;font-size:12px;margin-bottom:10px}
+  .glance-txt{gap:6px 12px}
+  .glance-r{margin-left:auto}
+  .stats-bar{font-size:11px}
+  #refreshBtn{padding:6px 11px;font-size:15px;line-height:1}
+  #newBetBtn{position:fixed;right:16px;bottom:calc(78px + env(safe-area-inset-bottom));z-index:7;border-radius:26px;padding:13px 18px;font-size:14px;box-shadow:0 14px 30px -8px rgba(255,174,88,.7)}
+  .filters{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;padding-bottom:4px;-webkit-mask-image:linear-gradient(90deg,#000 92%,transparent);mask-image:linear-gradient(90deg,#000 92%,transparent)}
+  .filters::-webkit-scrollbar{display:none}
+  .filters .chip,.filters select{flex:none}
+  /* tickets: tighter, and they fold */
+  .tickets{gap:8px}
+  .ticket{padding:12px 13px;gap:8px;border-radius:14px}
+  .terms{font-size:15px}
+  .bet-desc{font-size:12.5px}
+  .sides{flex-direction:column;gap:7px}
+  .side{flex:1 1 auto}
+  .vs{display:none}
+  .side-pick{font-size:13.5px}
+  .srow{grid-template-columns:1fr auto;gap:3px 10px}
+  .srow .sbar{grid-column:1/-1;height:4px}
+  .srow b{font-size:13px}
+  .t-fold{display:inline-block;margin-left:auto;padding:6px 10px;font-size:12px;color:var(--accent);background:transparent}
+  .t-foot{gap:6px 10px}
+  .t-actions{flex:1 1 100%}
+  .ticket.fold .bet-desc,.ticket.fold .t-actions,.ticket.fold .sbar,.ticket.fold .stat-head,.ticket.fold .proj-note,.ticket.fold .track-title{display:none}
+  .ticket.fold.has-stats .sides,.ticket.fold.has-stats .vs{display:none}
+  .ticket.fold .statline{border-top:0;padding-top:0}
+  /* ledger: one row per manager; proposed and cancelled only when there's something in them; a tap opens the bet names */
+  .board{grid-template-columns:1fr;gap:6px}
+  .seat{display:grid;grid-template-columns:1fr auto;grid-template-areas:"top figs" "team figs" "picks picks";column-gap:10px;row-gap:1px;padding:9px 11px;border-radius:12px;cursor:pointer}
+  .seat-top{grid-area:top}
+  .seat-team{grid-area:team;padding-left:39px;min-height:0;font-size:11px}
+  .seat-team:empty{display:none}
+  .figs{grid-area:figs;align-self:center;gap:14px;flex-wrap:nowrap}
+  .fig{min-width:62px;text-align:right}
+  .fig b{font-size:16px} .fig span{font-size:8.5px;margin-top:3px}
+  .fig.prop.zero,.fig.gone.zero{display:none}
+  .seat-picks{grid-area:picks;display:none;padding:6px 0 0 39px}
+  .seat.open .seat-picks{display:block}
+  /* hi / low: standings and weeks in single columns */
+  .hl-standings{grid-template-columns:1fr;gap:6px}
+  .hl-row{grid-template-columns:auto 1fr;row-gap:6px}
+  .hl-side.low{grid-column:2}
+  /* Settle Up: the table by manager, balances and payments as rows */
+  .pivot{min-width:0;font-size:12.5px}
+  .pivot th,.pivot td{padding:8px 7px}
+  .pivot.by-manager thead th.num{text-align:right}
+  .pivot.by-manager tbody th{text-transform:none;letter-spacing:0;font-size:12.5px;color:var(--ink);display:flex;align-items:center;gap:6px;border-bottom:0}
+  .pivot.by-manager tbody th span{overflow:hidden;text-overflow:ellipsis}
+  .pivot.by-manager tr.me td,.pivot.by-manager tr.me th{background:var(--accent-bg)}
+  .pivot.by-manager td.total{font-weight:800;color:var(--ink)}
+  .balances{grid-template-columns:1fr;gap:6px}
+  .debt{padding:9px 11px;gap:8px}
+  .debt-txt{font-size:13px}
+  .paid .paid-when{min-width:0;font-size:11px}
+  /* dialogs become sheets: full screen, the buttons pinned at the bottom */
+  dialog{width:100vw;max-width:none;height:100dvh;max-height:none;margin:0;border-radius:0;border:0}
+  dialog[open]{display:flex;flex-direction:column}
+  .dlg-head{padding:calc(12px + env(safe-area-inset-top)) 14px 10px}
+  .dlg-body{flex:1;max-height:none;padding:14px 14px 10px}
+  .form-foot{position:sticky;bottom:0;background:var(--surface);padding:12px 0 calc(6px + env(safe-area-inset-bottom));margin-top:12px;z-index:2}
+  .form-foot .btn.lg{flex:1 1 auto;padding:13px 16px}
+  #betDlg .grid.c3{grid-template-columns:1.2fr 1fr 1fr;gap:8px}
+  .foot{font-size:11.5px}
+}

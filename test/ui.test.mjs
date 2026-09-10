@@ -36,11 +36,12 @@ test.before(async () => {
 test.after(async () => { if (browser) await browser.close(); if (server) server.close(); });
 
 // A fresh page with the app's modules loaded and a small league in state.
-async function page(ua) {
+async function page(ua, viewport) {
   const p = await browser.newPage();
   const errors = [];
   p.on("pageerror", e => errors.push(e.message));
   if (ua) await p.setUserAgent(ua);
+  if (viewport) await p.setViewport(viewport);
   await p.goto(base, { waitUntil: "load" });
   await p.waitForSelector("#bEntries", { timeout: 20000 });
   await p.evaluate(async () => {
@@ -427,6 +428,84 @@ test("notifications on an iPhone in Safari: the button and the nudge lead to the
   assert.equal(out.status, "install");
   assert.deepEqual(out.btn, [false, "Get notifications"]); assert.equal(out.nudgeBtn, "Show me");
   assert.deepEqual(out.dlg, [true, 3, true, true], "the dialog opens with the three steps and this phone's passcode");
+  assert.deepEqual(errors, []);
+  await p.close();
+});
+
+// The same league the first test uses, as a phone sees it.
+const PHONE = { width: 390, height: 844, deviceScaleFactor: 1, isMobile: true, hasTouch: true };
+async function phoneState(p) {
+  await p.evaluate(async () => {
+    const { state } = await import("./state.js?v=dev"); const V = await import("./render.js?v=dev");
+    const h2h = { id: "h", status: "open", createdBy: "b", week: 5, kind: "matchup", amount: 10, name: "NE @ SEA", terms: "Straight up.",
+      game: { id: "g5", week: 5, away: "NE", home: "SEA", date: "2026-10-11T17:00:00Z" }, market: "ml",
+      entries: [{ memberId: "b", side: "NE", pick: "New England Patriots" }, { memberId: null, side: "SEA", pick: "Seattle Seahawks" }], paid: [] };
+    const pot = { id: "p", status: "active", createdBy: "b", week: 5, kind: "prop", amount: 10, name: "Pot", terms: "Most receiving yards.", joinable: false,
+      stats: { scope: "player", tracks: [{ stat: "rec_yd", metric: "Rec yds" }], rows: [
+        { id: "2", label: "Ja'Marr Chase", team: "CIN", memberId: "b", values: {} }, { id: "3", label: "Drake Maye", team: "NE", memberId: "c", values: {} }] },
+      entries: [{ memberId: "b", picks: [{ id: "2", name: "Ja'Marr Chase", pos: "WR", team: "CIN" }] }, { memberId: "c", picks: [{ id: "3", name: "Drake Maye", pos: "QB", team: "NE" }] }], paid: [] };
+    const done = { id: "d", status: "settled", createdBy: "b", week: 1, kind: "prop", amount: 10, name: "Done", terms: "t", winner: "b", entries: [{ memberId: "b", pick: "x" }, { memberId: "c", pick: "y" }], paid: [] };
+    state.bets = [h2h, pot, done]; state.local = false; state.connected = true; state.db = { doc() { return {}; } };
+    localStorage.setItem("smyrna.pushNudge", "x");
+    document.getElementById("login").hidden = true; document.getElementById("app").hidden = false;   // rects need the app on screen
+    V.render();
+  });
+}
+
+test("phone: tabs sit in a bar at the bottom, Propose floats, tickets fold and open on a tap, the ledger is a list", { skip }, async () => {
+  const { p, errors } = await page(null, PHONE);
+  await phoneState(p);
+  const out = await p.evaluate(async () => {
+    const cs = (el) => getComputedStyle(el), res = {}, wait = () => new Promise(r => setTimeout(r, 30));
+    const tabs = document.getElementById("tabs"), r = tabs.getBoundingClientRect();
+    res.tabs = { position: cs(tabs).position, atBottom: Math.round(r.bottom) === innerHeight, fits: [...tabs.querySelectorAll(".tab")].every(t => t.getBoundingClientRect().right <= innerWidth + 1), count: tabs.querySelectorAll(".tab").length };
+    res.fab = cs(document.getElementById("newBetBtn")).position;
+    res.refresh = document.getElementById("refreshBtn").textContent;
+    res.filtersNoWrap = cs(document.getElementById("filters")).flexWrap;
+    const tk = (id) => document.querySelector('article.ticket[data-bet="' + id + '"]');
+    res.open = { fold: tk("h").classList.contains("fold"), foldBtn: !!tk("h").querySelector(".t-fold") };
+    res.pot = { fold: tk("p").classList.contains("fold"), desc: cs(tk("p").querySelector(".bet-desc")).display, sides: cs(tk("p").querySelector(".sides")).display, rows: tk("p").querySelectorAll(".srow").length, bar: cs(tk("p").querySelector(".sbar")).display, btn: tk("p").querySelector(".t-fold").textContent };
+    tk("p").querySelector(".t-fold").click(); await wait();
+    res.potOpen = { fold: tk("p").classList.contains("fold"), desc: cs(tk("p").querySelector(".bet-desc")).display, btn: tk("p").querySelector(".t-fold").textContent };
+    tk("d").querySelector(".terms").click(); await wait();   // a tap on the body of a folded ticket
+    res.doneOpen = !tk("d").classList.contains("fold");
+    document.querySelector('#tabs .tab[data-tab="ledger"]').click(); await wait();
+    const seat = document.querySelector(".board .seat"), zero = document.querySelector(".board .fig.prop.zero");   // Bob proposed a bet, so look past his row
+    res.seat = { grid: cs(seat).display, propHidden: zero ? cs(zero).display : "n/a", picks: cs(seat.querySelector(".seat-picks")).display };
+    seat.click(); await wait();
+    res.seatOpen = cs(document.querySelector(".board .seat .seat-picks")).display;
+    document.querySelector('#tabs .tab[data-tab="settle"]').click(); await wait();
+    const pv = document.querySelector(".pivot");
+    res.pivot = { byManager: pv.classList.contains("by-manager"), rows: [...pv.querySelectorAll("tbody th span:last-child")].map(t => t.textContent.trim()), cells: pv.querySelectorAll('td[data-act="drill"]').length, fits: pv.getBoundingClientRect().width <= innerWidth };
+    document.getElementById("newBetBtn").click(); await new Promise(r => setTimeout(r, 60));
+    const dlg = document.getElementById("betDlg"); res.dialog = { w: Math.round(dlg.getBoundingClientRect().width), sticky: cs(dlg.querySelector(".form-foot")).position };
+    dlg.close();
+    return res;
+  });
+  assert.deepEqual(out.tabs, { position: "fixed", atBottom: true, fits: true, count: 4 }, "all four tabs on a fixed bar at the bottom");
+  assert.equal(out.fab, "fixed"); assert.equal(out.refresh, "\u21bb"); assert.equal(out.filtersNoWrap, "nowrap");
+  assert.deepEqual(out.open, { fold: false, foldBtn: false }, "a ticket still looking for people never folds");
+  assert.deepEqual(out.pot, { fold: true, desc: "none", sides: "none", rows: 2, bar: "none", btn: "Details" }, "folded: the stat rows carry the sides and their numbers, no bars, no terms");
+  assert.deepEqual(out.potOpen, { fold: false, desc: "block", btn: "Less" });
+  assert.equal(out.doneOpen, true, "a tap anywhere on a folded ticket opens it");
+  assert.deepEqual(out.seat, { grid: "grid", propHidden: "none", picks: "none" }, "ledger rows hide empty proposed/cancelled and the bet names");
+  assert.equal(out.seatOpen, "block");
+  assert.deepEqual(out.pivot, { byManager: true, rows: ["Alice", "Bob", "Cara"], cells: 12, fits: true }, "Settle Up's table runs by manager on a phone");
+  assert.deepEqual(out.dialog, { w: 390, sticky: "sticky" }, "dialogs fill the screen with the buttons pinned");
+  assert.deepEqual(errors, []);
+  await p.close();
+});
+
+test("desktop is untouched: no folding, tabs in the panel, the season table with managers across", { skip }, async () => {
+  const { p, errors } = await page(null, { width: 1200, height: 900 });
+  await phoneState(p);
+  const out = await p.evaluate(async () => {
+    const cs = (el) => getComputedStyle(el);
+    document.querySelector('#tabs .tab[data-tab="settle"]').click(); await new Promise(r => setTimeout(r, 30));
+    return { fold: !!document.querySelector("article.ticket.fold"), foldBtn: cs(document.querySelector(".t-fold")).display, tabs: cs(document.getElementById("tabs")).position, fab: cs(document.getElementById("newBetBtn")).position,
+      pivot: document.querySelector(".pivot").classList.contains("by-manager"), refresh: document.getElementById("refreshBtn").textContent };
+  });
+  assert.deepEqual(out, { fold: false, foldBtn: "none", tabs: "static", fab: "static", pivot: false, refresh: "Refresh stats" });
   assert.deepEqual(errors, []);
   await p.close();
 });

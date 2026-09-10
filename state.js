@@ -13,6 +13,7 @@ export const state = {
   sleeper:null,   // league/sleeper: each manager's Sleeper avatar and team name, by member id
   highlow:null,   // league/highlow: each finished week's top and bottom Sleeper scores
   payments:null,  // league/payments: { list: [{ id, from, to, amount, at, by, voided? }] } — settled once, at the end
+  unfolded:{},   // on a phone, tickets and ledger rows fold; ids opened by a tap live here
   timing:{},     // sign-in stopwatch, ms since navigation: boot, auth, click, key, signed, open — the footer shows it
   tab:"book",     // which panel is open: book, ledger, hl, settle — remembered per device   // league/seen: when each manager last opened the app
   // the propose / join forms' draft
