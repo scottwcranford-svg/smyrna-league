@@ -10,10 +10,34 @@
 const puppeteer = require("puppeteer-core");
 const path = require("path");
 
+// The accounts live in .env at the repo root, which is gitignored. Read it here rather than
+// adding a dependency for six lines, and never let it beat what is already in the
+// environment - passing E2E_USER on the command line has to win over the file.
+function loadEnv() {
+  const fs = require("fs");
+  const file = path.join(__dirname, "..", "..", ".env");
+  let text = "";
+  try { text = fs.readFileSync(file, "utf8"); } catch (e) { return; }
+  for (const line of text.split("\n")) {
+    if (/^\s*#/.test(line)) continue;
+    const m = /^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/.exec(line);
+    if (!m) continue;
+    let v = m[2].trim().replace(/\r$/, "");
+    const q = v[0];
+    if (v.length > 1 && (q === '"' || q === "'") && v[v.length - 1] === q) v = v.slice(1, -1);
+    if (v && process.env[m[1]] === undefined) process.env[m[1]] = v;
+  }
+}
+loadEnv();
+
+// E2E_ADMIN=1 switches to the admin bot, so one command covers both accounts.
+const asAdmin = process.env.E2E_ADMIN === "1" || process.argv.includes("--admin");
 const SITE = process.env.SITE || "https://scottwcranford-svg.github.io/smyrna-league/";
-const USER = process.env.E2E_USER, PASS = process.env.E2E_PASS, KEY = process.env.E2E_KEY || "smyrna-league-2026";
+const USER = process.env.E2E_USER_OVERRIDE || (asAdmin && process.env.E2E_ADMIN_USER) || process.env.E2E_USER;
+const PASS = process.env.E2E_PASS_OVERRIDE || (asAdmin && process.env.E2E_ADMIN_PASS) || process.env.E2E_PASS;
+const KEY = process.env.E2E_KEY || "smyrna-league-2026";
 const CHROME = process.env.CHROME || "C:/Program Files/Google/Chrome/Application/chrome.exe";
-if (!USER || !PASS) { console.error("set E2E_USER and E2E_PASS"); process.exit(2); }
+if (!USER || !PASS) { console.error("set E2E_USER and E2E_PASS, or put them in .env"); process.exit(2); }
 
 const $ = (sel) => document.querySelector(sel);
 const shown = (id) => getComputedStyle(document.getElementById(id)).display !== "none";

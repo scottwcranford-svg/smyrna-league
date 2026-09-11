@@ -158,7 +158,8 @@ viewport and Apple meta tags for the same reason.
 ```
 npm install          # puppeteer-core, for the browser tests
 npm test             # rules, store, auth, sleeper (pure logic, fake Firebase/Sleeper) + the UI suite
-E2E_USER=<name> E2E_PASS=<password> [E2E_ADMIN=1] node test/e2e/flow.js
+npm run e2e         # the live browser test, as testbot
+npm run e2e:admin   # again as testbotadmin, checking the admin switch shows and is off
 ```
 
 `test/ui.test.mjs` loads the real page in headless Chrome from a local server, feeds the
@@ -173,14 +174,22 @@ the propose form (stat and game modes, the player picker) read-only. Signing in
 writes one thing: the account's last-seen stamp. It runs against the live URL because
 the Firebase key is locked to that domain; a local copy renders but can't sign in.
 
-Give it its own manager. A real manager's password changes the first time they sign
-in (the forced change), and the test dies with them. Add a manager such as `testbot`
-in the League dialog with the admin switch on, set its password there, tick **Test**
-on its row so the league never sees it (off the ledger board and out of the pickers;
-it still signs in and can bet), and keep that password in the environment, never in
-git. Run with `E2E_ADMIN=1` only when the account
-is an app admin: the header switch must then show, off, and everything else still
-render as it does for everyone.
+It runs on its own accounts, never a real manager's — a real password changes the first
+time they sign in (the forced change) and the test dies with it. There are two, both
+ticked **Test** so the league never sees them (off the ledger board and out of the
+pickers, though they can still sign in and bet): `testbot`, a plain manager, and
+`testbotadmin`, an app admin. Credentials live in `.env` at the repo root, which is
+gitignored; `flow.js` reads that file itself, so `npm run e2e` needs nothing set.
+Anything already in the environment wins over the file.
+
+`npm run e2e:admin` (or `E2E_ADMIN=1`) switches to the admin bot, and asserts the header switch shows and starts
+off. Without the flag the test expects that switch hidden, so running the admin account
+plain fails on purpose.
+
+Neither password may be `<Name>123!`: that is the app's default, and typing it opens the
+non-dismissable forced-change dialog, which hangs the run behind a modal. The Firebase
+console cannot change an existing user's password — Reset password emails a domain that
+does not exist — so replace an account by deleting it and using **Add user**.
 
 ## What it does
 
