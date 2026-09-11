@@ -115,7 +115,10 @@ section{margin-top:28px}
 .sec-head h2{margin:0;font-weight:800;text-transform:uppercase;letter-spacing:.06em;font-size:13px;color:var(--ink)}
 .sec-head .note{font-size:12.5px;color:var(--ink-3)}
 .sec-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-.stats-bar{font-size:12px;color:var(--ink-3);display:inline-flex;align-items:center;gap:6px}
+/* The freshness note is a caption, not a control: it gets its own line under the
+   numbers and the buttons rather than elbowing in between them. */
+.stats-bar{flex:0 0 100%;order:3;margin-top:-2px;font-size:12px;color:var(--ink-3);display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.stats-bar:empty{display:none}
 .stats-bar .pending{color:var(--gold);font-weight:700}
 .stats-bar .pending::before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:currentColor;margin-right:5px;animation:pulse 1.6s ease-in-out infinite}
 
@@ -278,6 +281,9 @@ label.f > span{font-size:11px;font-weight:700;text-transform:uppercase;letter-sp
 
 .entry-row{display:flex;gap:9px;align-items:flex-start;flex-wrap:wrap}
 .entry-row .field{flex:1 1 150px;width:auto}
+/* .picker is a column, so the rule above would read 150px as the search box's HEIGHT
+   and stretch it down the row. It sizes itself. */
+.picker .field{flex:0 0 auto}
 .entry-row .rm{flex:none;margin-top:4px}
 .scope-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 #bStats{margin-top:8px;gap:5px}
@@ -296,7 +302,20 @@ label.f > span{font-size:11px;font-weight:700;text-transform:uppercase;letter-sp
 .gameline .ball{color:var(--accent);font-size:10px} .gameline .ball.rz{color:var(--loss)}
 .side.cover .side-pick::after{content:" · covering";color:var(--gold);font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
 .side.pushing .side-pick::after{content:" · push";color:var(--ink-3);font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
-#bStats .chip{padding:5px 11px;font-size:11px;text-transform:none;letter-spacing:0}
+/* Two different questions, so two different controls. The scope is one-of-three —
+   a segmented switch, sitting in its own track. The stats under it are a
+   multi-select, so they stay quiet outlines until you turn one on. Before this they
+   were the same accent-filled pill and the form read as one long jumble. */
+#bScope{display:inline-flex;gap:2px;flex-wrap:nowrap;background:var(--surface-2);border:1px solid var(--rule);border-radius:11px;padding:3px}
+#bScope .chip{background:transparent;border:0;border-radius:8px;padding:7px 15px;color:var(--ink-2)}
+#bScope .chip:hover{background:var(--surface-3);color:var(--ink)}
+#bScope .chip[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+
+#bStats{margin-top:11px;gap:6px}
+#bStats .chip{background:transparent;border:1px solid var(--rule-2);color:var(--ink-2);
+  border-radius:8px;padding:5px 11px;font-size:11.5px;text-transform:none;letter-spacing:0}
+#bStats .chip:hover{border-color:var(--ink-3);color:var(--ink)}
+#bStats .chip[aria-pressed="true"]{background:var(--accent-bg);border-color:var(--accent);color:var(--accent)}
 .track-title{font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-2);margin-top:4px}
 .picker{flex:2 1 220px;min-width:0;position:relative;display:flex;flex-direction:column;gap:6px}
 .pick-chips{display:flex;gap:5px;flex-wrap:wrap}
@@ -615,6 +634,10 @@ h1,h2,h3,.terms,.login-brand h1{font-family:"Poppins","Inter",system-ui,sans-ser
   .filters{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;padding-bottom:4px;-webkit-mask-image:linear-gradient(90deg,#000 92%,transparent);mask-image:linear-gradient(90deg,#000 92%,transparent)}
   .filters::-webkit-scrollbar{display:none}
   .filters .chip,.filters select{flex:none}
+  /* The propose form's two controls are choices, not a filter strip: don't fade their
+     edge, and let all the stats wrap into view rather than hide off to the right. */
+  #bScope{-webkit-mask-image:none;mask-image:none}
+  #bStats{flex-wrap:wrap;overflow:visible;-webkit-mask-image:none;mask-image:none}
   /* tickets: tighter, and they fold */
   .tickets{gap:8px}
   .ticket{padding:12px 13px;gap:8px;border-radius:14px}

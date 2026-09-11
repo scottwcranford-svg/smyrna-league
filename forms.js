@@ -20,6 +20,7 @@ const esc=Fmt.esc, money=Fmt.money, uid=Fmt.uid, clone=Fmt.clone, entriesOf=Fmt.
 const mName=function(id){ return Id.mName(id,members()); };
 const isLocked=function(b){ return Clock.isLocked(b,state.config); };
 const weekLocked=function(w){ return Clock.weekLocked(w,state.config); };
+const currentWeek=function(){ return Clock.currentWeek(state.config,state.games); };
 const allGames=function(){ return Clock.allGames(state.games); };
 const teamName=function(code){ return Roster.teamName(code,state.roster); };
 const rosterRows=function(){ return Roster.rosterRows(state.roster); };
@@ -301,7 +302,15 @@ export function openBetDlg(editId){
   document.getElementById("bName").value=bet?(bet.name||""):"";
   document.getElementById("bTerms").value=bet?(bet.terms||""):"";
   document.getElementById("bKind").value=bet?(bet.kind||"prop"):"prop";
-  wk.value=bet?String(bet.week||0):"0";
+  // A new bet opens on the week you're in. It used to default to 0 — season long —
+  // which stops being offered once the opener has kicked off, so the field sat empty
+  // and every prop started with a week to pick. If that week is gone from the list
+  // (kicked off, nothing left open), fall back to the first week still on offer.
+  if(bet) wk.value=String(bet.week||0);
+  else {
+    wk.value=String(currentWeek());
+    if(!wk.value) wk.value=wk.options[0]?wk.options[0].value:"";
+  }
   document.getElementById("bAmt").value=String(bet?bet.amount:stake);
   document.getElementById("bHint").textContent=bet
     ? (state.admin&&isLocked(bet)?"Admin update on a locked bet — everyone will see the change. ":"")+"Changing sides or stats resets the standings until the next refresh."

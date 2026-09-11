@@ -873,3 +873,58 @@ test("phone: the ticker stacks each game's line under the matchup", { skip }, as
   assert.deepEqual(errors, []);
   await p.close();
 });
+
+test("a new prop opens on the week you're in, not a blank week box", { skip }, async () => {
+  const { p, errors } = await page();
+  const out = await p.evaluate(async () => {
+    const { state } = await import("./state.js?v=dev"); const F = await import("./forms.js?v=dev");
+    // Mid-season: week 5 has started and still has a game to bet on, week 6 is ahead.
+    const now = Date.now(), week = 7 * 86400e3, ws = {};
+    for (let i = 1; i <= 18; i++) ws[String(i)] = new Date(now + (i - 5) * week).toISOString();
+    state.config = { ...state.config, kickoff: ws["1"], weekStarts: ws };
+    state.local = false;   // openBetDlg is guarded on a published league
+    state.games = { games: [
+      { id: "g5", week: 5, away: "NE", home: "SEA", date: new Date(now + 2 * 86400e3).toISOString(), status: "pre" },
+      { id: "g6", week: 6, away: "KC", home: "DEN", date: new Date(now + 9 * 86400e3).toISOString(), status: "pre" }] };
+    F.openBetDlg();
+    const wk = document.getElementById("bWeek");
+    return { value: wk.value, label: wk.selectedOptions[0] ? wk.selectedOptions[0].textContent : "",
+      seasonLongOffered: [...wk.options].some(o => o.value === "0"),
+      rowShown: !document.getElementById("bWeekRow").hidden };
+  });
+  assert.equal(out.value, "5", "the week box opens on the current week");
+  assert.equal(out.label, "Week 5");
+  assert.equal(out.seasonLongOffered, false, "season long is gone once the opener has kicked off — which is what left the box blank");
+  assert.equal(out.rowShown, true, "a player/team prop still picks its own week");
+  assert.deepEqual(errors, []);
+  await p.close();
+});
+
+test("the refresh note stacks under the numbers and the buttons, not between them", { skip }, async () => {
+  const { p, errors } = await page();
+  const out = await p.evaluate(async () => {
+    const { state } = await import("./state.js?v=dev"); const V = await import("./render.js?v=dev");
+    state.local = false; state.connected = true; state.ready = true; state.db = { doc() { return {}; } };
+    state.bets = [{ id: "x", week: 1, kind: "matchup", status: "open", amount: 5, createdBy: "a",
+      entries: [{ memberId: "a", pick: "ATL" }, { memberId: null, pick: "PIT" }],
+      stats: { updatedAt: new Date(Date.now() - 30e3).toISOString(), through: "Week 1" } }];
+    state.refresh = { requestedAt: new Date(Date.now() - 20e3).toISOString(), requestedBy: "a", finishedAt: null };
+    document.getElementById("login").hidden = true; document.getElementById("app").hidden = false;
+    V.render(); await new Promise(r => setTimeout(r, 40));
+    const glance = document.getElementById("glance"), bar = document.getElementById("statsBar");
+    const btns = document.querySelector(".glance-r");
+    const rb = bar.getBoundingClientRect(), rr = btns.getBoundingClientRect();
+    return { text: bar.textContent.trim(),
+      below: Math.round(rb.top) >= Math.round(rr.bottom) - 2,
+      ownRow: Math.round(rb.width) >= Math.round(glance.getBoundingClientRect().width) - 40,
+      holdsButtons: [...btns.children].map(c => c.id),
+      noBodyScroll: document.documentElement.scrollWidth <= innerWidth };
+  });
+  assert.match(out.text, /^Refresh requested/, "the pending note is what's showing");
+  assert.equal(out.below, true, "the note sits under the buttons, not beside them");
+  assert.equal(out.ownRow, true, "and gets the full width of the bar to itself");
+  assert.deepEqual(out.holdsButtons, ["refreshBtn", "newBetBtn"], "the right-hand group is buttons only");
+  assert.equal(out.noBodyScroll, true);
+  assert.deepEqual(errors, []);
+  await p.close();
+});
