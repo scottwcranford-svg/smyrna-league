@@ -38,8 +38,8 @@ const ADMIN_LS="smyrna.adminMode";
 try{ state.adminMode=localStorage.getItem(ADMIN_LS)==="on"; }catch(e){}
 // "hl" is the old id for what is now the Scores tab; a device that remembered it lands there.
 try{ var savedTab=localStorage.getItem("smyrna.tab");
-  if(savedTab==="hl") savedTab="scores";
-  if(["book","ledger","badges","scores","rivals","settle"].indexOf(savedTab)>=0) state.tab=savedTab; }catch(e){}
+  if(savedTab==="hl"||savedTab==="scores") savedTab="league";
+  if(["book","ledger","badges","league","rivals","settle"].indexOf(savedTab)>=0) state.tab=savedTab; }catch(e){}
 // A tapped notification opens the app at its bet: ?bet=<id>, read before storedKey() tidies the address.
 var openBet=null; try{ openBet=new URLSearchParams(location.search).get("bet"); if(openBet) history.replaceState(null,"",location.pathname); }catch(e){}
 function applyAuth(user){ var w=A.whoAmI(user,state.config); state.me=w.me; state.isAdmin=w.admin; state.admin=w.admin&&state.adminMode; stampSeen(); }

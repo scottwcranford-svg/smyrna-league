@@ -17,6 +17,7 @@ export const state = {
   allHighlow:null, allScores:null, allDraft:null,   // the raw documents; the narrowed ones below
   draft:null,     // league/draft: the season's picks, as the board draws them
   leagueTab:"scores",   // which half of the League tab is open: scores or draft
+  draftView:"mgr",      // and which view of the draft: mgr, board, keep
   scores:null,    // league/scores: every manager's fantasy points and projection, by week
   scoreWeek:null, // which week the Scores tab is showing; null follows the current week
   season:null,    // which season is being shown; null follows config.season

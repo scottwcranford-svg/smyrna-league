@@ -94,20 +94,38 @@ export function draftTick(db,ctx){
   return sj(SLEEPER+"/v1/league/"+lid+"/drafts").then(function(ds){
     var d=(ds||[]).filter(function(x){ return String(x.season)===here; })[0]||(ds||[])[0];
     if(!d||!d.draft_id) return;
+    // Last season's keepers decide whose contract is spent: kept two years running and the
+    // player goes back in the pool. Only the flags are taken, not a whole season - the book
+    // runs 2026 forward, and this is the one thing that needs to look further back.
+    var prevId=String(d.previous_league_id||"");
+    var prevKept=prevId
+      ? sj(SLEEPER+"/v1/league/"+prevId+"/drafts").then(function(pds){
+          var pd=(pds||[])[0];
+          if(!pd) return {};
+          return sj(SLEEPER+"/v1/draft/"+pd.draft_id+"/picks").then(function(ps){
+            var out={}; (ps||[]).forEach(function(x){ if(x.is_keeper&&x.player_id) out[x.player_id]=1; });
+            return out;
+          });
+        }).catch(function(){ return {}; })
+      : Promise.resolve({});
     return Promise.all([
       sj(SLEEPER+"/v1/draft/"+d.draft_id+"/picks"),
       sj(SLEEPER+"/v1/draft/"+d.draft_id+"/traded_picks").catch(function(){ return []; }),
       sj(SLEEPER+"/v1/league/"+lid+"/rosters"),
-      sj(SLEEPER+"/v1/league/"+lid+"/users")
+      sj(SLEEPER+"/v1/league/"+lid+"/users"),
+      prevKept
     ]).then(function(all){
       var rows=draftRows(all[0],all[1]);
       if(!rows.length) return;
-      var owner={}; (all[2]||[]).forEach(function(r){ owner[r.roster_id]=r.owner_id; });
+      var owner={}, squads={};
+      (all[2]||[]).forEach(function(r){ owner[r.roster_id]=r.owner_id; squads[r.roster_id]=(r.players||[]).slice(); });
       var uname={}; (all[3]||[]).forEach(function(u){ uname[u.user_id]=u.display_name||u.username||""; });
       var byRoster={}; Object.keys(owner).forEach(function(rid){ byRoster[rid]=uname[owner[rid]]||""; });
+      // which player each pick took, so the keeper view can price a roster against the draft
+      var byPlayer={}; (all[0]||[]).forEach(function(x){ if(x.player_id) byPlayer[x.player_id]={ r:Number(x.round), keeper:!!x.is_keeper }; });
       var out=Object.assign({},have);
       out[here]={ draftId:String(d.draft_id), at:isoNow(), type:d.type||"", rounds:Number((d.settings||{}).rounds)||0,
-        byRoster:byRoster, picks:rows };
+        byRoster:byRoster, rosters:squads, byPlayer:byPlayer, keptPrev:all[4]||{}, picks:rows };
       return db.doc("league/draft").set(Object.assign({},ctx.draft||{},{ updatedAt:isoNow(), bySeason:out }));
     });
   }).catch(function(){});

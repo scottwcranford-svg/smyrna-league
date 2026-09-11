@@ -266,7 +266,7 @@ test("Scores: a week board with projections, paired matchups, and the season poo
   const { p, errors } = await page();
   const out = await p.evaluate(async () => {
     const { state } = await import("./state.js?v=dev"); const V = await import("./render.js?v=dev");
-    state.tab = "scores";
+    state.tab = "league";
     V.render();
     const empty = document.getElementById("scores").textContent;
     const before = document.querySelectorAll("#board .fig").length;
@@ -408,7 +408,7 @@ test("tabs: Book open by default, the others behind their tabs, badges and the g
   assert.equal(out.line, "2026 · 10-Team Keeper SF PPR · side bets", "the league's settings from Sleeper");
   assert.equal(out.glance, "1 bet running$10 on the tableyou −$25 net · 1 seat waiting on takers");
   assert.deepEqual(out.shown, ["book"]);
-  assert.deepEqual(out.badges, [["book", true, "1"], ["ledger", false, ""], ["badges", false, "6"], ["scores", false, "1"], ["rivals", false, "1"], ["settle", false, "2"]], "a seat open, six titles held, a week in, a rivalry you're behind on, two transfers to clear");
+  assert.deepEqual(out.badges, [["book", true, "1"], ["ledger", false, ""], ["badges", false, "6"], ["league", false, "1"], ["rivals", false, "1"], ["settle", false, "2"]], "a seat open, six titles held, a week in, a rivalry you're behind on, two transfers to clear");
   assert.equal(out.me, "Alice"); assert.equal(out.dropHidden, true);
   assert.deepEqual(out.afterClick, { shown: ["settle"], on: ["settle"], saved: "settle" }, "the tab switches through the real click wiring and is remembered");
   assert.equal(out.dropOpen, true); assert.equal(out.dropClosed, true, "the menu opens on its button and closes on a click elsewhere");
@@ -1407,6 +1407,112 @@ test("the season is not editable as a label — only Start a season moves it", {
   assert.equal(out.shown.nameEditable, true, "while the league's name still can be, for an admin");
   assert.equal(out.after, "2026",
     "and even forced, saving does not move the league — that would empty the board and lock last season silently");
+  assert.deepEqual(errors, []);
+  await p.close();
+});
+
+const DRAFT = { draftId: "d1", rounds: 16, type: "snake",
+  byRoster: { 1: "Alice", 2: "Bob", 3: "Cara" },
+  rosters: { 1: ["p4", "p11", "free", "p1"], 2: ["p5"], 3: [] },
+  byPlayer: { p1: { r: 1, keeper: false }, p4: { r: 4, keeper: false },
+              p5: { r: 5, keeper: true }, p11: { r: 11, keeper: false } },
+  keptPrev: { p5: 1 },
+  // a full first round, because two cards would fit a phone and ten never will
+  picks: Array.from({ length: 10 }, (_, i) => ({ r: 1, p: i + 1, slot: i + 1,
+      roster: (i % 3) + 1, name: "Player " + (i + 1), pos: "RB", team: "DET", keeper: false, from: null }))
+    .concat([
+      { r: 4, p: 40, slot: 2, roster: 1, name: "Bo Nix", pos: "QB", team: "DEN", keeper: false, from: 2 },
+      { r: 5, p: 47, slot: 2, roster: 2, name: "Rashee Rice", pos: "WR", team: "KC", keeper: true, from: null },
+    ]) };
+
+async function withDraft(p) {
+  await p.evaluate(async (DRAFT) => {
+    const St = await import("./state.js?v=dev");
+    const { state } = St;
+    state.tab = "league"; state.leagueTab = "draft";
+    state.roster = { players: [["p4", "Bo Nix", "QB", "DEN"], ["p11", "DK Metcalf", "WR", "SEA"],
+      ["free", "Kayshon Boutte", "WR", "NE"], ["p1", "Jahmyr Gibbs", "RB", "DET"], ["p5", "Rashee Rice", "WR", "KC"]] };
+    St.setDraft({ bySeason: { 2026: DRAFT } });
+    document.getElementById("login").hidden = true; document.getElementById("app").hidden = false;
+  }, DRAFT);
+}
+
+test("the League tab holds Scores and the Draft, and the draft has three views", { skip }, async () => {
+  const { p, errors } = await page();
+  await withDraft(p);
+  const out = await p.evaluate(async () => {
+    const V = await import("./render.js?v=dev"); const { state } = await import("./state.js?v=dev");
+    const seg = (id) => [...document.querySelectorAll("#" + id + " button")].map(b => [b.textContent, b.getAttribute("aria-pressed")]);
+    V.render(); await new Promise(r => setTimeout(r, 30));
+    const halves = { tabs: seg("leagueTabs"),
+      scoresShown: !document.querySelector('[data-lview="scores"]').hidden,
+      draftShown: !document.querySelector('[data-lview="draft"]').hidden };
+    const byMgr = { views: seg("draftViews"),
+      mgrs: [...document.querySelectorAll("#draft .dmgr .dhead b")].map(b => b.textContent),
+      alicePicks: [...document.querySelectorAll("#draft .dmgr")][0].querySelectorAll("li").length,
+      from: [...document.querySelectorAll("#draft .dfrom")].map(f => f.textContent),
+      kept: [...document.querySelectorAll("#draft .dkept")].length,
+      note: document.getElementById("draftNote").textContent };
+    state.draftView = "board"; V.render(); await new Promise(r => setTimeout(r, 20));
+    const board = { rows: document.querySelectorAll("#draft .drow").length,
+      scrolls: getComputedStyle(document.querySelector("#draft .dgrid")).overflowX,
+      keptCell: document.querySelectorAll("#draft .dcell.kept").length };
+    state.draftView = "keep"; V.render(); await new Promise(r => setTimeout(r, 20));
+    const cards = [...document.querySelectorAll("#draft .dmgr")];
+    const keep = { bands: [...cards[0].querySelectorAll(".dblab")].map(b => b.textContent),
+      early: [...cards[0].querySelectorAll(".dband")][0].textContent,
+      late: [...cards[0].querySelectorAll(".dband")][1].textContent,
+      wire: cards[0].textContent.includes("Kayshon Boutte"),
+      bobSpent: cards[1].querySelector(".dspent") ? cards[1].querySelector(".dspent").textContent : "" };
+    return { halves, byMgr, board, keep, noBodyScroll: document.documentElement.scrollWidth <= innerWidth };
+  });
+  assert.deepEqual(out.halves.tabs, [["Scores", "false"], ["Draft", "true"]], "two halves, the draft open");
+  assert.equal(out.halves.scoresShown, false);
+  assert.equal(out.halves.draftShown, true);
+
+  assert.deepEqual(out.byMgr.views, [["By manager", "true"], ["Board", "false"], ["Next year", "false"]]);
+  assert.deepEqual(out.byMgr.mgrs, ["Alice", "Bob", "Cara"], "in the order they first picked");
+  assert.equal(out.byMgr.alicePicks, 5, "four in round one plus the pick she traded for");
+  assert.deepEqual(out.byMgr.from, ["from Bob"], "a traded pick says where it came from, on the manager who got the player");
+  assert.equal(out.byMgr.kept, 1);
+  assert.match(out.byMgr.note, /^12 picks · 16 rounds · snake · 1 kept · 1 traded$/);
+
+  assert.equal(out.board.rows, 3, "a row per round that has picks");
+  assert.equal(out.board.scrolls, "auto", "and it scrolls sideways inside its own box");
+  assert.equal(out.board.keptCell, 1);
+
+  assert.deepEqual(out.keep.bands, ["Rounds 3–9", "Rounds 10–16", "Waiver · 9th or 10th"]);
+  assert.match(out.keep.early, /Bo Nix/, "round 4 is in the first band");
+  assert.match(out.keep.late, /DK Metcalf/, "round 11 in the second");
+  assert.equal(out.keep.early.includes("Jahmyr Gibbs"), false, "a first-rounder cannot be kept");
+  assert.equal(out.keep.wire, true, "an undrafted player can be kept at 9 or 10");
+  assert.match(out.keep.bobSpent, /Rashee Rice/, "kept in both years, so back in the pool");
+  assert.equal(out.noBodyScroll, true);
+  assert.deepEqual(errors, []);
+  await p.close();
+});
+
+test("phone: the League tab's switches fill the width and the cards stack", { skip }, async () => {
+  const { p, errors } = await page(null, PHONE);
+  await withDraft(p);
+  const out = await p.evaluate(async () => {
+    const V = await import("./render.js?v=dev"); const { state } = await import("./state.js?v=dev");
+    V.render(); await new Promise(r => setTimeout(r, 40));
+    const seg = document.getElementById("draftViews");
+    const btns = [...seg.querySelectorAll("button")].map(b => Math.round(b.getBoundingClientRect().width));
+    const cards = [...document.querySelectorAll("#draft .dmgr")].map(c => Math.round(c.getBoundingClientRect().width));
+    state.draftView = "board"; V.render(); await new Promise(r => setTimeout(r, 30));
+    const grid = document.querySelector("#draft .dgrid");
+    return { btns, oneWide: new Set(cards).size === 1, cards: cards.length,
+      segFits: Math.round(seg.getBoundingClientRect().width) <= 390,
+      gridScrolls: grid.scrollWidth > grid.clientWidth,
+      noBodyScroll: document.documentElement.scrollWidth <= innerWidth };
+  });
+  assert.equal(out.segFits, true, "the view switch stays inside the screen");
+  assert.equal(new Set(out.btns).size, 1, "and splits it evenly rather than three sizes");
+  assert.equal(out.oneWide, true, "manager cards go one per row");
+  assert.equal(out.gridScrolls, true, "the board scrolls, because ten columns never fit a phone");
+  assert.equal(out.noBodyScroll, true, "but the page itself never scrolls sideways");
   assert.deepEqual(errors, []);
   await p.close();
 });

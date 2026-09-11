@@ -12,6 +12,7 @@ import * as Ledger from "./ledger.js?v=dev";
 import * as Bets from "./bets.js?v=dev";
 import * as Rivals from "./rivals.js?v=dev";
 import * as Sn from "./seasons.js?v=dev";
+import * as Keep from "./keepers.js?v=dev";
 import * as Badges from "./badges.js?v=dev";
 import { state, members, realMembers, teamOf, touch , seasonCfg } from "./state.js?v=dev";
 import * as Nf from "./notify.js?v=dev";
@@ -32,7 +33,7 @@ const gameOf=function(b){ return Bets.gameOf(b,state.games); };
 const currentWeek=function(){ return Clock.currentWeek(seasonCfg(),state.games); };
 const computeLedger=function(){ return Ledger.computeLedger(seasonCfg(),state.bets); };
 
-export function render(){ head(); ticker(); banner(); tabs(); glance(); badgesView(); board(); scoresView(); rivalsView(); settle(); filters(); tickets(); statsBar(); foot(); }
+export function render(){ head(); ticker(); banner(); tabs(); glance(); badgesView(); board(); leagueView(); rivalsView(); settle(); filters(); tickets(); statsBar(); foot(); }
 
 var toastTimer=null;
 export function toast(msg){
@@ -187,7 +188,7 @@ function tabs(){
   // Badges badges how many titles you're holding right now
   var mineBadges=0;
   if(state.me) badgeList().forEach(function(b){ if((b.holders||[]).indexOf(state.me)>=0) mineBadges++; });
-  var badge={ book:seats, ledger:0, badges:mineBadges, scores:HL.weeks.length, rivals:owed, settle:Bal.transfers.length };
+  var badge={ book:seats, ledger:0, badges:mineBadges, league:HL.weeks.length, rivals:owed, settle:Bal.transfers.length };
   Object.keys(badge).forEach(function(k){ var n=document.getElementById("tabN-"+k); if(!n) return; n.hidden=!badge[k]; n.textContent=badge[k]; });
   var cur=state.tab||"book";
   document.querySelectorAll("#tabs .tab").forEach(function(t){ var on=t.getAttribute("data-tab")===cur; t.classList.toggle("on",on); t.setAttribute("aria-selected",String(on)); });
@@ -233,6 +234,101 @@ function banner(){
 }
 
 // Week by week: who topped the league on Sleeper and who finished last, and what moved.
+// ---- the Draft board, and who can be kept next year ----
+
+const POSCOL={ QB:"var(--loss)", RB:"var(--accent)", WR:"var(--open)", TE:"var(--gold)" };
+function posTag(p){ return '<span class="dpos" style="color:'+(POSCOL[p]||"var(--ink-3)")+'">'+esc(p||"")+"</span>"; }
+
+// A pick's manager: the draft carries its own roster map, so a manager who left the app
+// still reads as themselves.
+function draftName(D,rid){ return (D&&D.byRoster&&D.byRoster[rid])||(D&&D.byRoster&&D.byRoster[String(rid)])||"Roster "+rid; }
+
+function draftByManager(D){
+  var by={}, order=[];
+  (D.picks||[]).forEach(function(p){
+    var who=draftName(D,p.roster);
+    if(!by[who]){ by[who]=[]; order.push(who); }
+    by[who].push(p);
+  });
+  return '<div class="dmgrs">'+order.map(function(who){
+    var ps=by[who], kept=ps.filter(function(p){ return p.keeper; }).length;
+    var got=ps.filter(function(p){ return p.from!=null; }).length;
+    var meta=[kept?kept+" kept":"",got?got+" traded in":""].filter(Boolean).join(" · ");
+    return '<div class="dmgr"><div class="dhead"><b>'+esc(who)+"</b><span>"+esc(meta)+"</span></div>"+
+      '<ol class="dpicks">'+ps.map(function(p){
+        return "<li><span class='dno'>"+p.r+"."+(p.p<10?"0":"")+p.p+"</span>"+
+          "<span class='dnm'>"+esc(p.name||"—")+"</span>"+posTag(p.pos)+
+          (p.keeper?'<span class="dkept">KEPT</span>':"")+
+          (p.from!=null?'<span class="dfrom">from '+esc(draftName(D,p.from))+"</span>":"")+"</li>";
+      }).join("")+"</ol></div>";
+  }).join("")+"</div>";
+}
+
+function draftBoard(D){
+  var rounds={}, order=[];
+  (D.picks||[]).forEach(function(p){ if(!rounds[p.r]){ rounds[p.r]=[]; order.push(p.r); } rounds[p.r].push(p); });
+  order.sort(function(a,b){ return a-b; });
+  return '<div class="dgrid">'+order.map(function(r){
+    return '<div class="drow"><span class="drlab">R'+r+'</span><div class="dcells">'+
+      rounds[r].map(function(p){
+        return '<div class="dcell'+(p.keeper?" kept":"")+'"><span class="dno">'+p.r+"."+(p.p<10?"0":"")+p.p+"</span>"+
+          "<b>"+esc(p.name||"—")+"</b><span class='dwho'>"+esc(draftName(D,p.roster))+"</span>"+posTag(p.pos)+
+          (p.from!=null?'<span class="dfrom">from '+esc(draftName(D,p.from))+"</span>":"")+"</div>";
+      }).join("")+"</div></div>";
+  }).join("")+"</div>";
+}
+
+// Next year's keepers, by the league's rules. keepers.js does the judging; this only
+// arranges it, and says plainly what each one would cost.
+function draftKeepers(D){
+  var squads=D.rosters||{}, byPlayer=D.byPlayer||{}, prev=D.keptPrev||{};
+  var ids=Object.keys(squads);
+  if(!ids.length) return '<div class="empty">Rosters haven’t arrived yet — they come with the next refresh.</div>';
+  var nameOf=function(pid){
+    var row=Roster.rosterFind(pid,state.roster);
+    return row?{ name:row[1], pos:row[2] }:{ name:pid, pos:"" };
+  };
+  var kept={}; Object.keys(byPlayer).forEach(function(pid){ if(byPlayer[pid].keeper) kept[pid]=1; });
+  return '<div class="dmgrs">'+ids.map(function(rid){
+    var rows=Keep.eligible(squads[rid],byPlayer,kept,prev,nameOf);
+    var band=function(b){ return rows.filter(function(r){ return r.band===b; })
+      .sort(function(a,c){ return (a.cost||99)-(c.cost||99); }); };
+    var spent=rows.filter(function(r){ return r.years>=2; });
+    var line=function(r){
+      return "<li><span class='dno'>"+(r.cost!=null?"R"+r.cost:"9/10")+"</span>"+
+        "<span class='dnm'>"+esc(r.name)+"</span>"+posTag(r.pos)+
+        (r.years===1?'<span class="dyr">yr 2</span>':"")+"</li>";
+    };
+    var grp=function(lab,list){
+      if(!list.length) return '<div class="dband"><span class="dblab">'+lab+'</span><p class="dnone">nobody eligible</p></div>';
+      return '<div class="dband"><span class="dblab">'+lab+'</span><ol class="dpicks">'+list.map(line).join("")+"</ol></div>";
+    };
+    return '<div class="dmgr"><div class="dhead"><b>'+esc(draftName(D,rid))+"</b>"+
+      (spent.length?"<span>"+spent.length+" spent</span>":"<span></span>")+"</div>"+
+      grp("Rounds 3–9",band("early"))+grp("Rounds 10–16",band("late"))+
+      (band("wire").length?grp("Waiver · 9th or 10th",band("wire")):"")+
+      (spent.length?'<p class="dspent">Back in the pool: '+spent.map(function(r){ return esc(r.name); }).join(", ")+"</p>":"")+
+      "</div>";
+  }).join("")+"</div>";
+}
+
+function draftView(){
+  var host=document.getElementById("draft"), note=document.getElementById("draftNote");
+  var D=state.draft;
+  if(!D||!(D.picks||[]).length){
+    host.innerHTML='<div class="empty">No draft in the book for '+esc(weekLabel(0)===""?"":"")+esc(Sn.shownSeasonOf(state))+" yet — it arrives with the next refresh.</div>";
+    note.textContent=""; return;
+  }
+  var v=state.draftView||"mgr";
+  document.querySelectorAll("#draftViews button").forEach(function(b){
+    b.setAttribute("aria-pressed",String(b.getAttribute("data-dv")===v)); });
+  host.innerHTML=v==="board"?draftBoard(D):v==="keep"?draftKeepers(D):draftByManager(D);
+  var kept=(D.picks||[]).filter(function(p){ return p.keeper; }).length;
+  var moved=(D.picks||[]).filter(function(p){ return p.from!=null; }).length;
+  note.textContent=(D.picks||[]).length+" picks · "+(D.rounds||0)+" rounds"+(D.type?" · "+D.type:"")+
+    (kept?" · "+kept+" kept":"")+(moved?" · "+moved+" traded":"");
+}
+
 // ---- Scores: the Sleeper league's own week, and the pool riding on it ----
 
 // Which weeks can be looked at: everything the book has a board for, plus the week
@@ -276,6 +372,16 @@ function boardSide(r,best,lead){
            :'<span class="sb-idle">Yet to play</span>')+
     (r.proj!=null?'<span class="sb-proj" data-tip="Projected from the starters’ published numbers">proj '+esc(String(r.proj))+"</span>":'<span class="sb-proj"></span>')+
     '<span class="sb-bar'+(played?"":" none")+'">'+(played?'<i style="width:'+pct+'%"></i>':"")+"</span></div>";
+}
+
+// The League tab: this week's scores, or the draft behind the season.
+function leagueView(){
+  var lt=state.leagueTab||"scores";
+  document.querySelectorAll("#leagueTabs button").forEach(function(b){
+    b.setAttribute("aria-pressed",String(b.getAttribute("data-lt")===lt)); });
+  document.querySelectorAll("[data-lview]").forEach(function(v){
+    v.hidden=v.getAttribute("data-lview")!==lt; });
+  if(lt==="draft") draftView(); else scoresView();
 }
 
 function scoresView(){

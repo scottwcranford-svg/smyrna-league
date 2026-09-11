@@ -390,6 +390,50 @@ h1,h2,h3,.terms,.login-brand h1{font-family:"Poppins","Inter",system-ui,sans-ser
 .season-pick .lbl{font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3)}
 .season-pick .field{width:auto;min-height:0;padding:4px 26px 4px 10px;font-size:12px;font-weight:800;border-radius:99px}
 
+/* ---- the League tab: a segmented switch, then the draft ---- */
+/* .seg is the same control the propose form's scope uses: one track, the chosen segment
+   filled. Two of them stack here - Scores/Draft, then the draft's own view. */
+.seg{display:inline-flex;gap:2px;flex-wrap:nowrap;background:var(--surface-2);border:1px solid var(--rule);
+  border-radius:11px;padding:3px;margin-bottom:12px;max-width:100%;overflow-x:auto;scrollbar-width:none}
+.seg::-webkit-scrollbar{display:none}
+.seg button{flex:none;background:transparent;border:0;border-radius:8px;padding:7px 15px;cursor:pointer;
+  font:inherit;font-size:11.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-2)}
+.seg button:hover{background:var(--surface-3);color:var(--ink)}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+.seg button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+.dmgrs{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px}
+.dmgr{background:var(--surface-3);border:1px solid var(--rule);border-radius:14px;padding:10px 12px;min-width:0}
+.dhead{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:6px}
+.dhead b{font-size:14.5px}
+.dhead span{font-size:10.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-3)}
+ol.dpicks{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px}
+ol.dpicks li{display:flex;align-items:baseline;gap:7px;font-size:13px;min-width:0}
+.dno{font-variant-numeric:tabular-nums;font-size:11px;font-weight:800;color:var(--ink-3);flex:none;min-width:38px}
+.dnm{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dpos{font-size:10px;font-weight:800;letter-spacing:.04em;flex:none}
+.dkept{font-size:9px;font-weight:800;letter-spacing:.06em;background:var(--gold-bg);color:var(--gold);
+  border-radius:4px;padding:1px 5px;flex:none}
+.dfrom{font-size:10px;font-weight:700;color:var(--open);flex:none}
+.dyr{font-size:9px;font-weight:800;letter-spacing:.05em;color:var(--gold);flex:none}
+.dband{margin-top:8px}
+.dblab{font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3)}
+.dnone{margin:2px 0 0;font-size:12px;color:var(--ink-3)}
+.dspent{margin:9px 0 0;font-size:11.5px;color:var(--ink-3)}
+
+/* the board is the one thing that must scroll sideways, inside its own box */
+.dgrid{overflow-x:auto;padding-bottom:6px}
+.drow{display:flex;align-items:stretch;gap:8px;margin-bottom:8px;width:max-content}
+.drlab{flex:none;width:30px;display:flex;align-items:center;justify-content:center;font-size:11px;
+  font-weight:800;color:var(--ink-3);background:var(--surface-3);border:1px solid var(--rule);border-radius:9px}
+.dcells{display:flex;gap:8px}
+.dcell{flex:none;width:152px;background:var(--surface-3);border:1px solid var(--rule);border-radius:10px;
+  padding:7px 9px;display:flex;flex-direction:column;gap:1px}
+.dcell.kept{border-color:var(--gold)}
+.dcell b{font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dcell .dno{min-width:0}
+.dwho{font-size:10px;font-weight:700;color:var(--ink-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
 /* ---- Scores: the Sleeper league's week, and the pool riding on it ---- */
 #weekPick .chip .n{background:var(--gold-bg);color:var(--gold);font-style:normal}
 #weekPick .chip[aria-pressed="true"] .n{background:rgba(0,0,0,.18);color:var(--accent-ink)}
@@ -686,6 +730,10 @@ h1,h2,h3,.terms,.login-brand h1{font-family:"Poppins","Inter",system-ui,sans-ser
   .glance-r{margin-left:auto}
   .stats-bar{font-size:11px}
   .sb-pools{grid-template-columns:1fr}
+  .dmgrs{grid-template-columns:1fr}
+  .seg{-webkit-mask-image:none;mask-image:none;width:100%}
+  .seg button{flex:1 1 0;padding:8px 10px;text-align:center}
+  .dcell{width:138px}
   .sb-side{grid-template-columns:minmax(0,1fr) auto}
   .sb-proj{grid-column:2;text-align:right;min-width:0}
   #refreshBtn{padding:6px 11px;font-size:15px;line-height:1}
