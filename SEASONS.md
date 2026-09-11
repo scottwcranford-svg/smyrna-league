@@ -1,7 +1,21 @@
 # Plan: one app, many seasons
 
-**Status:** proposed — Sept 11 2026. Nothing built. **Behavior change for users:** none until
-a second season is added; 2026 keeps working exactly as it does today.
+**Status:** phase 1 done — Sept 11 2026. Nothing is visible yet; 2026 works exactly as it
+did. Phase 2 is untouched. **Behavior change for users:** none until a second season is
+added.
+
+Done, beyond what phase 1 originally scoped:
+
+- `seasons.js` and its tests; `season` stamped on every new bet and payment.
+- The `state.allBets` → `state.bets` seam, and the season context resetting on every load.
+- A roster sync in `functions/`, nightly and on a **Sync from Sleeper** button, which adds
+  new managers with the default password, records the seasons they play, and **pins each
+  manager to their Sleeper `user_id`** — without that, a display-name change forks a
+  person in two and splits their history.
+- Remove is only offered for a manager nothing in the book points at.
+
+Wired so far: `LEGACY_SEASON`, `currentSeason`, `seasonOf`, `betsFor`. Written and waiting
+for phase 2: `seasonsOf`, `inSeason`, `withSeason`, `seasonList`, `settingsFor`.
 
 ## Why
 
@@ -239,15 +253,27 @@ That is the lot. After it, 2027 is a feature to build rather than a migration to
 
 ### Phase 2 — the feature (when a second season actually exists)
 
-Left cold deliberately; none of it gets harder by waiting.
+Left cold deliberately; none of it gets harder by waiting. In rough order of risk:
 
-4. **Season-scoped documents** through `docFor` — `league/highlow-2027` and friends.
-5. **Season-scoped settings** — `stake`, `kickoff`, `weekStarts`, `sleeperLeagueId` via
-   `config.bySeason[year]`, today's top-level values as the 2026 fallback.
-6. **`sleeper.js` per season** — the league id comes from the season's settings; optionally
-   follow `previous_league_id` to offer the new id when a season is added.
-7. **The picker and the read-only past.** First visible change.
-8. **Add-a-season in the League dialog**, admin only.
+4. **The member list narrows to the season.** The fiddly one, and the reason to do it
+   first: 36 places read the roster. `realMembers()` becomes "the people in the season
+   being shown" — the ledger board, the hi/low standings, the badge field and the pickers
+   all follow it — while `mName` and `avatarHtml` keep resolving against the full permanent
+   list, so a 2026 ticket still says *RTownsend* years after he stops playing. Getting this
+   half-right is how a season ends up showing the wrong people.
+5. **Season-scoped documents.** Nine of them still write to a bare name: `badges`, `games`,
+   `highlow`, `lines`, `proj`, `roster`, `scores`, `sleeper`. Their weekly maps key by week
+   (`weeks["1"]`) and need a season above that. `config`, `push`, `seen` and `refresh` stay
+   book-level. `payments` is the exception that needs no split — its entries already carry
+   `season`, so it filters like bets do.
+6. **Season-scoped settings.** `settingsFor` exists and nothing calls it yet: `stake`,
+   `kickoff`, `weekStarts` and `sleeperLeagueId` are still read from the top level.
+7. **`sleeper.js` per season** — the league id comes from the season's settings rather than
+   the constant in [roster.js:5](roster.js#L5), which `functions/roster.js` now duplicates.
+8. **The picker and the read-only past.** First visible change. It must not persist the
+   choice — a test already enforces that.
+9. **Add-a-season in the League dialog**, admin only, offering the next league id from
+   `previous_league_id` rather than asking anyone to paste nineteen digits.
 
 ## Verification
 
