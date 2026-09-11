@@ -46,6 +46,36 @@ export function openSettleDlg(id){
   document.getElementById("settleDlg").showModal();
 }
 
+/* ---- asking for something, in the app's own language ---- */
+// The browser's prompt() is drawn by the OS: system font, system buttons, and it freezes
+// the page while it is up. This is the same question asked in the app's own dialog, and it
+// answers with a promise so callers can wait on it.
+var askDone=null;
+export function askFor(opts){
+  var dlg=document.getElementById("askDlg"), input=document.getElementById("askInput");
+  document.getElementById("askTitle").textContent=opts.title||"Confirm";
+  document.getElementById("askBody").textContent=opts.body||"";
+  document.getElementById("askLabel").textContent=opts.label||"Password";
+  document.getElementById("askHint").textContent="";
+  input.value="";
+  if(!dlg.open) dlg.showModal();
+  setTimeout(function(){ input.focus(); },30);
+  return new Promise(function(resolve){
+    askDone=resolve;
+  });
+}
+
+// Close the dialog and hand back whatever it holds - null when it was cancelled, which
+// setPassword reads as "leave the password alone".
+export function closeAsk(ok){
+  var dlg=document.getElementById("askDlg"), input=document.getElementById("askInput");
+  var v=ok?input.value:null;
+  input.value="";
+  if(dlg.open) dlg.close();
+  var done=askDone; askDone=null;
+  if(done) done(v||null);
+}
+
 /* ---- the League dialog ---- */
 export function openRoster(){
   var adm=!!state.admin;
@@ -130,7 +160,11 @@ export function setPassword(memberId,pw){
   if(!state.admin) return Promise.reject({ message:"Only the admin can set passwords" });
   var m=member(memberId); if(!m) return Promise.reject({ message:"No such manager" });
   if(!pw||pw.length<6) return Promise.reject({ code:"auth/weak-password" });
-  return A.setPassword(m,pw,function(){ return prompt("An account for "+m.name+" already exists. Enter its current password to change it:"); });
+  return A.setPassword(m,pw,function(){
+    return askFor({ title:"Change "+m.name+"'s password",
+      body:"They already have an account, so their current password is needed to change it. If nobody has it, delete the account in Firebase and set a new one.",
+      label:"Their current password" });
+  });
 }
 
 /* ---- your own password ---- */

@@ -50,10 +50,13 @@ export function setPassword(m,pw,askCurrent){
     return auth2.signOut().then(function(){ return "Password set for "+m.name; });
   }).catch(function(e){
     if(e.code!=="auth/email-already-in-use") throw e;
-    var cur=askCurrent?askCurrent():null;
-    if(!cur) throw { message:"Password not changed" };
-    return auth2.signInWithEmailAndPassword(email,cur).then(function(){ return auth2.currentUser.updatePassword(pw); })
-      .then(function(){ return auth2.signOut(); }).then(function(){ return "Password changed for "+m.name; });
+    // askCurrent may answer later - it opens a dialog rather than blocking the page the
+    // way prompt() did - so wait on it either way.
+    return Promise.resolve(askCurrent?askCurrent():null).then(function(cur){
+      if(!cur) throw { message:"Password not changed" };
+      return auth2.signInWithEmailAndPassword(email,cur).then(function(){ return auth2.currentUser.updatePassword(pw); })
+        .then(function(){ return auth2.signOut(); }).then(function(){ return "Password changed for "+m.name; });
+    });
   });
 }
 

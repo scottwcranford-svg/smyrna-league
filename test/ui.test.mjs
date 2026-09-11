@@ -1244,3 +1244,50 @@ test("participation is asserted per season, never inherited from the last one", 
   assert.deepEqual(errors, []);
   await p.close();
 });
+
+test("asking for a password is the app's dialog, not the browser's", { skip }, async () => {
+  const { p, errors } = await page();
+  const out = await p.evaluate(async () => {
+    const D = await import("./dialogs.js?v=dev");
+    // prompt() would freeze the page here; this returns a promise and the page stays live
+    const asked = D.askFor({ title: "Change Bob's password", body: "They already have an account.", label: "Their current password" });
+    await new Promise(r => setTimeout(r, 50));
+    const dlg = document.getElementById("askDlg");
+    const open = { isOpen: dlg.open, modal: dlg.matches(":modal"),
+      title: document.getElementById("askTitle").textContent,
+      label: document.getElementById("askLabel").textContent,
+      type: document.getElementById("askInput").type,
+      focused: document.activeElement.id };
+    document.getElementById("askInput").value = "hunter2";
+    document.getElementById("askGo").click();
+    const answer = await asked;
+    const afterOk = { isOpen: dlg.open, left: document.getElementById("askInput").value };
+
+    // cancelling answers null, which setPassword reads as "leave it alone"
+    const asked2 = D.askFor({ title: "again" });
+    await new Promise(r => setTimeout(r, 30));
+    document.getElementById("askInput").value = "typed but thought better of it";
+    document.getElementById("askCancel").click();
+    const cancelled = await asked2;
+
+    // and Escape must answer too, or the caller waits forever
+    const asked3 = D.askFor({ title: "escape" });
+    await new Promise(r => setTimeout(r, 30));
+    dlg.close();
+    const escaped = await asked3;
+    return { open, answer, afterOk, cancelled, escaped };
+  });
+  assert.equal(out.open.isOpen, true, "the app's own dialog, not an OS box");
+  assert.equal(out.open.modal, true, "and it is modal, like every other dialog here");
+  assert.equal(out.open.title, "Change Bob's password", "asked in words about this manager");
+  assert.equal(out.open.label, "Their current password");
+  assert.equal(out.open.type, "password", "never shown on screen");
+  assert.equal(out.open.focused, "askInput", "you can just type");
+  assert.equal(out.answer, "hunter2");
+  assert.equal(out.afterOk.isOpen, false);
+  assert.equal(out.afterOk.left, "", "the password is not left sitting in the field");
+  assert.equal(out.cancelled, null, "cancelling answers null, so nothing is changed");
+  assert.equal(out.escaped, null, "and so does Escape — an unanswered promise would hang the caller");
+  assert.deepEqual(errors, []);
+  await p.close();
+});

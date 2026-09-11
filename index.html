@@ -193,6 +193,19 @@
   </div>
 </dialog>
 
+<dialog id="askDlg">
+  <form method="dialog" class="dlg-head"><h3 id="askTitle">Confirm</h3><button class="btn" value="cancel">Close</button></form>
+  <div class="dlg-body">
+    <p class="bet-desc" style="margin:0 0 12px" id="askBody"></p>
+    <label class="f"><span id="askLabel">Password</span><input class="field" id="askInput" type="password" autocomplete="current-password"></label>
+    <div class="form-foot">
+      <button class="btn pri lg" id="askGo">Continue</button>
+      <button class="btn" id="askCancel">Cancel</button>
+      <span class="hint" id="askHint"></span>
+    </div>
+  </div>
+</dialog>
+
 <dialog id="rosterDlg">
   <form method="dialog" class="dlg-head"><h3>League</h3><button class="btn" value="cancel">Close</button></form>
   <div class="dlg-body">

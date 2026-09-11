@@ -252,6 +252,11 @@ export function bindEvents(hooks){
   on("siForm","submit",function(e){ e.preventDefault(); D.submitLogin(hooks.enterBook); });
   on("siReset","click",D.startOver);
   ["siName","siPw","siKey"].forEach(function(id){ on(id,"keydown",function(e){ if(e.key==="Enter"){ e.preventDefault(); D.submitLogin(hooks.enterBook); } }); });
+  on("askGo","click",function(e){ e.preventDefault(); D.closeAsk(true); });
+  on("askCancel","click",function(e){ e.preventDefault(); D.closeAsk(false); });
+  // closing it any other way - Escape, the header X - is a cancel, not a hang
+  var askDlg=document.getElementById("askDlg");
+  if(askDlg) askDlg.addEventListener("close",function(){ D.closeAsk(false); });
   on("rAdd","click",function(e){ e.preventDefault(); addMember(); });
   on("rSync","click",function(e){ e.preventDefault(); B.requestRosterSync(); });
   on("rSave","click",function(e){ e.preventDefault(); saveLeague(); });
