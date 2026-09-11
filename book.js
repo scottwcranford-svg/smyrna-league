@@ -8,7 +8,7 @@ import * as Id from "./identity.js?v=dev";
 import * as Bets from "./bets.js?v=dev";
 import * as Badges from "./badges.js?v=dev";
 import { dbMsg } from "./store.js?v=dev";
-import { state, members, touch } from "./state.js?v=dev";
+import { state, members, touch, putBet, dropBet, shownSeason } from "./state.js?v=dev";
 import { toast, statsBar } from "./render.js?v=dev";
 
 const entriesOf=Fmt.entriesOf, openSeats=Fmt.openSeats, clone=Fmt.clone;
@@ -27,18 +27,24 @@ export function findBet(id){ var hit=null; state.bets.forEach(function(b){ if(b.
 function body(b){ var o={}; Object.keys(b).forEach(function(k){ if(k!=="id") o[k]=b[k]; }); return o; }
 
 export function saveBet(b){
-  var i=-1;
-  for(var k=0;k<state.bets.length;k++){ if(state.bets[k].id===b.id){ i=k; break; } }
-  if(i>=0) state.bets[i]=b; else state.bets.unshift(b);
+  putBet(b);
   touch();
   if(state.db&&!state.local) state.db.doc("bets/"+b.id).set(body(b)).catch(function(e){ toast(dbMsg(e)); });
 }
 export function removeBet(id){
-  state.bets=state.bets.filter(function(b){ return b.id!==id; });
+  dropBet(id);
   touch();
   if(state.db&&!state.local) state.db.doc("bets/"+id).delete().catch(function(e){ toast(dbMsg(e)); });
 }
 export function saveConfig(){
+  // Pin who is playing, at the moment an admin deliberately saves. Nobody has a `seasons`
+  // list yet and the default covers them ("no list means 2026"), but once a second season
+  // exists that default stops being able to tell 2026-only from every-season. Writing it
+  // on an explicit save is the one safe moment to record it.
+  var here=shownSeason();
+  ((state.config&&state.config.members)||[]).forEach(function(m){
+    if(!Array.isArray(m.seasons)||!m.seasons.length) m.seasons=[here];
+  });
   touch();
   if(state.db&&!state.local&&state.config)
     state.db.doc("league/config").set(state.config).catch(function(e){ toast(dbMsg(e)); });
@@ -154,7 +160,7 @@ export function recordPayment(from,to,amount){
   amount=Math.round((Number(amount)||0)*100)/100;
   if(!from||!to||from===to||!(amount>0)) return toast("Nothing to record");
   var cur=state.payments||{ list:[] }, list=Array.isArray(cur.list)?cur.list.slice():[];
-  list.push({ id:uid(), from:from, to:to, amount:amount, at:new Date().toISOString(), by:state.me||null });
+  list.push({ id:uid(), season:shownSeason(), from:from, to:to, amount:amount, at:new Date().toISOString(), by:state.me||null });
   state.payments={ updatedAt:new Date().toISOString(), list:list };
   touch();
   if(state.db&&!state.local) state.db.doc("league/payments").set(state.payments).catch(function(e){ toast(dbMsg(e)); });

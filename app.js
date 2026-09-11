@@ -9,7 +9,7 @@ import * as Badges from "./badges.js?v=dev";
 import * as S from "./store.js?v=dev";
 import * as A from "./auth.js?v=dev";
 import * as N from "./sleeper.js?v=dev";
-import { state, members, onRender, touch } from "./state.js?v=dev";
+import { state, members, onRender, touch, setBets } from "./state.js?v=dev";
 import { render, toast, ticker, statsBar, showBet } from "./render.js?v=dev";
 import { expireBets, settleFinished, syncBadges } from "./book.js?v=dev";
 import { drawScope, drawEntries, drawGameBox } from "./forms.js?v=dev";
@@ -107,7 +107,7 @@ function subscribeBook(db){
         state.config.adminEmails=Array.isArray(d.adminEmails)?d.adminEmails:(d.adminEmail?[d.adminEmail]:[]);
         if(state.local){
           state.local=false;
-          state.bets=remoteBets||[];
+          setBets(remoteBets||[]);
         }
         applyAuth(A.currentUser());   // the roster may have arrived after sign-in
         var u=A.currentUser();
@@ -200,7 +200,7 @@ function subscribeBook(db){
       return v;
     });
     if(state.local) return;
-    state.bets=remoteBets;
+    setBets(remoteBets);
     touch();
     startPush();
     if(openBet){ var id=openBet; openBet=null; state.tab="book"; touch(); setTimeout(function(){ showBet(id); },300); }
@@ -213,7 +213,7 @@ try{ window.matchMedia("(max-width: 600px)").addEventListener("change",function(
 bindEvents({ enterBook:enterBook, toggleAdmin:toggleAdmin });
 bindTips();
 state.config={ leagueName:"Smyrna League", season:"2026", stake:25, kickoff:Clock.DEFAULT_KICKOFF, members:[] };
-state.bets=[];
+setBets([]);
 render();
 
 state.ready=true;

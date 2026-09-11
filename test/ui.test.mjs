@@ -1055,3 +1055,47 @@ test("tooltips are the app's own, not the browser's, and none are left native", 
   assert.deepEqual(errors, []);
   await p.close();
 });
+
+test("the season seam: the book holds every season, the app shows one", { skip }, async () => {
+  const { p, errors } = await page();
+  const out = await p.evaluate(async () => {
+    const St = await import("./state.js?v=dev"); const V = await import("./render.js?v=dev");
+    const B = await import("./book.js?v=dev");
+    const { state } = St;
+    state.tab = "settle";
+    // one book, two seasons in it
+    St.setBets([
+      { id: "s1", status: "settled", week: 0, amount: 25, winner: "a", entries: [{ memberId: "a", pick: "x" }, { memberId: "b", pick: "y" }], paid: [] },
+      { id: "w1", status: "settled", week: 2, amount: 10, winner: "c", entries: [{ memberId: "a", pick: "x" }, { memberId: "c", pick: "y" }], paid: [] },
+      { id: "n1", season: "2027", status: "settled", week: 1, amount: 50, winner: "b", entries: [{ memberId: "a", pick: "x" }, { memberId: "b", pick: "y" }], paid: [] },
+    ]);
+    const totals = () => { V.render(); return [...document.querySelectorAll("#settle table.pivot tbody tr")]
+      .filter(r => r.querySelector("th").textContent === "Total")
+      .map(r => [...r.querySelectorAll("td")].map(d => d.textContent))[0]; };
+    const shownDefault = St.shownSeason();
+    const held = state.allBets.length, showing2026 = state.bets.length;
+    const t2026 = totals();
+    St.setSeason("2027");
+    const t2027 = totals(), showing2027 = state.bets.length;
+    St.setSeason(null);
+    // a locally saved bet lands in the book, not just the view
+    B.saveBet({ id: "z9", status: "open", week: 1, amount: 5, season: "2027",
+      entries: [{ memberId: "a", pick: "x" }, { memberId: null, pick: "" }], paid: [] });
+    const afterSave = { all: state.allBets.length, shown: state.bets.length };
+    B.removeBet("z9");
+    const afterDrop = { all: state.allBets.length, shown: state.bets.length };
+    return { shownDefault, held, showing2026, showing2027, t2026, t2027, afterSave, afterDrop };
+  });
+  assert.equal(out.shownDefault, "2026", "with nothing picked, the season the book is on");
+  assert.equal(out.held, 3, "the book keeps every season");
+  assert.equal(out.showing2026, 2, "the app shows one — the two untagged bets are 2026");
+  assert.equal(out.showing2027, 1);
+  // Alice: +25 on the season bet, −10 on the weekly one. The 2027 bet must not reach her.
+  assert.deepEqual(out.t2026, ["+$15", "−$25", "+$10"], "2026 totals, with 2027 nowhere in them");
+  assert.deepEqual(out.t2027, ["−$50", "+$50", "$0"], "and 2027 on its own");
+  assert.deepEqual(out.afterSave, { all: 4, shown: 2 },
+    "a 2027 bet saved while looking at 2026 joins the book without appearing on screen");
+  assert.deepEqual(out.afterDrop, { all: 3, shown: 2 }, "and deleting it removes it from the book, not just the view");
+  assert.deepEqual(errors, []);
+  await p.close();
+});

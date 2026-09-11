@@ -6,7 +6,7 @@ import * as Fmt from "./fmt.js?v=dev";
 import * as Clock from "./clock.js?v=dev";
 import * as Id from "./identity.js?v=dev";
 import * as A from "./auth.js?v=dev";
-import { state, members, touch } from "./state.js?v=dev";
+import { state, members, touch, shownSeason } from "./state.js?v=dev";
 import { toast, showBet } from "./render.js?v=dev";
 import * as B from "./book.js?v=dev";
 import * as F from "./forms.js?v=dev";
@@ -157,6 +157,7 @@ function addMember(){
   if(!n) return toast("Name required");
   state.config.members.push({ id:uid(), name:n,
     team:document.getElementById("rNewTeam").value.trim(),
+    seasons:[shownSeason()],
     color:COLORS[state.config.members.length%COLORS.length] });
   document.getElementById("rNewName").value="";
   document.getElementById("rNewTeam").value="";

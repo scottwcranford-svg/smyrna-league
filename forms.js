@@ -9,7 +9,7 @@ import * as Roster from "./roster.js?v=dev";
 import * as Sched from "./schedule.js?v=dev";
 import * as Stats from "./stats.js?v=dev";
 import * as Bets from "./bets.js?v=dev";
-import { state, members, realMembers } from "./state.js?v=dev";
+import { state, members, realMembers, shownSeason } from "./state.js?v=dev";
 import { toast, statusTagsHtml, logoHtml } from "./render.js?v=dev";
 import { guard, findBet, saveBet } from "./book.js?v=dev";
 import { dbMsg } from "./store.js?v=dev";
@@ -430,6 +430,7 @@ export function submitBet(){
     id:existing?existing.id:uid(),
     createdAt:existing?existing.createdAt:new Date().toISOString(),
     createdBy:existing&&!admin?existing.createdBy:proposer,
+    season:existing?(existing.season||shownSeason()):shownSeason(),
     week:wkPick,
     kind:isGame?"matchup":document.getElementById("bKind").value,
     amount:Math.round(amt*100)/100, name:name, terms:terms,
