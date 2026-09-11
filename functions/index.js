@@ -140,9 +140,9 @@ async function syncBook(key) {
   if (isNoop(plan)) return { key, season, added: 0, carried: 0, failed: true };
 
   await ref.update({ members: applyPlan(cfg.members, plan) });
-  logger.info("roster synced", { key, season, added: made, carried: plan.seasonAdds.length,
+  logger.info("roster synced", { key, season, added: made, carried: plan.updates.length,
     skipped: plan.skipped });
-  return { key, season, added: plan.adds.length, carried: plan.seasonAdds.length };
+  return { key, season, added: plan.adds.length, carried: plan.updates.length };
 }
 
 exports.syncRoster = onSchedule({ schedule: "every day 06:00", timeZone: "America/New_York" }, async () => {

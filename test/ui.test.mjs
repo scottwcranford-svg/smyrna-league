@@ -1218,3 +1218,29 @@ test("Remove is only offered for a manager nothing points at yet", { skip }, asy
   assert.deepEqual(errors, []);
   await p.close();
 });
+
+test("participation is asserted per season, never inherited from the last one", { skip }, async () => {
+  const { p, errors } = await page();
+  const out = await p.evaluate(async () => {
+    const { state } = await import("./state.js?v=dev");
+    const B = await import("./book.js?v=dev");
+    const Sn = await import("./seasons.js?v=dev");
+    // a later season is in charge, and nobody has a list yet
+    state.config = { ...state.config, season: "2027" };
+    state.admin = true; state.local = true;
+    B.saveConfig();
+    const stamped = state.config.members.map(m => [m.id, (m.seasons || []).join(",")]);
+    // someone who played 2026 and is back for 2027 says so explicitly
+    const both = Sn.withSeason({ id: "a", seasons: ["2026"] }, "2027");
+    return { stamped, both,
+      in2027: state.config.members.filter(m => Sn.inSeason(m, "2027")).map(m => m.id),
+      in2026: state.config.members.filter(m => Sn.inSeason(m, "2026")).map(m => m.id) };
+  });
+  assert.deepEqual(out.stamped, [["a", "2026"], ["b", "2026"], ["c", "2026"]],
+    "saving in 2027 records what 'no list' already meant — 2026 — and not the season in charge");
+  assert.deepEqual(out.in2027, [], "nobody is carried into a season just because it started");
+  assert.deepEqual(out.in2026, ["a", "b", "c"], "and last season is untouched");
+  assert.deepEqual(out.both, ["2026", "2027"], "coming back is a second tag, not a replacement");
+  assert.deepEqual(errors, []);
+  await p.close();
+});

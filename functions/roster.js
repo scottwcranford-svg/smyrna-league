@@ -38,48 +38,74 @@ function nameOf(u){ return String((u && (u.display_name || u.username)) || "").t
 function reconcile(sleeperUsers, members, season, newId) {
   const wanted = String(season);
   const list = Array.isArray(members) ? members : [];
-  const byName = {};
-  list.forEach((m) => { const k = slugName(m && m.name); if (k) byName[k] = m; });
 
-  const adds = [], seasonAdds = [], skipped = [];
+  // Sleeper's user_id is the only stable handle on a person: display names change between
+  // seasons, and matching on one forks the identity - last year's bets stay on the old
+  // record while this year's go to a new one. So a member is pinned to their Sleeper id
+  // the first time we can, and matched on it forever after.
+  const bySleeper = {}, byName = {};
+  list.forEach((m) => {
+    if (m && m.sleeperId) bySleeper[String(m.sleeperId)] = m;
+    const k = slugName(m && m.name);
+    if (k && !byName[k]) byName[k] = m;
+  });
+
+  const adds = [], updates = [], skipped = [];
   const seen = {};
   let colour = list.length;
 
   (Array.isArray(sleeperUsers) ? sleeperUsers : []).forEach((u) => {
     const name = nameOf(u);
+    const sid = String((u && u.user_id) || "");
     const key = slugName(name);
     if (!key) { skipped.push({ name, why: "no usable name" }); return; }
-    if (seen[key]) { skipped.push({ name, why: "listed twice in the Sleeper league" }); return; }
-    seen[key] = true;
+    if (seen[sid || key]) { skipped.push({ name, why: "listed twice in the Sleeper league" }); return; }
+    seen[sid || key] = true;
 
-    const m = byName[key];
+    let m = sid ? bySleeper[sid] : null;
+    let learn = false;
+    if (!m) {
+      const cand = byName[key];
+      // Adopt a name match only if that record isn't already somebody else's Sleeper
+      // account. Two managers can share a display name; they cannot share a user_id.
+      if (cand && !cand.sleeperId) { m = cand; learn = !!sid; }
+    }
+
     if (m) {
       const have = Array.isArray(m.seasons) && m.seasons.length ? m.seasons.map(String) : ["2026"];
-      if (have.indexOf(wanted) < 0) seasonAdds.push({ id: m.id, seasons: have.concat([wanted]).sort() });
+      const up = { id: m.id };
+      if (have.indexOf(wanted) < 0) up.seasons = have.concat([wanted]).sort();
+      if (learn) up.sleeperId = sid;
+      if (up.seasons || up.sleeperId) updates.push(up);
       return;
     }
+
     adds.push({
-      member: { id: newId ? newId() : null, name: name, team: "",
+      member: { id: newId ? newId() : null, name: name, team: "", sleeperId: sid || null,
         seasons: [wanted], color: COLORS[colour++ % COLORS.length] },
       account: { email: emailFor(name), password: defaultPw(name) },
     });
   });
 
-  return { adds, seasonAdds, skipped };
+  return { adds, updates, skipped };
 }
 
 // Nothing to write is the normal case, and a write that changes nothing would come back as
 // a snapshot and redraw every open page for no reason.
-function isNoop(plan){ return !plan.adds.length && !plan.seasonAdds.length; }
+function isNoop(plan){ return !plan.adds.length && !plan.updates.length; }
 
 // Apply a plan to a members array, returning a new one. Order is preserved and nobody is
 // dropped: the only edits are appended managers and a longer `seasons` list.
 function applyPlan(members, plan) {
-  const bySeasonAdd = {};
-  plan.seasonAdds.forEach((s) => { bySeasonAdd[s.id] = s.seasons; });
+  const byId = {};
+  plan.updates.forEach((u) => { byId[u.id] = u; });
   const out = (Array.isArray(members) ? members : []).map((m) => {
-    const next = bySeasonAdd[m && m.id];
-    return next ? Object.assign({}, m, { seasons: next }) : m;
+    const u = byId[m && m.id];
+    if (!u) return m;
+    const next = Object.assign({}, m);
+    if (u.seasons) next.seasons = u.seasons;
+    if (u.sleeperId) next.sleeperId = u.sleeperId;
+    return next;
   });
   return out.concat(plan.adds.map((a) => a.member));
 }

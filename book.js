@@ -9,6 +9,7 @@ import * as Bets from "./bets.js?v=dev";
 import * as Badges from "./badges.js?v=dev";
 import { dbMsg } from "./store.js?v=dev";
 import { state, members, touch, putBet, dropBet, shownSeason } from "./state.js?v=dev";
+import * as Sn from "./seasons.js?v=dev";
 import { toast, statsBar } from "./render.js?v=dev";
 
 const entriesOf=Fmt.entriesOf, openSeats=Fmt.openSeats, clone=Fmt.clone;
@@ -37,13 +38,14 @@ export function removeBet(id){
   if(state.db&&!state.local) state.db.doc("bets/"+id).delete().catch(function(e){ toast(dbMsg(e)); });
 }
 export function saveConfig(){
-  // Pin who is playing, at the moment an admin deliberately saves. Nobody has a `seasons`
-  // list yet and the default covers them ("no list means 2026"), but once a second season
-  // exists that default stops being able to tell 2026-only from every-season. Writing it
-  // on an explicit save is the one safe moment to record it.
-  var here=shownSeason();
+  // Write down what "no seasons list" already means, rather than anything new. That is
+  // LEGACY_SEASON and only ever LEGACY_SEASON: a listless record is someone who was here
+  // before seasons existed, not someone playing now. Stamping the *current* season here
+  // would quietly enrol the whole 2026 roster into 2027 the first time an admin saved,
+  // which is the one thing participation must never do - it is asserted per season, never
+  // inherited from the last one.
   ((state.config&&state.config.members)||[]).forEach(function(m){
-    if(!Array.isArray(m.seasons)||!m.seasons.length) m.seasons=[here];
+    if(!Array.isArray(m.seasons)||!m.seasons.length) m.seasons=[Sn.LEGACY_SEASON];
   });
   touch();
   if(state.db&&!state.local&&state.config)
