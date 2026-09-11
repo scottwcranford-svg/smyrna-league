@@ -9,7 +9,7 @@ import * as Badges from "./badges.js?v=dev";
 import * as S from "./store.js?v=dev";
 import * as A from "./auth.js?v=dev";
 import * as N from "./sleeper.js?v=dev";
-import { state, members, onRender, touch, setBets, setHighlow, setScores, setDraft, currentCfg } from "./state.js?v=dev";
+import { state, members, onRender, touch, setBets, setHighlow, setScores, setDraft, setSquads, currentCfg } from "./state.js?v=dev";
 import { render, toast, ticker, statsBar, showBet } from "./render.js?v=dev";
 import { expireBets, settleFinished, syncBadges } from "./book.js?v=dev";
 import { drawScope, drawEntries, drawGameBox } from "./forms.js?v=dev";
@@ -26,7 +26,7 @@ mark("boot");
    The loops need a snapshot of what this page knows; nothing in sleeper.js reads state. */
 // Always the current season's settings: a refresh writes the season being played, not the
 // one someone happens to be reading.
-function refreshCtx(){ return { config:currentCfg(), games:state.games, refresh:state.refresh, bets:state.bets, roster:state.roster, proj:state.proj, sleeper:state.sleeper, highlow:state.allHighlow, scores:state.allScores, draft:state.allDraft, season:state.season,
+function refreshCtx(){ return { config:currentCfg(), games:state.games, refresh:state.refresh, bets:state.bets, roster:state.roster, proj:state.proj, sleeper:state.sleeper, highlow:state.allHighlow, scores:state.allScores, draft:state.allDraft, squads:state.allSquads, season:state.season,
                                 holder:state.me, mobile:/Mobi|Android/i.test(navigator.userAgent) }; }
 function scoresTick(db){ if(!db||state.local) return; N.scoresTick(db,refreshCtx()); }
 function runRefresh(db,by,forced){ return N.runRefresh(db,by,forced,refreshCtx()); }
@@ -174,6 +174,11 @@ function subscribeBook(db){
     if(document.getElementById("rosterDlg").open) drawRoster();
     touch();
   },function(){ /* the button just won't report back */ });
+
+  db.doc("league/squads").onSnapshot(function(snap){
+    setSquads(snap.exists?snap.data():null);   // read-only; who is on each team right now
+    touch();
+  },function(){ /* the Roster view says it's waiting on a refresh */ });
 
   db.doc("league/draft").onSnapshot(function(snap){
     setDraft(snap.exists?snap.data():null);   // read-only; a draft never changes once it's done

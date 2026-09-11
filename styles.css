@@ -434,6 +434,30 @@ ol.dpicks li{display:flex;align-items:baseline;gap:7px;font-size:13px;min-width:
 .dcell .dno{min-width:0}
 .dwho{font-size:10px;font-weight:700;color:var(--ink-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
+/* the roster, and what each player would cost to keep */
+.rsum{background:var(--surface-3);border:1px solid var(--rule);border-left:3px solid var(--accent);
+  border-radius:12px;padding:10px 13px;margin-bottom:11px;font-size:13px;color:var(--ink-2)}
+.rsum .rlab{display:block;font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--ink-3);margin-bottom:4px}
+.rsum p{margin:0;max-width:62ch}
+.rsum b{color:var(--ink);font-variant-numeric:tabular-nums}
+.rsum .rfine{margin-top:5px;font-size:11.5px;color:var(--ink-3)}
+.rsum .rfine b{color:var(--ink-2)}
+ol.rlist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}
+ol.rlist li{display:flex;align-items:baseline;gap:9px;padding:6px 10px;border-radius:9px;
+  background:var(--surface-3);border:1px solid transparent;font-size:13.5px;min-width:0}
+ol.rlist li.start{border-color:var(--rule-2)}
+.rpos{flex:none;width:30px;font-size:10px;font-weight:800;letter-spacing:.04em}
+.rnm{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1 1 auto;min-width:0}
+.rteam{flex:none;font-size:10.5px;font-weight:700;color:var(--ink-3)}
+.rcost{flex:none;width:38px;text-align:right;font-variant-numeric:tabular-nums;font-size:12px;
+  font-weight:800;color:var(--ink-2)}
+.rkeep{flex:none;font-size:9px;font-weight:800;letter-spacing:.05em;border-radius:4px;padding:1px 6px;
+  background:var(--accent-bg);color:var(--accent)}
+.rkeep.late{background:var(--open-bg);color:var(--open)}
+.rkeep.wire{background:var(--gold-bg);color:var(--gold)}
+.rno{flex:none;width:52px;text-align:center;font-size:11px;font-weight:800;color:var(--ink-3)}
+
 /* ---- Scores: the Sleeper league's week, and the pool riding on it ---- */
 #weekPick .chip .n{background:var(--gold-bg);color:var(--gold);font-style:normal}
 #weekPick .chip[aria-pressed="true"] .n{background:rgba(0,0,0,.18);color:var(--accent-ink)}
@@ -731,6 +755,9 @@ ol.dpicks li{display:flex;align-items:baseline;gap:7px;font-size:13px;min-width:
   .stats-bar{font-size:11px}
   .sb-pools{grid-template-columns:1fr}
   .dmgrs{grid-template-columns:1fr}
+  .rsum{font-size:12.5px}
+  ol.rlist li{gap:7px;padding:7px 9px;font-size:13px}
+  .rteam{display:none}
   .seg{-webkit-mask-image:none;mask-image:none;width:100%}
   .seg button{flex:1 1 0;padding:8px 10px;text-align:center}
   .dcell{width:138px}

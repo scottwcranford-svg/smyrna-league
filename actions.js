@@ -297,6 +297,7 @@ export function bindEvents(hooks){
   var askDlg=document.getElementById("askDlg");
   if(askDlg) askDlg.addEventListener("close",function(){ D.closeAsk(false); });
   on("seasonSel","change",function(e){ setSeason(e.target.value); touch(); });
+  on("rosterOf","change",function(e){ state.rosterOf=e.target.value; touch(); });
   on("rAdd","click",function(e){ e.preventDefault(); addMember(); });
   on("rSeasonGo","click",function(e){ e.preventDefault(); startSeason(); });
   on("rSync","click",function(e){ e.preventDefault(); B.requestRosterSync(); });

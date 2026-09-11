@@ -65,6 +65,36 @@ export function findNextLeague(fromId,season){
   }).catch(function(){ return null; });
 }
 
+// Who is on each team right now. Unlike the draft this moves all season - waivers,
+// trades, drops - so it is refreshed on the hourly pass rather than written once. Kept in
+// its own document so a roster change does not rewrite the draft.
+export function squadTick(db,ctx){
+  var cfg=ctx.config||{}, here=Sn.currentSeason(cfg);
+  var cur=(ctx.squads&&ctx.squads.bySeason&&ctx.squads.bySeason[here])||null;
+  if(cur&&ageMin(cur.at)<55) return Promise.resolve();
+  var lid=leagueIdOf(cfg);
+  if(!lid) return Promise.resolve();
+  return Promise.all([
+    sj(SLEEPER+"/v1/league/"+lid+"/rosters"),
+    sj(SLEEPER+"/v1/league/"+lid+"/users")
+  ]).then(function(all){
+    var rs=all[0]||[];
+    if(!rs.length) return;
+    var uname={}; (all[1]||[]).forEach(function(u){ uname[u.user_id]=u.display_name||u.username||""; });
+    var byRoster={}, squads={}, starters={};
+    rs.forEach(function(r){
+      byRoster[r.roster_id]=uname[r.owner_id]||"";
+      squads[r.roster_id]=(r.players||[]).slice();
+      starters[r.roster_id]=(r.starters||[]).filter(function(p){ return p&&p!=="0"; });
+    });
+    // nothing moved: a write would only come back as a snapshot and redraw
+    if(cur&&JSON.stringify(cur.rosters)===JSON.stringify(squads)&&JSON.stringify(cur.starters)===JSON.stringify(starters)) return;
+    var out=Object.assign({},(ctx.squads&&ctx.squads.bySeason)||{});
+    out[here]={ at:isoNow(), byRoster:byRoster, rosters:squads, starters:starters };
+    return db.doc("league/squads").set(Object.assign({},ctx.squads||{},{ updatedAt:isoNow(), bySeason:out }));
+  }).catch(function(){});
+}
+
 // The draft, trimmed to what the board draws. Sleeper's roster_id on a pick is who *got*
 // the player, not whose slot it was, so a traded pick already credits the right manager;
 // draft_slot is the original slot, and traded_picks says which ones moved. Keeping both
@@ -271,6 +301,7 @@ export function runRefresh(db,by,forced,ctx){
           var scDoc=ctx.scores||{}, scWeeks=Sn.weeksOf(scDoc,here);
           // the draft, once, whenever the book has none for this season
           writes.push(draftTick(db,ctx));
+          writes.push(squadTick(db,ctx));
           var finals=Clock.finalWeeks(ctx.games);
           var isFinal={}; finals.forEach(function(w){ isFinal[String(w)]=true; });
           var need=finals.filter(function(w){

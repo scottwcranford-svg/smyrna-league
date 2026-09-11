@@ -154,7 +154,8 @@ test("runRefresh: weekly high / low from the league's matchups, for finished wee
   // nothing new for either doc: no lookups, no writes
   hits.length = 0; const db3 = fakeDb();
   await N.runRefresh(db3, "m0", true, { ...base, highlow: w[2], scores: sb });
-  assert.equal(hits.some((h) => /rosters|matchups/.test(h)), false);
+  assert.equal(hits.some((h) => /matchups/.test(h)), false,
+    "the pool and the board have nothing to fetch (the roster pull is its own job, and still runs)");
   assert.equal(db3.writes.some((x) => x[1] === "league/highlow" || x[1] === "league/scores"), false,
     "an unchanged board is never rewritten - a write comes back as a snapshot and would loop");
 });

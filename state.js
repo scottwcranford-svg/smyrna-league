@@ -14,8 +14,10 @@ export const state = {
   proj:null,   // league/proj: Sleeper's weekly projections for the weeks in play
   sleeper:null,   // league/sleeper: each manager's Sleeper avatar and team name, by member id
   highlow:null,   // league/highlow: each finished week's top and bottom Sleeper scores
-  allHighlow:null, allScores:null, allDraft:null,   // the raw documents; the narrowed ones below
+  allHighlow:null, allScores:null, allDraft:null, allSquads:null,   // the raw documents; the narrowed ones below
   draft:null,     // league/draft: the season's picks, as the board draws them
+  squads:null,    // league/squads: who is on each team right now, refreshed hourly
+  rosterOf:null,  // which team the Roster view is showing; null means yours
   leagueTab:"scores",   // which half of the League tab is open: scores or draft
   draftView:"mgr",      // and which view of the draft: mgr, board, keep
   scores:null,    // league/scores: every manager's fantasy points and projection, by week
@@ -54,10 +56,13 @@ function syncWeekly(){
   state.scores=state.allScores?Object.assign({},state.allScores,{ weeks:Sn.weeksOf(state.allScores,shownSeason()) }):null;
   var dr=(state.allDraft&&state.allDraft.bySeason)||{};
   state.draft=dr[shownSeason()]||null;
+  var sq=(state.allSquads&&state.allSquads.bySeason)||{};
+  state.squads=sq[shownSeason()]||null;
 }
 
 export function setHighlow(doc){ state.allHighlow=doc||null; syncWeekly(); }
 export function setDraft(doc){ state.allDraft=doc||null; syncWeekly(); }
+export function setSquads(doc){ state.allSquads=doc||null; syncWeekly(); }
 export function setScores(doc){ state.allScores=doc||null; syncWeekly(); }
 
 // Replace the book wholesale (a snapshot arrived).

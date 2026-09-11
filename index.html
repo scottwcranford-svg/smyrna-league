@@ -102,6 +102,7 @@
       <div class="seg" id="leagueTabs" role="group" aria-label="Scores or the draft">
         <button type="button" data-act="leagueTab" data-lt="scores" aria-pressed="true">Scores</button>
         <button type="button" data-act="leagueTab" data-lt="draft" aria-pressed="false">Draft</button>
+        <button type="button" data-act="leagueTab" data-lt="roster" aria-pressed="false">Roster</button>
       </div>
 
       <div data-lview="scores">
@@ -115,9 +116,15 @@
         <div class="seg" id="draftViews" role="group" aria-label="Which view">
           <button type="button" data-act="draftView" data-dv="mgr" aria-pressed="true">By manager</button>
           <button type="button" data-act="draftView" data-dv="board" aria-pressed="false">Board</button>
-          <button type="button" data-act="draftView" data-dv="keep" aria-pressed="false">Next year</button>
         </div>
         <div id="draft"></div>
+      </div>
+
+      <div data-lview="roster" hidden>
+        <div class="sec-head"><span class="note" id="rosterNote"></span></div>
+        <label class="season-pick" style="margin:0 0 12px"><span class="lbl">Team</span>
+          <select class="field" id="rosterOf" aria-label="Whose roster"></select></label>
+        <div id="rosterView"></div>
       </div>
     </section>
 

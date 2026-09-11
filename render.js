@@ -278,38 +278,72 @@ function draftBoard(D){
   }).join("")+"</div>";
 }
 
-// Next year's keepers, by the league's rules. keepers.js does the judging; this only
-// arranges it, and says plainly what each one would cost.
-function draftKeepers(D){
-  var squads=D.rosters||{}, byPlayer=D.byPlayer||{}, prev=D.keptPrev||{};
-  var ids=Object.keys(squads);
-  if(!ids.length) return '<div class="empty">Rosters haven’t arrived yet — they come with the next refresh.</div>';
+// The roster as it stands, and what each player would cost to keep next year. The draft
+// says what happened; this says what you have and what you can do with it, which is the
+// question anyone actually opens the app with in February.
+function rosterView(){
+  var host=document.getElementById("rosterView"), note=document.getElementById("rosterNote");
+  var sel=document.getElementById("rosterOf");
+  var S=state.squads, D=state.draft;
+  if(!S||!S.rosters||!Object.keys(S.rosters).length){
+    host.innerHTML='<div class="empty">Rosters haven’t arrived yet — they come with the next refresh.</div>';
+    note.textContent=""; sel.innerHTML=""; return;
+  }
+  var ids=Object.keys(S.rosters).sort(function(a,b){ return Number(a)-Number(b); });
+  var nameOfTeam=function(rid){ return (S.byRoster&&(S.byRoster[rid]||S.byRoster[String(rid)]))||"Roster "+rid; };
+  // default to your own team, so the view opens on the question you asked
+  var mine=null;
+  if(state.me){ var me=Id.member(state.me,members()); if(me) ids.forEach(function(rid){ if(nameOfTeam(rid)===me.name) mine=rid; }); }
+  var want=state.rosterOf&&ids.indexOf(String(state.rosterOf))>=0?String(state.rosterOf):(mine||ids[0]);
+  var built=ids.join("|");
+  if(sel.getAttribute("data-built")!==built){
+    sel.innerHTML=ids.map(function(rid){ return '<option value="'+esc(rid)+'">'+esc(nameOfTeam(rid))+(rid===mine?" · you":"")+"</option>"; }).join("");
+    sel.setAttribute("data-built",built);
+  }
+  sel.value=want;
+
+  var players=S.rosters[want]||[], starters=(S.starters&&S.starters[want])||[];
+  var onField={}; starters.forEach(function(p){ onField[p]=1; });
   var nameOf=function(pid){
     var row=Roster.rosterFind(pid,state.roster);
-    return row?{ name:row[1], pos:row[2] }:{ name:pid, pos:"" };
+    return row?{ name:row[1], pos:row[2], team:row[3] }:{ name:pid, pos:"", team:"" };
   };
+  var byPlayer=(D&&D.byPlayer)||{}, prev=(D&&D.keptPrev)||{};
   var kept={}; Object.keys(byPlayer).forEach(function(pid){ if(byPlayer[pid].keeper) kept[pid]=1; });
-  return '<div class="dmgrs">'+ids.map(function(rid){
-    var rows=Keep.eligible(squads[rid],byPlayer,kept,prev,nameOf);
-    var band=function(b){ return rows.filter(function(r){ return r.band===b; })
-      .sort(function(a,c){ return (a.cost||99)-(c.cost||99); }); };
-    var spent=rows.filter(function(r){ return r.years>=2; });
-    var line=function(r){
-      return "<li><span class='dno'>"+(r.cost!=null?"R"+r.cost:"9/10")+"</span>"+
-        "<span class='dnm'>"+esc(r.name)+"</span>"+posTag(r.pos)+
-        (r.years===1?'<span class="dyr">yr 2</span>':"")+"</li>";
-    };
-    var grp=function(lab,list){
-      if(!list.length) return '<div class="dband"><span class="dblab">'+lab+'</span><p class="dnone">nobody eligible</p></div>';
-      return '<div class="dband"><span class="dblab">'+lab+'</span><ol class="dpicks">'+list.map(line).join("")+"</ol></div>";
-    };
-    return '<div class="dmgr"><div class="dhead"><b>'+esc(draftName(D,rid))+"</b>"+
-      (spent.length?"<span>"+spent.length+" spent</span>":"<span></span>")+"</div>"+
-      grp("Rounds 3–9",band("early"))+grp("Rounds 10–16",band("late"))+
-      (band("wire").length?grp("Waiver · 9th or 10th",band("wire")):"")+
-      (spent.length?'<p class="dspent">Back in the pool: '+spent.map(function(r){ return esc(r.name); }).join(", ")+"</p>":"")+
-      "</div>";
-  }).join("")+"</div>";
+  var rows=Keep.eligible(players,byPlayer,kept,prev,nameOf);
+  rows.forEach(function(r){ r.start=!!onField[r.id]; r.team=nameOf(r.id).team; });
+
+  var order={ QB:0, RB:1, WR:2, TE:3, K:4, DEF:5 };
+  rows.sort(function(a,b){ return (order[a.pos]==null?9:order[a.pos])-(order[b.pos]==null?9:order[b.pos])||a.name.localeCompare(b.name); });
+
+  var line=function(r){
+    var cost=r.band==="wire"?"9/10":(r.cost!=null?"R"+r.cost:"—");
+    var tag=r.band?'<span class="rkeep '+esc(r.band)+'">'+(r.band==="wire"?"WAIVER":r.band==="early"?"3–9":"10–16")+"</span>"
+                  :'<span class="rno" data-tip="'+esc(r.why||"not eligible")+'">—</span>';
+    return '<li'+(r.start?' class="start"':"")+'><span class="rpos" style="color:'+(POSCOL[r.pos]||"var(--ink-3)")+'">'+esc(r.pos||"")+"</span>"+
+      '<span class="rnm">'+esc(r.name)+"</span>"+
+      '<span class="rteam">'+esc(r.team||"")+"</span>"+
+      '<span class="rcost">'+esc(cost)+"</span>"+tag+
+      (r.years===1?'<span class="dyr">yr 2</span>':"")+"</li>";
+  };
+  var can=rows.filter(function(r){ return r.band; });
+  var early=can.filter(function(r){ return r.band==="early"; }).length;
+  var late=can.filter(function(r){ return r.band==="late"; }).length;
+  var wire=can.filter(function(r){ return r.band==="wire"; }).length;
+  var spent=rows.filter(function(r){ return r.years>=2; });
+
+  // Say the rule, not just the count. "8 eligible" means nothing without "keep 1 of them".
+  var n=function(k,what){ return "<b>"+k+"</b> "+(k===1?what:what+"s"); };
+  host.innerHTML='<div class="rsum"><span class="rlab">How keeping works</span>'+
+      '<p>Keep up to <b>two</b>. One of the '+n(early,"player")+" you drafted in <b>rounds 3–9</b>, "+
+      "and one of the "+n(late,"player")+" from <b>rounds 10–16</b>."+
+      (wire?" A player you never drafted — "+n(wire,"here")+" — can take the <b>9th or 10th</b> slot instead.":"")+
+      "</p><p class=\"rfine\">A keeper costs your pick in that round. Only one of the two may be a QB. "+
+      "A player kept two seasons running goes back in the draft pool.</p></div>"+
+    (spent.length?'<p class="dspent">Back in the pool next year: '+spent.map(function(r){ return esc(r.name); }).join(", ")+"</p>":"")+
+    '<ol class="rlist">'+rows.map(line).join("")+"</ol>";
+  note.textContent=esc(nameOfTeam(want))+" · "+rows.length+" players · "+starters.length+" starting"+
+    (S.at?" · "+ago(S.at):"");
 }
 
 function draftView(){
@@ -322,7 +356,7 @@ function draftView(){
   var v=state.draftView||"mgr";
   document.querySelectorAll("#draftViews button").forEach(function(b){
     b.setAttribute("aria-pressed",String(b.getAttribute("data-dv")===v)); });
-  host.innerHTML=v==="board"?draftBoard(D):v==="keep"?draftKeepers(D):draftByManager(D);
+  host.innerHTML=v==="board"?draftBoard(D):draftByManager(D);
   var kept=(D.picks||[]).filter(function(p){ return p.keeper; }).length;
   var moved=(D.picks||[]).filter(function(p){ return p.from!=null; }).length;
   note.textContent=(D.picks||[]).length+" picks · "+(D.rounds||0)+" rounds"+(D.type?" · "+D.type:"")+
@@ -381,7 +415,7 @@ function leagueView(){
     b.setAttribute("aria-pressed",String(b.getAttribute("data-lt")===lt)); });
   document.querySelectorAll("[data-lview]").forEach(function(v){
     v.hidden=v.getAttribute("data-lview")!==lt; });
-  if(lt==="draft") draftView(); else scoresView();
+  if(lt==="draft") draftView(); else if(lt==="roster") rosterView(); else scoresView();
 }
 
 function scoresView(){

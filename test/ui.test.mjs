@@ -1437,7 +1437,7 @@ async function withDraft(p) {
   }, DRAFT);
 }
 
-test("the League tab holds Scores and the Draft, and the draft has three views", { skip }, async () => {
+test("the League tab holds Scores, the Draft and the Roster", { skip }, async () => {
   const { p, errors } = await page();
   await withDraft(p);
   const out = await p.evaluate(async () => {
@@ -1457,20 +1457,13 @@ test("the League tab holds Scores and the Draft, and the draft has three views",
     const board = { rows: document.querySelectorAll("#draft .drow").length,
       scrolls: getComputedStyle(document.querySelector("#draft .dgrid")).overflowX,
       keptCell: document.querySelectorAll("#draft .dcell.kept").length };
-    state.draftView = "keep"; V.render(); await new Promise(r => setTimeout(r, 20));
-    const cards = [...document.querySelectorAll("#draft .dmgr")];
-    const keep = { bands: [...cards[0].querySelectorAll(".dblab")].map(b => b.textContent),
-      early: [...cards[0].querySelectorAll(".dband")][0].textContent,
-      late: [...cards[0].querySelectorAll(".dband")][1].textContent,
-      wire: cards[0].textContent.includes("Kayshon Boutte"),
-      bobSpent: cards[1].querySelector(".dspent") ? cards[1].querySelector(".dspent").textContent : "" };
-    return { halves, byMgr, board, keep, noBodyScroll: document.documentElement.scrollWidth <= innerWidth };
+    return { halves, byMgr, board, noBodyScroll: document.documentElement.scrollWidth <= innerWidth };
   });
-  assert.deepEqual(out.halves.tabs, [["Scores", "false"], ["Draft", "true"]], "two halves, the draft open");
+  assert.deepEqual(out.halves.tabs, [["Scores", "false"], ["Draft", "true"], ["Roster", "false"]], "three, the draft open");
   assert.equal(out.halves.scoresShown, false);
   assert.equal(out.halves.draftShown, true);
 
-  assert.deepEqual(out.byMgr.views, [["By manager", "true"], ["Board", "false"], ["Next year", "false"]]);
+  assert.deepEqual(out.byMgr.views, [["By manager", "true"], ["Board", "false"]], "the draft is what happened; what you can keep lives on Roster");
   assert.deepEqual(out.byMgr.mgrs, ["Alice", "Bob", "Cara"], "in the order they first picked");
   assert.equal(out.byMgr.alicePicks, 5, "four in round one plus the pick she traded for");
   assert.deepEqual(out.byMgr.from, ["from Bob"], "a traded pick says where it came from, on the manager who got the player");
@@ -1481,12 +1474,6 @@ test("the League tab holds Scores and the Draft, and the draft has three views",
   assert.equal(out.board.scrolls, "auto", "and it scrolls sideways inside its own box");
   assert.equal(out.board.keptCell, 1);
 
-  assert.deepEqual(out.keep.bands, ["Rounds 3–9", "Rounds 10–16", "Waiver · 9th or 10th"]);
-  assert.match(out.keep.early, /Bo Nix/, "round 4 is in the first band");
-  assert.match(out.keep.late, /DK Metcalf/, "round 11 in the second");
-  assert.equal(out.keep.early.includes("Jahmyr Gibbs"), false, "a first-rounder cannot be kept");
-  assert.equal(out.keep.wire, true, "an undrafted player can be kept at 9 or 10");
-  assert.match(out.keep.bobSpent, /Rashee Rice/, "kept in both years, so back in the pool");
   assert.equal(out.noBodyScroll, true);
   assert.deepEqual(errors, []);
   await p.close();
@@ -1513,6 +1500,64 @@ test("phone: the League tab's switches fill the width and the cards stack", { sk
   assert.equal(out.oneWide, true, "manager cards go one per row");
   assert.equal(out.gridScrolls, true, "the board scrolls, because ten columns never fit a phone");
   assert.equal(out.noBodyScroll, true, "but the page itself never scrolls sideways");
+  assert.deepEqual(errors, []);
+  await p.close();
+});
+
+test("Roster: your team by default, what each player costs to keep, and who is spent", { skip }, async () => {
+  const { p, errors } = await page();
+  await withDraft(p);
+  const out = await p.evaluate(async (DRAFT) => {
+    const St = await import("./state.js?v=dev"); const V = await import("./render.js?v=dev");
+    const { state } = St;
+    state.leagueTab = "roster";
+    state.config = { ...state.config, members: [{ id: "a", name: "Alice", seasons: ["2026"] },
+      { id: "b", name: "Bob", seasons: ["2026"] }] };
+    state.me = "b";   // Bob is signed in, so Bob's roster should open
+    St.setSquads({ bySeason: { 2026: { at: new Date().toISOString(),
+      byRoster: DRAFT.byRoster, rosters: DRAFT.rosters,
+      starters: { 1: ["p4"], 2: ["p5"], 3: [] } } } });
+    V.render(); await new Promise(r => setTimeout(r, 40));
+    const sel = document.getElementById("rosterOf");
+    const read = () => ({
+      picked: sel.value, options: [...sel.options].map(o => o.textContent),
+      note: document.getElementById("rosterNote").textContent,
+      rows: [...document.querySelectorAll("#rosterView .rlist li")].map(li => [
+        li.querySelector(".rnm").textContent,
+        li.querySelector(".rcost").textContent,
+        li.querySelector(".rkeep") ? li.querySelector(".rkeep").textContent : "—",
+        li.classList.contains("start")]),
+      summary: document.querySelector("#rosterView .rsum").textContent,
+      spent: document.querySelector("#rosterView .dspent") ? document.querySelector("#rosterView .dspent").textContent : "" });
+    const bob = read();
+    // switch to Alice's team
+    sel.value = "1"; sel.dispatchEvent(new Event("change", { bubbles: true }));
+    await new Promise(r => setTimeout(r, 40));
+    return { bob, alice: read(), noBodyScroll: document.documentElement.scrollWidth <= innerWidth };
+  }, DRAFT);
+
+  assert.equal(out.bob.picked, "2", "it opens on your own team, not the first in the list");
+  assert.deepEqual(out.bob.options, ["Alice", "Bob · you", "Cara"], "and says which one is yours");
+  assert.match(out.bob.note, /^Bob · 1 players · 1 starting/);
+  assert.deepEqual(out.bob.rows, [["Rashee Rice", "—", "—", true]],
+    "his one player: starting, but no band and no price, because the contract is up");
+  assert.match(out.bob.spent, /Rashee Rice/, "kept in both years already, so he goes back in the pool");
+
+  assert.equal(out.alice.picked, "1", "the picker switches teams");
+  assert.deepEqual(out.alice.rows, [
+    ["Bo Nix", "R4", "3–9", true],
+    ["Jahmyr Gibbs", "R1", "—", false],
+    ["DK Metcalf", "R11", "10–16", false],
+    ["Kayshon Boutte", "9/10", "WAIVER", false]],
+    "sorted QB, RB, WR. Gibbs still shows R1 - the round is why he cannot be kept, and the empty band says so");
+  assert.match(out.alice.summary, /Keep up to two/, "the rule is stated, not left to be inferred");
+  assert.match(out.alice.summary, /One of the 1 player you drafted in rounds 3–9/,
+    "with the count folded into the rule rather than sitting beside it");
+  assert.match(out.alice.summary, /1 here .* can take the 9th or 10th slot/, "the waiver route, only when there is one");
+  assert.match(out.alice.summary, /costs your pick in that round/);
+  assert.match(out.alice.summary, /Only one of the two may be a QB/, "the rule that catches people out");
+  assert.match(out.alice.summary, /kept two seasons running goes back in the draft pool/);
+  assert.equal(out.noBodyScroll, true);
   assert.deepEqual(errors, []);
   await p.close();
 });
