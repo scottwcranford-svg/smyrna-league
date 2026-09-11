@@ -4,7 +4,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import * as R from "../rules.js";
+import * as Roster from "../roster.js";
 
 const fx = (n) => JSON.parse(fs.readFileSync(new URL("./fixtures/" + n, import.meta.url), "utf8"));
 const N = await import("../sleeper.js");
@@ -38,10 +38,10 @@ test("parseRoster: a status code rides on the row only when there's one", () => 
   const by = Object.fromEntries(rows.map((r) => [r[0], r]));
   assert.equal(by.q[4], "Q"); assert.equal(by.o[4], "OUT"); assert.equal(by.ir[4], "IR");
   assert.equal(by.ok.length, 4, "an active player carries no fifth slot");
-  assert.deepEqual(R.statusOf("q+o", { players: rows }), ["Q", "OUT"], "a combined pick lists each");
-  assert.deepEqual(R.statusOf("ok", { players: rows }), []);
-  assert.equal(R.statusCode({ status: "Inactive" }), "INA"); assert.equal(R.statusCode({ status: "Practice Squad" }), "PS");
-  assert.equal(R.statusCode({ status: "Something New" }), "", "unknown roster statuses stay quiet");
+  assert.deepEqual(Roster.statusOf("q+o", { players: rows }), ["Q", "OUT"], "a combined pick lists each");
+  assert.deepEqual(Roster.statusOf("ok", { players: rows }), []);
+  assert.equal(Roster.statusCode({ status: "Inactive" }), "INA"); assert.equal(Roster.statusCode({ status: "Practice Squad" }), "PS");
+  assert.equal(Roster.statusCode({ status: "Something New" }), "", "unknown roster statuses stay quiet");
 });
 
 test("parseRoster: fantasy positions on a team plus every defense, defenses last", () => {

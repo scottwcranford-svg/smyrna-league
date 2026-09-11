@@ -1,17 +1,28 @@
 # Refactor plan: split rules.js
 
-**Status:** steps 0–5 done — Sept 11 2026. `rules.js` is now a barrel over ten modules;
-no consumer has changed yet. Steps 6 (drop the barrel, one consumer per commit) and 7
-(split the tests) remain. Follows [REFACTOR.md](REFACTOR.md), which split the monolith and
-set the ceiling this file broke. **Behavior change for users:** none. Same page, same
-features, same URL, same Firestore data.
+**Status:** done — Sept 11 2026, steps 0–7. `rules.js` is gone; ten modules stand in its
+place, every consumer imports the ones it needs, and the tests are split to match.
+Follows [REFACTOR.md](REFACTOR.md), which split the monolith and set the ceiling this file
+broke. **Behavior change for users:** none. Same page, same features, same URL, same
+Firestore data. **Not yet verified live:** `node test/e2e/flow.js` needs `E2E_PASS`, so
+the post-deploy check is still owed.
 
-What differs from the plan below: steps 1–5 landed as one commit rather than five,
-because the modules were generated from one pass over the original and only verify as a
-set. The verbatim check turned out to be stronger than planned — every one of the 90
-still-exported symbols is byte-identical in source to its pre-split self
-(`fn.toString()` compared across the two module graphs), so the moves are provably
-mechanical. The `fmtMoney` "cleanup" was wrong and is now documented as a trap.
+What differs from the plan below:
+
+- Steps 1–5 landed as one commit rather than five, and step 6 as one rather than seven.
+  The modules were generated in a single pass over the original and only verify as a set;
+  hand-staging intermediate states would have added no safety.
+- The verbatim check turned out stronger than planned: every one of the 90 still-exported
+  symbols is byte-identical in source to its pre-split self (`fn.toString()` compared
+  across the two module graphs), so the moves are provably mechanical rather than
+  merely test-passing.
+- Consumers use namespace imports (`Fmt.money`, `Clock.isLocked`) rather than named ones.
+  It matches the house style already used for store/auth/sleeper/book/forms/dialogs, and
+  it sidesteps collisions with consumers' own names — `render.js` has had a local
+  `highLow()` all along.
+- The `fmtMoney` "cleanup" was wrong. See below; it is now documented as a trap.
+- `test/fixtures.mjs` was added for the two fixtures more than one split test file needs
+  (`KICKOFF`, `config`). Everything else stayed local to its file.
 
 ## Why
 

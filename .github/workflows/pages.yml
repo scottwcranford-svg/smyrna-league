@@ -1,7 +1,7 @@
 # Deploys the site to GitHub Pages on every push to master, stamping the commit
 # into the module URLs first. Browsers cache ES modules per URL, so "?v=dev" in
 # the source becomes "?v=<commit>" at deploy time and every file of a build is
-# fetched together — no stale rules.js under a fresh app.js, and no build number
+# fetched together — no stale ledger.js under a fresh app.js, and no build number
 # to bump by hand. The login card shows the same stamp.
 name: pages
 on:
