@@ -10,6 +10,7 @@ import * as Roster from "./roster.js?v=dev";
 import * as Sched from "./schedule.js?v=dev";
 import * as Stats from "./stats.js?v=dev";
 import * as Ledger from "./ledger.js?v=dev";
+import * as Sn from "./seasons.js?v=dev";
 import { lease } from "./store.js?v=dev";
 
 export const SLEEPER="https://api.sleeper.app";
@@ -106,7 +107,8 @@ export function boardSig(rows){
 export function boardTick(db,ctx,w){
   var sc=ctx.scores||{}, byRoster=sc.byRoster||{};
   if(!Object.keys(byRoster).length) return Promise.resolve();   // runRefresh hasn't laid the map down yet
-  var k=String(w), was=(sc.weeks||{})[k];
+  var here=Sn.currentSeason(ctx.config), mine=Sn.weeksOf(sc,here);
+  var k=String(w), was=mine[k];
   if(was&&was.final) return Promise.resolve();
   var lid=leagueIdOf(ctx.config), mem=(ctx.config&&ctx.config.members)||[];
   var memByName={}; mem.forEach(function(m){ memByName[String(m.name).toLowerCase()]=m.id; });
@@ -114,9 +116,9 @@ export function boardTick(db,ctx,w){
     var rows=boardRows(ms,function(rid){ return byRoster[rid]||byRoster[String(rid)]||""; },memByName,Stats.projFor(w,ctx.proj));
     if(!rows.length) return;
     if(was&&boardSig(was.rows)===boardSig(rows)) return;         // nothing moved; writing would only loop
-    var weeks=Object.assign({},sc.weeks||{});
+    var weeks=Object.assign({},mine);
     weeks[k]={ at:isoNow(), final:false, rows:rows };
-    return db.doc("league/scores").set(Object.assign({},sc,{ updatedAt:isoNow(), weeks:weeks }));
+    return db.doc("league/scores").set(Object.assign({},sc,{ updatedAt:isoNow(), weeks:Sn.withWeeks(sc,here,weeks) }));
   }).catch(function(){});
 }
 
@@ -177,8 +179,11 @@ export function runRefresh(db,by,forced,ctx){
           // week the book doesn't have yet. Owners map to managers by Sleeper display name.
           // The same call carries every manager's score, not just the top and bottom, so the
           // Scores tab is stored alongside the pool rather than fetched twice.
-          var hlDoc=ctx.highlow||{}, hlWeeks=(hlDoc.weeks)||{}, hlMem=cfg.members||[];
-          var scDoc=ctx.scores||{}, scWeeks=scDoc.weeks||{};
+          // Read and write only the season being played; other seasons in these documents
+          // are left exactly as they are.
+          var here=Sn.currentSeason(cfg);
+          var hlDoc=ctx.highlow||{}, hlWeeks=Sn.weeksOf(hlDoc,here), hlMem=cfg.members||[];
+          var scDoc=ctx.scores||{}, scWeeks=Sn.weeksOf(scDoc,here);
           var finals=Clock.finalWeeks(ctx.games);
           var isFinal={}; finals.forEach(function(w){ isFinal[String(w)]=true; });
           var need=finals.filter(function(w){
@@ -222,8 +227,8 @@ export function runRefresh(db,by,forced,ctx){
                 board[k]={ at:now, final:!!isFinal[k], rows:rows }; anySC=true;
               });
               var jobs=[];
-              if(anyHL) jobs.push(db.doc("league/highlow").set({ updatedAt:now, leagueId:lid2, weeks:out }));
-              if(anySC) jobs.push(db.doc("league/scores").set({ updatedAt:now, leagueId:lid2, season:season, byRoster:pairs.byRoster||{}, weeks:board }));
+              if(anyHL) jobs.push(db.doc("league/highlow").set(Object.assign({},hlDoc,{ updatedAt:now, leagueId:lid2, weeks:Sn.withWeeks(hlDoc,here,out) })));
+              if(anySC) jobs.push(db.doc("league/scores").set(Object.assign({},scDoc,{ updatedAt:now, leagueId:lid2, season:season, byRoster:pairs.byRoster||{}, weeks:Sn.withWeeks(scDoc,here,board) })));
               return Promise.all(jobs);
             }).catch(function(){}));
           }

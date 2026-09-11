@@ -71,3 +71,27 @@ test("settingsFor reads a season's own, falling back to what was there before se
   assert.equal(next.kickoff, "2027-09-09T00:20:00Z");
   assert.equal(next.weekStarts, config.weekStarts, "what a season doesn't override, it inherits");
 });
+
+test("a weekly document keeps its old flat shape meaning 2026", () => {
+  const flat = { weeks: { "1": { high: ["a"] }, "2": { high: ["b"] } } };
+  assert.deepEqual(S.weeksOf(flat, "2026"), flat.weeks, "week-numbered keys are the pre-seasons shape");
+  assert.deepEqual(S.weeksOf(flat, "2027"), {}, "and hold nothing for any other season");
+  assert.deepEqual(S.seasonsIn(flat), ["2026"]);
+
+  const nested = { weeks: { "2026": { "1": { high: ["a"] } }, "2027": { "1": { high: ["z"] } } } };
+  assert.deepEqual(S.weeksOf(nested, "2027"), { "1": { high: ["z"] } });
+  assert.deepEqual(S.seasonsIn(nested), ["2026", "2027"]);
+  assert.deepEqual(S.weeksOf({}, "2026"), {}, "an empty document is not a flat one");
+  assert.deepEqual(S.weeksOf(null, "2026"), {});
+});
+
+test("writing a season's weeks lifts the old shape rather than dropping it", () => {
+  const flat = { weeks: { "1": { high: ["a"] } } };
+  const out = S.withWeeks(flat, "2027", { "1": { high: ["z"] } });
+  assert.deepEqual(out, { "2026": { "1": { high: ["a"] } }, "2027": { "1": { high: ["z"] } } },
+    "2026's weeks move under their season instead of being overwritten");
+  const again = S.withWeeks({ weeks: out }, "2026", { "1": { high: ["b"] }, "2": { high: ["c"] } });
+  assert.deepEqual(Object.keys(again).sort(), ["2026", "2027"]);
+  assert.deepEqual(again["2027"], { "1": { high: ["z"] } }, "the other season is untouched");
+  assert.deepEqual(again["2026"], { "1": { high: ["b"] }, "2": { high: ["c"] } });
+});

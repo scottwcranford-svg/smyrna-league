@@ -130,23 +130,27 @@ test("runRefresh: weekly high / low from the league's matchups, for finished wee
   const base = { config: cfg, refresh: {}, bets: [], roster: { updatedAt: N.isoNow() }, holder: "m0", mobile: true, games, sleeper: { updatedAt: N.isoNow(), leagueId: "L1", byId: { m0: {}, m1: {} } } };
   await N.runRefresh(db, "m0", true, base);
   const w = db.writes.find((x) => x[1] === "league/highlow");
-  assert.deepEqual(Object.keys(w[2].weeks), ["1", "2"], "weeks 1 and 2 are final; 3 is live");
-  assert.deepEqual(w[2].weeks["1"], { high: [{ id: null, name: "ghost", pts: 130.2 }], low: [{ id: "m1", name: "testbot", pts: 99.1 }] }, "an owner who isn't a manager keeps their Sleeper name");
-  assert.deepEqual(w[2].weeks["2"].high, [{ id: "m1", name: "testbot", pts: 140 }]);
+  // the weeks now sit under their season, so another year can never land on top of them
+  assert.deepEqual(Object.keys(w[2].weeks), ["2026"], "one season in the document");
+  const hl26 = w[2].weeks["2026"];
+  assert.deepEqual(Object.keys(hl26), ["1", "2"], "weeks 1 and 2 are final; 3 is live");
+  assert.deepEqual(hl26["1"], { high: [{ id: null, name: "ghost", pts: 130.2 }], low: [{ id: "m1", name: "testbot", pts: 99.1 }] }, "an owner who isn't a manager keeps their Sleeper name");
+  assert.deepEqual(hl26["2"].high, [{ id: "m1", name: "testbot", pts: 140 }]);
   // the same fetch fills the Scores board: everyone's row, not just the top and bottom
   const sb = db.writes.find((x) => x[1] === "league/scores")[2];
-  assert.deepEqual(Object.keys(sb.weeks), ["1", "2"]);
-  assert.equal(sb.weeks["1"].final, true, "a finished week is frozen");
-  assert.deepEqual(sb.weeks["1"].rows.map((r) => [r.name, r.pts]),
+  const sb26 = sb.weeks["2026"];
+  assert.deepEqual(Object.keys(sb26), ["1", "2"]);
+  assert.equal(sb26["1"].final, true, "a finished week is frozen");
+  assert.deepEqual(sb26["1"].rows.map((r) => [r.name, r.pts]),
     [["hobnailboot", 120.5], ["testbot", 99.1], ["ghost", 130.2]], "every manager, in roster order");
-  assert.equal(sb.weeks["1"].rows[0].proj, null, "no projection published for a week already played");
+  assert.equal(sb26["1"].rows[0].proj, null, "no projection published for a week already played");
   assert.deepEqual(sb.byRoster, { 1: "hobnailboot", 2: "testbot", 3: "ghost" }, "the roster map rides along so the live tick needs one call");
 
   // week 1 already in the pool: the pool skips it, but the board still wants its rows
   hits.length = 0; const db2 = fakeDb();
-  await N.runRefresh(db2, "m0", true, { ...base, highlow: { weeks: { "1": w[2].weeks["1"] } } });
+  await N.runRefresh(db2, "m0", true, { ...base, highlow: { weeks: { "2026": { "1": hl26["1"] } } } });
   assert.deepEqual(hits.filter((h) => /matchups/.test(h)).sort(), ["league/L1/matchups/1", "league/L1/matchups/2"]);
-  assert.deepEqual(Object.keys(db2.writes.find((x) => x[1] === "league/highlow")[2].weeks), ["1", "2"]);
+  assert.deepEqual(Object.keys(db2.writes.find((x) => x[1] === "league/highlow")[2].weeks["2026"]), ["1", "2"]);
   // nothing new for either doc: no lookups, no writes
   hits.length = 0; const db3 = fakeDb();
   await N.runRefresh(db3, "m0", true, { ...base, highlow: w[2], scores: sb });

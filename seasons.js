@@ -75,3 +75,38 @@ export function settingsFor(config,season){
     weekStarts:per.weekStarts||(config&&config.weekStarts)||null
   };
 }
+
+// ---- weekly documents ----
+// league/highlow and league/scores hold { weeks: { "3": {...} } }. That shape has no room
+// for a season, so it gains one above the week: { weeks: { "2027": { "3": {...} } } }. The
+// old flat shape is 2026 by the same rule as everything else, so nothing has to be
+// rewritten - a key that looks like a week number means the map predates seasons.
+function isFlat(weeks){
+  var ks=Object.keys(weeks||{});
+  if(!ks.length) return false;
+  return ks.every(function(k){ var n=Number(k); return n>=0&&n<=18; });
+}
+
+// The weeks a season has, whichever shape the document is in.
+export function weeksOf(doc,season){
+  var weeks=(doc&&doc.weeks)||{};
+  if(isFlat(weeks)) return String(season)===LEGACY_SEASON?weeks:{};
+  return weeks[String(season)]||{};
+}
+
+// The whole map with one season's weeks replaced, ready to write back. Other seasons are
+// left exactly as they were, and a flat map is lifted under 2026 on the way past.
+export function withWeeks(doc,season,weeks){
+  var cur=(doc&&doc.weeks)||{};
+  var out=isFlat(cur)?{}:Object.assign({},cur);
+  if(isFlat(cur)) out[LEGACY_SEASON]=cur;
+  out[String(season)]=weeks;
+  return out;
+}
+
+// Which seasons a weekly document actually holds.
+export function seasonsIn(doc){
+  var weeks=(doc&&doc.weeks)||{};
+  if(isFlat(weeks)) return [LEGACY_SEASON];
+  return Object.keys(weeks).sort();
+}

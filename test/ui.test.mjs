@@ -1076,6 +1076,10 @@ test("the season seam: the book holds every season, the app shows one", { skip }
     const held = state.allBets.length, showing2026 = state.bets.length;
     const t2026 = totals();
     St.setSeason("2027");
+    // nobody has said they are playing 2027 yet, so the board has nobody on it
+    const strangers = { rows: totals(), members: St.realMembers().length };
+    // now they say so - participation is asserted, never inherited
+    state.config.members.forEach(m => { if (m.id !== "c") m.seasons = ["2026", "2027"]; });
     const t2027 = totals(), showing2027 = state.bets.length;
     St.setSeason(null);
     // a locally saved bet lands in the book, not just the view
@@ -1084,7 +1088,7 @@ test("the season seam: the book holds every season, the app shows one", { skip }
     const afterSave = { all: state.allBets.length, shown: state.bets.length };
     B.removeBet("z9");
     const afterDrop = { all: state.allBets.length, shown: state.bets.length };
-    return { shownDefault, held, showing2026, showing2027, t2026, t2027, afterSave, afterDrop };
+    return { shownDefault, held, showing2026, showing2027, strangers, t2026, t2027, afterSave, afterDrop };
   });
   assert.equal(out.shownDefault, "2026", "with nothing picked, the season the book is on");
   assert.equal(out.held, 3, "the book keeps every season");
@@ -1092,7 +1096,9 @@ test("the season seam: the book holds every season, the app shows one", { skip }
   assert.equal(out.showing2027, 1);
   // Alice: +25 on the season bet, −10 on the weekly one. The 2027 bet must not reach her.
   assert.deepEqual(out.t2026, ["+$15", "−$25", "+$10"], "2026 totals, with 2027 nowhere in them");
-  assert.deepEqual(out.t2027, ["−$50", "+$50", "$0"], "and 2027 on its own");
+  assert.equal(out.strangers.members, 0, "a season nobody has joined shows nobody");
+  assert.equal(out.strangers.rows, undefined, "so there is no board to draw");
+  assert.deepEqual(out.t2027, ["−$50", "+$50"], "and once two of them join, 2027 on its own - Cara didn't, so she has no column");
   assert.deepEqual(out.afterSave, { all: 4, shown: 2 },
     "a 2027 bet saved while looking at 2026 joins the book without appearing on screen");
   assert.deepEqual(out.afterDrop, { all: 3, shown: 2 }, "and deleting it removes it from the book, not just the view");

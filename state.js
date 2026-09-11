@@ -14,6 +14,7 @@ export const state = {
   proj:null,   // league/proj: Sleeper's weekly projections for the weeks in play
   sleeper:null,   // league/sleeper: each manager's Sleeper avatar and team name, by member id
   highlow:null,   // league/highlow: each finished week's top and bottom Sleeper scores
+  allHighlow:null, allScores:null,   // the raw documents; the two below are the season shown
   scores:null,    // league/scores: every manager's fantasy points and projection, by week
   scoreWeek:null, // which week the Scores tab is showing; null follows the current week
   season:null,    // which season is being shown; null follows config.season
@@ -42,6 +43,17 @@ export function shownSeason(){ return state.season||Sn.currentSeason(state.confi
 
 function syncBets(){ state.bets=Sn.betsFor(state.allBets,shownSeason()); }
 
+// The weekly documents get the same treatment as bets: the book keeps every season,
+// `state.highlow` and `state.scores` are the season being shown. hlTally, balances,
+// drillRows and the Scores tab all read the narrowed ones and need no season logic.
+function syncWeekly(){
+  state.highlow=state.allHighlow?Object.assign({},state.allHighlow,{ weeks:Sn.weeksOf(state.allHighlow,shownSeason()) }):null;
+  state.scores=state.allScores?Object.assign({},state.allScores,{ weeks:Sn.weeksOf(state.allScores,shownSeason()) }):null;
+}
+
+export function setHighlow(doc){ state.allHighlow=doc||null; syncWeekly(); }
+export function setScores(doc){ state.allScores=doc||null; syncWeekly(); }
+
 // Replace the book wholesale (a snapshot arrived).
 export function setBets(list){ state.allBets=Array.isArray(list)?list.slice():[]; syncBets(); }
 
@@ -59,14 +71,25 @@ export function dropBet(id){
 }
 
 // Look at a different season.
-export function setSeason(s){ state.season=s?String(s):null; syncBets(); }
+export function setSeason(s){ state.season=s?String(s):null; syncBets(); syncWeekly(); }
 
 export function members(){ return (state.config&&state.config.members)||[]; }
 // The roster as the league sees it: test accounts (member.test) are left out of the
 // ledger board and the pickers, but never out of name lookups. You always see yourself.
 // A manager's team name: Sleeper's, if the league sync has one, else what the League dialog says.
 export function teamOf(m){ var s=m&&state.sleeper&&state.sleeper.byId?state.sleeper.byId[m.id]:null; return (s&&s.team)||(m&&m.team)||""; }
-export function realMembers(){ return members().filter(function(m){ return !m.test||m.id===state.me; }); }
+// The league as the season being shown had it. `members()` stays the full permanent list,
+// because a name or an avatar must still resolve for somebody who stopped playing years
+// ago - a 2026 ticket should say RTownsend forever. This is the narrowed one: the ledger
+// board, the hi/low standings, the badge field and the pickers all run off it, so they
+// show the people who were actually there.
+export function realMembers(){
+  var s=shownSeason();
+  return members().filter(function(m){
+    if(m.test&&m.id!==state.me) return false;
+    return Sn.inSeason(m,s);
+  });
+}
 
 var renderFn=null, pending=false;
 export function onRender(fn){ renderFn=fn; }
