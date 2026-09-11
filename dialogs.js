@@ -58,7 +58,7 @@ export function openRoster(){
   document.getElementById("rAdd").hidden=!adm;
   document.getElementById("rSave").hidden=!adm;
   document.getElementById("rHint").textContent=adm
-    ? "Set each manager's password here and hand it to them. Removing someone keeps their settled bets in the ledger."
+    ? "Set each manager's password here and hand it to them. Managers stay for good — their bets, badges and payments all point at them."
     : "App admin"+(adminIds().length===1?"":"s")+": "+esc(adminIds().map(mName).join(", ")||"none set")+". Only admins can change the league, set passwords or flag admins.";
   drawRoster();
   document.getElementById("rosterDlg").showModal();
@@ -117,7 +117,11 @@ export function drawRoster(){
            '<button class="btn" data-act="pwDefault" data-id="'+esc(m.id)+'" data-tip="'+esc(defaultPw(m))+'">Default</button>':"")+
       (adm?'<label class="check r-chk"><input type="checkbox" data-act="admToggle" data-id="'+esc(m.id)+'"'+(isAdminMember(m.id)?" checked":"")+'> Admin</label>':"")+
       (adm?'<label class="check r-chk" data-tip="A test account: kept off the ledger board and out of the pickers"><input type="checkbox" data-act="testToggle" data-id="'+esc(m.id)+'"'+(m.test?" checked":"")+'> Test</label>':"")+
-      (adm&&m.id!==state.me?'<button class="btn danger" data-act="rmMember" data-id="'+esc(m.id)+'">Remove</button>':"")+
+      // Managers are not removed - their bets, payments and hi/low weeks point at this
+      // record by id. The button is only here to undo a handle typed wrong, so it only
+      // appears while there is still nothing against their name.
+      (adm&&m.id!==state.me&&!Ledger.footprint(m.id,state.allBets,state.highlow,state.payments&&state.payments.list).any
+        ? '<button class="btn danger" data-act="rmMember" data-id="'+esc(m.id)+'" data-tip="Nothing in the book points at them yet">Remove</button>':"")+
     "</div>";
   }).join("");
 }

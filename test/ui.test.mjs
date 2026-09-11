@@ -1190,7 +1190,7 @@ test("a sync that never comes back doesn't lock the button", { skip }, async () 
   await p.close();
 });
 
-test("Remove refuses a manager the ledger still points at", { skip }, async () => {
+test("Remove is only offered for a manager nothing points at yet", { skip }, async () => {
   const { p, errors } = await page();
   const out = await p.evaluate(async () => {
     const St = await import("./state.js?v=dev");
@@ -1204,16 +1204,16 @@ test("Remove refuses a manager the ledger still points at", { skip }, async () =
     const click = (id) => { const b = document.querySelector('#rosterList [data-act="rmMember"][data-id="' + id + '"]');
       if (!b) return "no button"; b.click(); return null; };
     const before = state.config.members.map(m => m.id);
+    const bobBtn = document.querySelector('#rosterList [data-act="rmMember"][data-id="b"]');
     click("b"); await new Promise(r => setTimeout(r, 30));
-    const afterBob = { ids: state.config.members.map(m => m.id), toast: document.getElementById("toast").textContent };
+    const afterBob = { ids: state.config.members.map(m => m.id), offered: !!bobBtn };
     click("c"); await new Promise(r => setTimeout(r, 30));
     const afterCara = state.config.members.map(m => m.id);
     return { before, afterBob, afterCara };
   });
   assert.deepEqual(out.before, ["a", "b", "c"]);
-  assert.deepEqual(out.afterBob.ids, ["a", "b", "c"], "Bob stays — a settled bet points at him");
-  assert.match(out.afterBob.toast, /^Bob is in 1 bet — removing them would empty their name out of the ledger$/,
-    "and it says what would be lost, not just 'no'");
+  assert.equal(out.afterBob.offered, false, "Bob is not offered a Remove at all — a settled bet points at him");
+  assert.deepEqual(out.afterBob.ids, ["a", "b", "c"], "and the action refuses too, so a hand-made click can't get round it");
   assert.deepEqual(out.afterCara, ["a", "b"], "Cara has nothing against her name, so a mistyped handle is still cleanable");
   assert.deepEqual(errors, []);
   await p.close();
