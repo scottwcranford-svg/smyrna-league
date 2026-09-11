@@ -1,21 +1,29 @@
 # Plan: one app, many seasons
 
-**Status:** phase 1 done — Sept 11 2026. Nothing is visible yet; 2026 works exactly as it
-did. Phase 2 is untouched. **Behavior change for users:** none until a second season is
-added.
+**Status:** done — Sept 11 2026, both phases. The book can run 2027 without anything being
+migrated, and 2026 reads exactly as it always has. **Behavior change for users:** none until
+a second season is started, at which point a picker appears beside the league name.
 
-Done, beyond what phase 1 originally scoped:
+What shipped:
 
-- `seasons.js` and its tests; `season` stamped on every new bet and payment.
-- The `state.allBets` → `state.bets` seam, and the season context resetting on every load.
-- A roster sync in `functions/`, nightly and on a **Sync from Sleeper** button, which adds
-  new managers with the default password, records the seasons they play, and **pins each
-  manager to their Sleeper `user_id`** — without that, a display-name change forks a
-  person in two and splits their history.
-- Remove is only offered for a manager nothing in the book points at.
+- `seasons.js` — the rules, and the only place `LEGACY_SEASON` lives.
+- Bets and payments tagged; managers tagged with the seasons they played and pinned to their
+  Sleeper `user_id`, so a rename never forks a person's history.
+- Narrowed at the boundary, so nothing downstream needs season logic: `state.bets` from
+  `allBets`, `realMembers()` to the season shown, and `state.highlow` / `state.scores` to
+  their season's weeks. `members()` stays the full permanent list, so an old ticket still
+  names someone who stopped playing.
+- `seasonCfg()` for stake, kickoff, week starts and league id — and `currentCfg()` for the
+  refresh loops, which must write the season being played even while someone reads an older
+  one.
+- A picker that appears only when there is more than one season, always opening on the one
+  the league is on. An older season is read only, refused in `guard()`.
+- **Start a season** in the League dialog, which carries nobody over; the roster sync adds
+  whoever is in the new Sleeper league.
 
-Wired so far: `LEGACY_SEASON`, `currentSeason`, `seasonOf`, `betsFor`. Written and waiting
-for phase 2: `seasonsOf`, `inSeason`, `withSeason`, `seasonList`, `settingsFor`.
+Not done, deliberately: **all-time records across seasons.** Everything needed is there —
+`state.allBets` is the whole book — but it is a feature, not plumbing, and nobody has asked
+for it.
 
 ## Why
 
