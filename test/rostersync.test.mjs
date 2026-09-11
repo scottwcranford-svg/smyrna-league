@@ -77,3 +77,24 @@ test("an empty or failed Sleeper read changes nothing", () => {
   assert.equal(R.isNoop(R.reconcile(null, members, "2027", fresh())), true);
   assert.deepEqual(R.applyPlan(members, R.reconcile([], members, "2027", fresh())), members);
 });
+
+test("the league id falls back the way the app does, not to nothing", () => {
+  // The book has never set sleeperLeagueId - the app defaults it in code - so a function
+  // that only read config skipped every sync with "no Sleeper league id".
+  assert.equal(R.leagueIdFor(null, "2026"), R.SLEEPER_LEAGUE_ID, "no config at all still finds the league");
+  assert.equal(R.leagueIdFor({}, "2026"), R.SLEEPER_LEAGUE_ID);
+  assert.equal(R.leagueIdFor({ sleeperLeagueId: "L9" }, "2026"), "L9", "a book-wide override wins over the default");
+  assert.equal(R.leagueIdFor({ sleeperLeagueId: "L9", bySeason: { 2027: { leagueId: "L2027" } } }, "2027"), "L2027",
+    "and a season's own wins over both - Sleeper mints a new id every year");
+  assert.equal(R.leagueIdFor({ sleeperLeagueId: "L9", bySeason: { 2027: { leagueId: "L2027" } } }, "2026"), "L9",
+    "without reaching into another season's");
+});
+
+test("the copy of the league id has not drifted from the app's", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const src = await readFile(new URL("../roster.js", import.meta.url), "utf8");
+  const m = src.match(/SLEEPER_LEAGUE_ID\s*=\s*"(\d+)"/);
+  assert.ok(m, "roster.js still declares the constant");
+  assert.equal(R.SLEEPER_LEAGUE_ID, m[1],
+    "functions/ cannot import the browser module, so this is the check that keeps the two in step");
+});

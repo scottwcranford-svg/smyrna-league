@@ -14,6 +14,10 @@
 "use strict";
 
 const AUTH_DOMAIN = "smyrna.league";
+// The league the app falls back to when config carries no override, kept in step with
+// SLEEPER_LEAGUE_ID in roster.js. The book has never set sleeperLeagueId, because the app
+// has always defaulted it in code - so a function that only read config found nothing.
+const SLEEPER_LEAGUE_ID = "1314265150127116288";
 const COLORS = ["#3B5799","#A8353B","#1C6F53","#8A6A12","#6D4C9F","#0F7284",
                 "#B4542A","#2F6B34","#8C3D6B","#4A5D75","#A0522D","#365F9E"];
 
@@ -80,4 +84,12 @@ function applyPlan(members, plan) {
   return out.concat(plan.adds.map((a) => a.member));
 }
 
-module.exports = { reconcile, applyPlan, isNoop, slugName, emailFor, defaultPw, AUTH_DOMAIN };
+// A season's Sleeper league id: the season's own, else the book-wide override, else the
+// default the app itself uses. Sleeper mints a new id every year, which is why phase 2
+// moves this onto the season rather than leaving it a constant.
+function leagueIdFor(cfg, season) {
+  const per = (cfg && cfg.bySeason && cfg.bySeason[String(season)]) || {};
+  return String(per.leagueId || (cfg && cfg.sleeperLeagueId) || SLEEPER_LEAGUE_ID);
+}
+
+module.exports = { reconcile, applyPlan, isNoop, leagueIdFor, slugName, emailFor, defaultPw, AUTH_DOMAIN, SLEEPER_LEAGUE_ID };

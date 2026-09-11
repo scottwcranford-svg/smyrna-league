@@ -101,17 +101,10 @@ exports.highLowChanged = onDocumentWritten("books/{book}/league/highlow", async 
 
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { getAuth } = require("firebase-admin/auth");
-const { reconcile, applyPlan, isNoop, emailFor } = require("./roster");
+const { reconcile, applyPlan, isNoop, emailFor, leagueIdFor } = require("./roster");
 
 const SLEEPER = "https://api.sleeper.app";
 const memberId = () => "b" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
-
-// A season's Sleeper league id: the season's own, else the book-wide one. Sleeper mints a
-// new id every year, so this is the thing that actually changes come September.
-function leagueIdFor(cfg, season) {
-  const per = (cfg && cfg.bySeason && cfg.bySeason[String(season)]) || {};
-  return String(per.leagueId || (cfg && cfg.sleeperLeagueId) || "");
-}
 
 async function syncBook(key) {
   const ref = book(key).collection("league").doc("config");
