@@ -86,3 +86,76 @@ exports.highLowChanged = onDocumentWritten("books/{book}/league/highlow", async 
   const L = await leagueOf(ev.params.book);
   await deliver(ev.params.book, highLowNotices(doc(ev.data.before), doc(ev.data.after), L.members, L.hlStake));
 });
+
+/* ---- the season roster: who Sleeper says is in the league ---- */
+// New managers arrive between seasons, and until now each one needed the admin to create
+// an account by hand — which the Firebase console blocks from the browser anyway, since
+// public sign-up is switched off. The Admin SDK has no such limit, so this does it: once a
+// day it reads the current season's Sleeper league, adds anyone the book is missing with
+// the app's default password, and records the season against everyone still playing. They
+// are forced to pick a real password the first time they sign in.
+//
+// Nobody is ever removed. A manager who left keeps their record — bets, badges and
+// rivalries point at it by id — and simply doesn't get the new season on their list.
+// The reconcile itself is roster.js, tested under test/rostersync.test.mjs.
+
+const { onSchedule } = require("firebase-functions/v2/scheduler");
+const { getAuth } = require("firebase-admin/auth");
+const { reconcile, applyPlan, isNoop } = require("./roster");
+
+const SLEEPER = "https://api.sleeper.app";
+const memberId = () => "b" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+
+// A season's Sleeper league id: the season's own, else the book-wide one. Sleeper mints a
+// new id every year, so this is the thing that actually changes come September.
+function leagueIdFor(cfg, season) {
+  const per = (cfg && cfg.bySeason && cfg.bySeason[String(season)]) || {};
+  return String(per.leagueId || (cfg && cfg.sleeperLeagueId) || "");
+}
+
+async function syncBook(key) {
+  const ref = book(key).collection("league").doc("config");
+  const cfg = doc(await ref.get());
+  if (!cfg || !Array.isArray(cfg.members)) return { key, skipped: "no config" };
+
+  const season = String(cfg.season || "2026");
+  const leagueId = leagueIdFor(cfg, season);
+  if (!leagueId) return { key, skipped: "no Sleeper league id" };
+
+  const res = await fetch(`${SLEEPER}/v1/league/${leagueId}/users`);
+  if (!res.ok) return { key, skipped: `Sleeper said ${res.status}` };
+  const users = await res.json();
+  // An empty read is indistinguishable from everyone leaving, so treat it as nothing to do.
+  if (!Array.isArray(users) || !users.length) return { key, skipped: "Sleeper returned nobody" };
+
+  const plan = reconcile(users, cfg.members, season, memberId);
+  if (isNoop(plan)) return { key, season, added: 0, carried: 0 };
+
+  // Accounts first: a member nobody can sign in as is worse than no member.
+  const made = [];
+  for (const a of plan.adds) {
+    try {
+      await getAuth().createUser({ email: a.account.email, password: a.account.password });
+      made.push(a.member.name);
+    } catch (e) {
+      if (e && e.code === "auth/email-already-exists") { made.push(a.member.name); continue; }
+      logger.error("account failed", { name: a.member.name, code: e && e.code, message: e && e.message });
+      a.failed = true;
+    }
+  }
+  plan.adds = plan.adds.filter(a => !a.failed);
+  if (isNoop(plan)) return { key, season, added: 0, carried: 0, failed: true };
+
+  await ref.update({ members: applyPlan(cfg.members, plan) });
+  logger.info("roster synced", { key, season, added: made, carried: plan.seasonAdds.length,
+    skipped: plan.skipped });
+  return { key, season, added: plan.adds.length, carried: plan.seasonAdds.length };
+}
+
+exports.syncRoster = onSchedule({ schedule: "every day 06:00", timeZone: "America/New_York" }, async () => {
+  const books = await getFirestore().collection("books").listDocuments();
+  for (const b of books) {
+    try { logger.info("sync", await syncBook(b.id)); }
+    catch (e) { logger.error("sync failed", { key: b.id, message: e && e.message }); }
+  }
+});
