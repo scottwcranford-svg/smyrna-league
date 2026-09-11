@@ -31,7 +31,7 @@ const gameOf=function(b){ return Bets.gameOf(b,state.games); };
 const currentWeek=function(){ return Clock.currentWeek(state.config,state.games); };
 const computeLedger=function(){ return Ledger.computeLedger(state.config,state.bets); };
 
-export function render(){ head(); ticker(); banner(); tabs(); glance(); badgesView(); board(); highLow(); rivalsView(); settle(); filters(); tickets(); statsBar(); foot(); }
+export function render(){ head(); ticker(); banner(); tabs(); glance(); badgesView(); board(); scoresView(); rivalsView(); settle(); filters(); tickets(); statsBar(); foot(); }
 
 var toastTimer=null;
 export function toast(msg){
@@ -170,7 +170,7 @@ function tabs(){
   // Badges badges how many titles you're holding right now
   var mineBadges=0;
   if(state.me) badgeList().forEach(function(b){ if((b.holders||[]).indexOf(state.me)>=0) mineBadges++; });
-  var badge={ book:seats, ledger:0, badges:mineBadges, hl:HL.weeks.length, rivals:owed, settle:Bal.transfers.length };
+  var badge={ book:seats, ledger:0, badges:mineBadges, scores:HL.weeks.length, rivals:owed, settle:Bal.transfers.length };
   Object.keys(badge).forEach(function(k){ var n=document.getElementById("tabN-"+k); if(!n) return; n.hidden=!badge[k]; n.textContent=badge[k]; });
   var cur=state.tab||"book";
   document.querySelectorAll("#tabs .tab").forEach(function(t){ var on=t.getAttribute("data-tab")===cur; t.classList.toggle("on",on); t.setAttribute("aria-selected",String(on)); });
@@ -216,31 +216,102 @@ function banner(){
 }
 
 // Week by week: who topped the league on Sleeper and who finished last, and what moved.
-function highLow(){
-  var host=document.getElementById("highlow"), note=document.getElementById("hlNote");
+// ---- Scores: the Sleeper league's own week, and the pool riding on it ----
+
+// Which weeks can be looked at: everything the book has a board for, plus the week
+// being played. Ascending, so the picker reads like a season.
+function scoreWeeks(){
+  var have={}, out=[];
+  var W=(state.scores&&state.scores.weeks)||{};
+  Object.keys(W).forEach(function(k){ var n=Number(k); if(n>0){ have[n]=1; } });
+  var cw=currentWeek(); if(cw>0) have[cw]=1;
+  Object.keys(have).forEach(function(k){ out.push(Number(k)); });
+  return out.sort(function(a,b){ return a-b; });
+}
+
+// The week on screen: what was picked, if it still exists, else the current one.
+function shownWeek(){
+  var weeks=scoreWeeks();
+  if(!weeks.length) return currentWeek();
+  var want=state.scoreWeek;
+  if(want!=null&&weeks.indexOf(Number(want))>=0) return Number(want);
+  var cw=currentWeek();
+  return weeks.indexOf(cw)>=0?cw:weeks[weeks.length-1];
+}
+
+function weekPicker(){
+  var host=document.getElementById("weekPick"), weeks=scoreWeeks(), cur=shownWeek();
+  var W=(state.scores&&state.scores.weeks)||{};
+  host.innerHTML=weeks.map(function(w){
+    var e=W[String(w)], live=e&&!e.final&&w===currentWeek();
+    return '<button type="button" class="chip'+(live?" live":"")+'" data-act="scoreWeek" data-w="'+w+'" aria-pressed="'+(w===cur)+'">'+
+      esc(weekLabel(w))+(live?'<i class="n">live</i>':"")+"</button>";
+  }).join("");
+}
+
+function boardSide(r,best,lead){
+  var pct=best>0?Math.max(2,Math.round((Number(r.pts)||0)/best*100)):0;
+  var played=(Number(r.pts)||0)>0;
+  var face=r.id?avatarHtml(r.id,22):'<span class="avatar" aria-hidden="true">'+esc(initials(r.name))+"</span>";
+  return '<div class="sb-side'+(lead?" lead":"")+(played?"":" idle")+'">'+
+    '<span class="sb-who">'+face+'<span class="sb-name">'+esc(r.id?mName(r.id):r.name)+"</span></span>"+
+    (played?'<span class="sb-pts">'+esc(String(r.pts))+"</span>"
+           :'<span class="sb-idle">Yet to play</span>')+
+    (r.proj!=null?'<span class="sb-proj" data-tip="Projected from the starters’ published numbers">proj '+esc(String(r.proj))+"</span>":'<span class="sb-proj"></span>')+
+    '<span class="sb-bar'+(played?"":" none")+'">'+(played?'<i style="width:'+pct+'%"></i>':"")+"</span></div>";
+}
+
+function scoresView(){
+  var host=document.getElementById("scores"), note=document.getElementById("scoresNote");
   var stake=Ledger.hlStake(state.config), HL=Ledger.hlTally(state.highlow,members(),stake);
-  if(!HL.weeks.length){
-    host.innerHTML='<div class="empty">Each week the top Sleeper score takes '+money(stake)+" from the bottom score. Runs all season, settles at the end.</div>";
-    note.textContent=""; return;
+  weekPicker();
+  var w=shownWeek(), E=(state.scores&&state.scores.weeks)?state.scores.weeks[String(w)]:null;
+  var rows=(E&&Array.isArray(E.rows))?E.rows:[];
+  var head="";
+  if(!rows.length){
+    head='<div class="empty">No scores for '+esc(weekLabel(w))+" yet — they arrive with the next refresh. Each week the top Sleeper score takes "+money(stake)+" from the bottom.</div>";
+  } else {
+    var played=rows.filter(function(r){ return (Number(r.pts)||0)>0; });
+    var best=0; rows.forEach(function(r){ if((Number(r.pts)||0)>best) best=Number(r.pts)||0; });
+    // the pool for this week: settled once every game is final, running before that
+    var hl=Ledger.highLow(played);
+    var pool="";
+    if(hl){
+      var side=function(list,cls,lab,amt){
+        var n=list.length;
+        return '<div class="sb-pool '+cls+'"><span class="sb-pool-lab">'+lab+(E.final?"":" so far")+"</span>"+
+          '<span class="sb-pool-who">'+list.map(function(r){ return esc(r.id?mName(r.id):r.name); }).join(" · ")+"</span>"+
+          '<span class="sb-pool-pts">'+esc(String(list[0].pts))+" pts · <b>"+signed(amt/n)+"</b></span></div>";
+      };
+      pool='<div class="sb-pools">'+side(hl.high,"hi","High",stake)+side(hl.low,"lo","Low",-stake)+"</div>";
+    }
+    // pair the sides on Sleeper's own matchup id; anything unpaired stands alone
+    var by={}, order=[];
+    rows.forEach(function(r){ var k=r.mid==null?("x"+r.name):String(r.mid); if(!by[k]){ by[k]=[]; order.push(k); } by[k].push(r); });
+    var games=order.map(function(k){
+      // ahead in this matchup, not on the whole board: a side is only leading the
+      // manager across from it, and a tie leads nobody
+      var top=-1, tied=false;
+      by[k].forEach(function(r){ var v=Number(r.pts)||0; if(v>top){ top=v; tied=false; } else if(v===top) tied=true; });
+      return '<div class="sb-game">'+by[k].map(function(r){
+        return boardSide(r,best,!tied&&top>0&&(Number(r.pts)||0)===top);
+      }).join("")+"</div>";
+    }).join("");
+    head=pool+'<div class="sb-games">'+games+"</div>";
   }
-  var who=function(list){ return list.map(function(r){ return (r.id?avatarHtml(r.id,20):"")+'<span class="hl-name">'+esc(r.id?mName(r.id):r.name)+"</span>"; }).join('<span class="hl-tie">·</span>'); };
-  var pts=function(list){ return list.length?String(list[0].pts):""; };
-  // Standings for this pool alone: every manager, net first, then the weeks under it.
+  // the season-long pool standings keep their place under the week
   var standing=realMembers().filter(function(m){ return !m.test; }).map(function(m){ return { m:m, t:HL.byId[m.id]||{ net:0, highs:0, lows:0 } }; })
     .sort(function(a,b){ return (b.t.net-a.t.net)||(b.t.highs-a.t.highs)||a.m.name.localeCompare(b.m.name); });
-  var strip='<div class="hl-standings">'+standing.map(function(s){
+  var strip=HL.weeks.length?'<div class="track-title" style="margin-top:18px">Hi / low, all season</div><div class="hl-standings">'+standing.map(function(s){
     return '<div class="hl-stand'+(s.m.id===state.me?" me":"")+'">'+avatarHtml(s.m.id,22)+'<span class="hl-name">'+esc(s.m.name)+"</span>"+
       '<b class="'+(s.t.net>0?"pos":s.t.net<0?"neg":"flat")+'">'+signed(s.t.net)+"</b>"+
       '<small>'+s.t.highs+" hi · "+s.t.lows+" low</small></div>";
-  }).join("")+"</div>";
-  host.innerHTML=strip+'<div class="hl-table">'+HL.weeks.slice().reverse().map(function(w){
-    var e=state.highlow.weeks[String(w)];
-    return '<div class="hl-row"><span class="wk">'+esc(weekLabel(w))+"</span>"+
-      '<span class="hl-side high">'+who(e.high)+'<b>'+esc(pts(e.high))+"</b><i>"+signed(stake/e.high.length)+"</i></span>"+
-      '<span class="hl-side low">'+who(e.low)+'<b>'+esc(pts(e.low))+"</b><i>"+signed(-stake/e.low.length)+"</i></span></div>";
-  }).join("")+"</div>";
-  var lead=null; Object.keys(HL.byId).forEach(function(id){ if(!lead||HL.byId[id].net>HL.byId[lead].net) lead=id; });
-  note.textContent=HL.weeks.length+(HL.weeks.length===1?" week":" weeks")+" in · "+money(stake)+" a week · "+(lead&&HL.byId[lead].net>0?mName(lead)+" leads at "+signed(HL.byId[lead].net):"all square");
+  }).join("")+"</div>":"";
+  host.innerHTML=head+strip;
+  var when=E&&E.at?" · updated "+ago(E.at):"";
+  note.textContent=rows.length
+    ? weekLabel(w)+" · "+(E.final?"final":"in progress")+" · "+money(stake)+" a week"+when
+    : money(stake)+" a week, top score takes it from the bottom.";
 }
 
 function board(){

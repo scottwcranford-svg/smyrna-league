@@ -262,27 +262,71 @@ test("Sleeper avatars and team names show where the book has them; initials and 
   await p.close();
 });
 
-test("weekly high / low: a running tally on the ledger cards and a week-by-week section", { skip }, async () => {
+test("Scores: a week board with projections, paired matchups, and the season pool under it", { skip }, async () => {
   const { p, errors } = await page();
   const out = await p.evaluate(async () => {
     const { state } = await import("./state.js?v=dev"); const V = await import("./render.js?v=dev");
+    state.tab = "scores";
     V.render();
-    const empty = document.getElementById("highlow").textContent;
+    const empty = document.getElementById("scores").textContent;
     const before = document.querySelectorAll("#board .fig").length;
     state.highlow = { weeks: {
       "1": { high: [{ id: "a", name: "Alice", pts: 148.4 }], low: [{ id: "c", name: "Cara", pts: 92.1 }] },
       "2": { high: [{ id: "a", name: "Alice", pts: 131 }], low: [{ id: "b", name: "Bob", pts: 88.6 }] } } };
-    V.render();
-    return { empty, before, after: document.querySelectorAll("#board .fig").length,
-      standings: [...document.querySelectorAll("#highlow .hl-stand")].map(s => [s.querySelector(".hl-name").textContent, s.querySelector("b").textContent, s.querySelector("b").className, s.querySelector("small").textContent, s.classList.contains("me")]),
-      rows: [...document.querySelectorAll("#highlow .hl-row")].map(r => [r.querySelector(".wk").textContent, r.querySelector(".high .hl-name").textContent, r.querySelector(".high i").textContent, r.querySelector(".low .hl-name").textContent, r.querySelector(".low i").textContent]),
-      note: document.getElementById("hlNote").textContent };
+    state.scores = { weeks: {
+      "1": { at: new Date().toISOString(), final: true, rows: [
+        { id: "a", name: "Alice", pts: 148.4, proj: 121.2, mid: 1 },
+        { id: "c", name: "Cara", pts: 92.1, proj: 110.9, mid: 1 },
+        { id: "b", name: "Bob", pts: 120, proj: 115.5, mid: 2 },
+        { id: null, name: "ghost", pts: 130.5, proj: null, mid: 2 } ] },
+      "2": { at: new Date().toISOString(), final: false, rows: [
+        { id: "a", name: "Alice", pts: 131, proj: 118.5, mid: 1 },
+        { id: "b", name: "Bob", pts: 88.6, proj: 104.2, mid: 1 },
+        { id: "c", name: "Cara", pts: 0, proj: 99.4, mid: 2 } ] } } };
+    V.render(); await new Promise(r => setTimeout(r, 30));
+    const read = () => ({
+      picker: [...document.querySelectorAll("#weekPick .chip")].map(c => [c.textContent.replace("live", "").trim(), c.getAttribute("aria-pressed")]),
+      games: [...document.querySelectorAll("#scores .sb-game")].map(g => [...g.querySelectorAll(".sb-side")].map(s => [
+        s.querySelector(".sb-name").textContent,
+        s.querySelector(".sb-pts") ? s.querySelector(".sb-pts").textContent : s.querySelector(".sb-idle").textContent,
+        s.querySelector(".sb-proj").textContent,
+        s.classList.contains("lead")])),
+      pools: [...document.querySelectorAll("#scores .sb-pool")].map(x => [x.querySelector(".sb-pool-lab").textContent, x.querySelector(".sb-pool-who").textContent, x.querySelector(".sb-pool-pts b").textContent]),
+      note: document.getElementById("scoresNote").textContent,
+      avatars: document.querySelectorAll("#scores .sb-who .avatar, #scores .sb-who img").length });
+    const wk1 = read();
+    // the picker moves the board
+    document.querySelector('#weekPick .chip[data-w="2"]').click();
+    await new Promise(r => setTimeout(r, 30));
+    return { empty, before, after: document.querySelectorAll("#board .fig").length, wk1, wk2: read(),
+      standings: [...document.querySelectorAll("#scores .hl-stand")].map(s => [s.querySelector(".hl-name").textContent, s.querySelector("b").textContent, s.querySelector("small").textContent]),
+      noBodyScroll: document.documentElement.scrollWidth <= innerWidth };
   });
-  assert.match(out.empty, /top Sleeper score takes \$5/, "explains itself before any week is final");
-  assert.equal(out.before, 12); assert.equal(out.after, 12, "the ledger cards keep their four figures; hi/low stays out of them");
-  assert.deepEqual(out.standings, [["Alice", "+$10", "pos", "2 hi · 0 low", true], ["Bob", "−$5", "neg", "0 hi · 1 low", false], ["Cara", "−$5", "neg", "0 hi · 1 low", false]], "its own standings, net first, you marked");
-  assert.deepEqual(out.rows, [["WK 2", "Alice", "+$5", "Bob", "−$5"], ["WK 1", "Alice", "+$5", "Cara", "−$5"]], "latest week first");
-  assert.equal(out.note, "2 weeks in · $5 a week · Alice leads at +$10");
+  assert.match(out.empty, /top Sleeper score takes \$5/, "explains itself before any week has scores");
+  assert.equal(out.before, 12); assert.equal(out.after, 12, "the ledger cards keep their four figures; the pool stays out of them");
+
+  // week 1 is final and opens by default (it is the current week in this fixture)
+  assert.deepEqual(out.wk1.picker, [["WK 1", "true"], ["WK 2", "false"]], "a chip per week the book has a board for");
+  assert.deepEqual(out.wk1.games, [
+    [["Alice", "148.4", "proj 121.2", true], ["Cara", "92.1", "proj 110.9", false]],
+    [["Bob", "120", "proj 115.5", false], ["ghost", "130.5", "", true]]],
+    "paired on Sleeper's matchup id, and a side leads the manager across from it - ghost is ahead of Bob without being the week's best");
+  assert.deepEqual(out.wk1.pools, [["High", "Alice", "+$5"], ["Low", "Cara", "−$5"]], "a final week states the pool outright");
+  assert.equal(out.wk1.avatars, 4, "every manager wears their avatar, and a name the league does not know falls back to initials");
+  assert.match(out.wk1.note, /^WK 1 · final · \$5 a week/);
+
+  // week 2 is live: the pool is provisional and a manager yet to play says so
+  assert.deepEqual(out.wk2.picker, [["WK 1", "false"], ["WK 2", "true"]], "the picker follows the click");
+  assert.deepEqual(out.wk2.games, [
+    [["Alice", "131", "proj 118.5", true], ["Bob", "88.6", "proj 104.2", false]],
+    [["Cara", "Yet to play", "proj 99.4", false]]], "a zero is 'yet to play', not a shutout");
+  assert.deepEqual(out.wk2.pools, [["High so far", "Alice", "+$5"], ["Low so far", "Bob", "−$5"]],
+    "live, it is 'so far', and Cara's nothing-yet is left out of the low");
+  assert.match(out.wk2.note, /^WK 2 · in progress/);
+
+  assert.deepEqual(out.standings, [["Alice", "+$10", "2 hi · 0 low"], ["Bob", "−$5", "0 hi · 1 low"], ["Cara", "−$5", "0 hi · 1 low"]],
+    "the season pool keeps its standings under the week");
+  assert.equal(out.noBodyScroll, true);
   assert.deepEqual(errors, []);
   await p.close();
 });
@@ -364,7 +408,7 @@ test("tabs: Book open by default, the others behind their tabs, badges and the g
   assert.equal(out.line, "2026 · 10-Team Keeper SF PPR · side bets", "the league's settings from Sleeper");
   assert.equal(out.glance, "1 bet running$10 on the tableyou −$25 net · 1 seat waiting on takers");
   assert.deepEqual(out.shown, ["book"]);
-  assert.deepEqual(out.badges, [["book", true, "1"], ["ledger", false, ""], ["badges", false, "6"], ["hl", false, "1"], ["rivals", false, "1"], ["settle", false, "2"]], "a seat open, six titles held, a week in, a rivalry you're behind on, two transfers to clear");
+  assert.deepEqual(out.badges, [["book", true, "1"], ["ledger", false, ""], ["badges", false, "6"], ["scores", false, "1"], ["rivals", false, "1"], ["settle", false, "2"]], "a seat open, six titles held, a week in, a rivalry you're behind on, two transfers to clear");
   assert.equal(out.me, "Alice"); assert.equal(out.dropHidden, true);
   assert.deepEqual(out.afterClick, { shown: ["settle"], on: ["settle"], saved: "settle" }, "the tab switches through the real click wiring and is remembered");
   assert.equal(out.dropOpen, true); assert.equal(out.dropClosed, true, "the menu opens on its button and closes on a click elsewhere");

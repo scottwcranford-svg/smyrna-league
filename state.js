@@ -12,6 +12,8 @@ export const state = {
   proj:null,   // league/proj: Sleeper's weekly projections for the weeks in play
   sleeper:null,   // league/sleeper: each manager's Sleeper avatar and team name, by member id
   highlow:null,   // league/highlow: each finished week's top and bottom Sleeper scores
+  scores:null,    // league/scores: every manager's fantasy points and projection, by week
+  scoreWeek:null, // which week the Scores tab is showing; null follows the current week
   payments:null,  // league/payments: { list: [{ id, from, to, amount, at, by, voided? }] } — settled once, at the end
   lines:null,     // league/lines: Vegas's spread and total per game, from the schedule file
   badges:null,    // league/badges: { byKey: { <badge>: { holder, value, at, week, from, since } } }

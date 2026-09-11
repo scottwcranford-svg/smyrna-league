@@ -24,6 +24,7 @@ const num=function(t,n){ return Number(t.getAttribute(n)); };
 export const ACTIONS = {
   filter:function(t){ state.filter.status=attr(t,"data-status"); touch(); },
   mine:function(){ state.filter.mine=!state.filter.mine; touch(); },
+  scoreWeek:function(t){ state.scoreWeek=num(t,"data-w"); touch(); },
   publishLeague:function(){ B.publishLeague(); },
   take:function(t,id){ B.takeSeat(id,num(t,"data-i")); },
   accept:function(t,id){ B.takeSeat(id,num(t,"data-i")); },

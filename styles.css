@@ -385,6 +385,36 @@ h1,h2,h3,.terms,.login-brand h1{font-family:"Poppins","Inter",system-ui,sans-ser
 .chip .n{background:rgba(0,0,0,.18)}
 .tag.pos-QB{color:#FF2B6D} .tag.pos-RB{color:#00CEB8} .tag.pos-WR{color:#58A7FF} .tag.pos-TE{color:#FFAE58} .tag.pos-K{color:#BD66FF}
 
+/* ---- Scores: the Sleeper league's week, and the pool riding on it ---- */
+#weekPick .chip .n{background:var(--gold-bg);color:var(--gold);font-style:normal}
+#weekPick .chip[aria-pressed="true"] .n{background:rgba(0,0,0,.18);color:var(--accent-ink)}
+.sb-pools{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:12px}
+.sb-pool{background:var(--surface);border:1px solid var(--rule);border-radius:12px;padding:9px 12px;
+  display:flex;flex-direction:column;gap:1px;min-width:0}
+.sb-pool.hi{border-left:3px solid var(--win)}
+.sb-pool.lo{border-left:3px solid var(--loss)}
+.sb-pool-lab{font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3)}
+.sb-pool-who{font-weight:800;font-size:14.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sb-pool-pts{font-size:12px;color:var(--ink-2);font-variant-numeric:tabular-nums}
+.sb-pool.hi .sb-pool-pts b{color:var(--win)}
+.sb-pool.lo .sb-pool-pts b{color:var(--loss)}
+
+.sb-games{display:flex;flex-direction:column;gap:8px}
+.sb-game{background:var(--surface);border:1px solid var(--rule);border-radius:14px;padding:10px 12px;
+  display:flex;flex-direction:column;gap:7px}
+.sb-side{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:10px}
+.sb-who{display:flex;align-items:center;gap:8px;min-width:0}
+.sb-name{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink-2)}
+.sb-side.lead .sb-name{color:var(--ink)}
+.sb-pts{font-variant-numeric:tabular-nums;font-weight:800;font-size:16px;color:var(--ink-2)}
+.sb-side.lead .sb-pts{color:var(--ink)}
+.sb-idle{font-size:10.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--open)}
+.sb-proj{font-size:11px;font-weight:700;color:var(--ink-3);font-variant-numeric:tabular-nums;white-space:nowrap;min-width:56px;text-align:right}
+.sb-bar{grid-column:1 / -1;height:4px;border-radius:99px;background:var(--surface-2);overflow:hidden}
+.sb-bar i{display:block;height:100%;border-radius:99px;background:var(--rule-2)}
+.sb-side.lead .sb-bar i{background:var(--accent)}
+.sb-bar.none{background:repeating-linear-gradient(90deg,var(--surface-2) 0 6px,transparent 6px 10px)}
+
 /* ---- weekly high / low ---- */
 .hl-standings{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin-bottom:10px}
 .hl-stand{display:grid;grid-template-columns:auto 1fr auto;grid-template-areas:"av name net" "av count net";column-gap:8px;align-items:center;background:var(--surface);border:1px solid var(--rule);border-radius:12px;padding:8px 11px}
@@ -650,6 +680,9 @@ h1,h2,h3,.terms,.login-brand h1{font-family:"Poppins","Inter",system-ui,sans-ser
   .glance-txt{gap:6px 12px}
   .glance-r{margin-left:auto}
   .stats-bar{font-size:11px}
+  .sb-pools{grid-template-columns:1fr}
+  .sb-side{grid-template-columns:minmax(0,1fr) auto}
+  .sb-proj{grid-column:2;text-align:right;min-width:0}
   #refreshBtn{padding:6px 11px;font-size:15px;line-height:1}
   #newBetBtn{position:fixed;right:16px;bottom:calc(78px + env(safe-area-inset-bottom));z-index:7;border-radius:26px;padding:13px 18px;font-size:14px;box-shadow:0 14px 30px -8px rgba(255,174,88,.7)}
   .filters{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;padding-bottom:4px;-webkit-mask-image:linear-gradient(90deg,#000 92%,transparent);mask-image:linear-gradient(90deg,#000 92%,transparent)}

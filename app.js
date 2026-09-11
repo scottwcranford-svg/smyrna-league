@@ -24,7 +24,7 @@ mark("boot");
 
 /* ---- keeping the book current ----
    The loops need a snapshot of what this page knows; nothing in sleeper.js reads state. */
-function refreshCtx(){ return { config:state.config, games:state.games, refresh:state.refresh, bets:state.bets, roster:state.roster, proj:state.proj, sleeper:state.sleeper, highlow:state.highlow,
+function refreshCtx(){ return { config:state.config, games:state.games, refresh:state.refresh, bets:state.bets, roster:state.roster, proj:state.proj, sleeper:state.sleeper, highlow:state.highlow, scores:state.scores,
                                 holder:state.me, mobile:/Mobi|Android/i.test(navigator.userAgent) }; }
 function scoresTick(db){ if(!db||state.local) return; N.scoresTick(db,refreshCtx()); }
 function runRefresh(db,by,forced){ return N.runRefresh(db,by,forced,refreshCtx()); }
@@ -34,7 +34,10 @@ function makeDb(key){ return S.makeDb(key,{ refresh:runRefresh }); }
 // looks and behaves as it does for everyone else. The switch is remembered per device.
 const ADMIN_LS="smyrna.adminMode";
 try{ state.adminMode=localStorage.getItem(ADMIN_LS)==="on"; }catch(e){}
-try{ var savedTab=localStorage.getItem("smyrna.tab"); if(["book","ledger","badges","hl","rivals","settle"].indexOf(savedTab)>=0) state.tab=savedTab; }catch(e){}
+// "hl" is the old id for what is now the Scores tab; a device that remembered it lands there.
+try{ var savedTab=localStorage.getItem("smyrna.tab");
+  if(savedTab==="hl") savedTab="scores";
+  if(["book","ledger","badges","scores","rivals","settle"].indexOf(savedTab)>=0) state.tab=savedTab; }catch(e){}
 // A tapped notification opens the app at its bet: ?bet=<id>, read before storedKey() tidies the address.
 var openBet=null; try{ openBet=new URLSearchParams(location.search).get("bet"); if(openBet) history.replaceState(null,"",location.pathname); }catch(e){}
 function applyAuth(user){ var w=A.whoAmI(user,state.config); state.me=w.me; state.isAdmin=w.admin; state.admin=w.admin&&state.adminMode; stampSeen(); }
@@ -163,6 +166,11 @@ function subscribeBook(db){
     state.highlow=snap.exists?snap.data():null;   // read-only
     touch();
   },function(){ /* no high/low until the first week is final anyway */ });
+
+  db.doc("league/scores").onSnapshot(function(snap){
+    state.scores=snap.exists?snap.data():null;   // read-only
+    touch();
+  },function(){ /* the Scores tab says it's waiting on the first refresh */ });
 
   db.doc("league/sleeper").onSnapshot(function(snap){
     state.sleeper=snap.exists?snap.data():null;   // read-only

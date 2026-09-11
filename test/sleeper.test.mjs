@@ -133,15 +133,26 @@ test("runRefresh: weekly high / low from the league's matchups, for finished wee
   assert.deepEqual(Object.keys(w[2].weeks), ["1", "2"], "weeks 1 and 2 are final; 3 is live");
   assert.deepEqual(w[2].weeks["1"], { high: [{ id: null, name: "ghost", pts: 130.2 }], low: [{ id: "m1", name: "testbot", pts: 99.1 }] }, "an owner who isn't a manager keeps their Sleeper name");
   assert.deepEqual(w[2].weeks["2"].high, [{ id: "m1", name: "testbot", pts: 140 }]);
-  // week 1 already in the book: only week 2 is fetched, and week 1 is kept
+  // the same fetch fills the Scores board: everyone's row, not just the top and bottom
+  const sb = db.writes.find((x) => x[1] === "league/scores")[2];
+  assert.deepEqual(Object.keys(sb.weeks), ["1", "2"]);
+  assert.equal(sb.weeks["1"].final, true, "a finished week is frozen");
+  assert.deepEqual(sb.weeks["1"].rows.map((r) => [r.name, r.pts]),
+    [["hobnailboot", 120.5], ["testbot", 99.1], ["ghost", 130.2]], "every manager, in roster order");
+  assert.equal(sb.weeks["1"].rows[0].proj, null, "no projection published for a week already played");
+  assert.deepEqual(sb.byRoster, { 1: "hobnailboot", 2: "testbot", 3: "ghost" }, "the roster map rides along so the live tick needs one call");
+
+  // week 1 already in the pool: the pool skips it, but the board still wants its rows
   hits.length = 0; const db2 = fakeDb();
   await N.runRefresh(db2, "m0", true, { ...base, highlow: { weeks: { "1": w[2].weeks["1"] } } });
-  assert.deepEqual(hits.filter((h) => /matchups/.test(h)), ["league/L1/matchups/2"]);
+  assert.deepEqual(hits.filter((h) => /matchups/.test(h)).sort(), ["league/L1/matchups/1", "league/L1/matchups/2"]);
   assert.deepEqual(Object.keys(db2.writes.find((x) => x[1] === "league/highlow")[2].weeks), ["1", "2"]);
-  // nothing new: no lookups, no write
+  // nothing new for either doc: no lookups, no writes
   hits.length = 0; const db3 = fakeDb();
-  await N.runRefresh(db3, "m0", true, { ...base, highlow: w[2] });
-  assert.equal(hits.some((h) => /rosters|matchups/.test(h)), false); assert.equal(db3.writes.some((x) => x[1] === "league/highlow"), false);
+  await N.runRefresh(db3, "m0", true, { ...base, highlow: w[2], scores: sb });
+  assert.equal(hits.some((h) => /rosters|matchups/.test(h)), false);
+  assert.equal(db3.writes.some((x) => x[1] === "league/highlow" || x[1] === "league/scores"), false,
+    "an unchanged board is never rewritten - a write comes back as a snapshot and would loop");
 });
 
 test("runRefresh: the Sleeper league's team names and avatars, one call for everyone", async () => {
@@ -164,11 +175,17 @@ test("runRefresh: the Sleeper league's team names and avatars, one call for ever
   assert.equal(w[2].leagueId, "L1");
   assert.deepEqual(w[2].byId, { m0: { avatar: "6dcbee5f", team: "Cheat 2 Win" }, m1: { avatar: "t3st", team: "" } }, "league members get team names; others their public avatar");
   assert.deepEqual(w[2].league, { name: "Smyrna League", season: "2026", teams: 10, keeper: true, dynasty: false, sf: true, scoring: "PPR", avatar: "" }, "and the league's own settings ride along");
-  assert.equal(hits.filter((h) => /^league\//.test(h)).length, 2, "two league calls for everyone: the users and the settings");
-  // all known, fresh, league cached: no lookups at all
+  // the identity block asks for everyone at once rather than per member; the board block
+  // asks again for the week being played, which is one extra pair on the hourly refresh
+  assert.deepEqual([...new Set(hits.filter((h) => /^league\/L1/.test(h)))].sort(),
+    ["league/L1", "league/L1/matchups/1", "league/L1/rosters", "league/L1/users"],
+    "the league's users and settings once each, plus the live week's board");
+  assert.equal(hits.filter((h) => h === "league/L1").length, 1, "the settings are not fetched per manager");
+  // all known, fresh, league cached: no identity lookups (the live board still refreshes)
   hits.length = 0; const db2 = fakeDb();
   await N.runRefresh(db2, "m0", true, { config: cfg, refresh: {}, bets: [], roster: { updatedAt: N.isoNow() }, holder: "m0", mobile: true, sleeper: { updatedAt: N.isoNow(), leagueId: "L1", byId: w[2].byId, league: w[2].league } });
-  assert.equal(hits.some((h) => /^(user|league)\//.test(h)), false); assert.equal(db2.writes.some((x) => x[1] === "league/sleeper"), false);
+  assert.equal(hits.some((h) => /^user\//.test(h) || h === "league/L1"), false, "nobody is looked up again once the league is cached");
+  assert.equal(db2.writes.some((x) => x[1] === "league/sleeper"), false);
   // a new manager: sync again
   hits.length = 0; const db3 = fakeDb();
   await N.runRefresh(db3, "m0", true, { config: { ...cfg, members: cfg.members.concat([{ id: "m2", name: "newguy" }]) }, refresh: {}, bets: [], roster: { updatedAt: N.isoNow() }, holder: "m0", mobile: true, sleeper: { updatedAt: N.isoNow(), leagueId: "L1", byId: w[2].byId, league: w[2].league } });

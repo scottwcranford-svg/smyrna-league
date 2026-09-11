@@ -74,6 +74,52 @@ export function restat(S,totals,through,now){
 /* ---- the loops ---- */
 
 // This week's (and next week's) scores — every minute while a game is on, else every ten.
+// One week of the Sleeper league's own scoreboard, from a /matchups payload.
+// `points` is what they have scored; the projection is summed from the starters'
+// published numbers, which league/proj already holds for the weeks in play — so a
+// live board costs one call, not two. Sides pair on matchup_id.
+export function boardRows(ms,nameOf,memByName,projWeek){
+  return (ms||[]).map(function(m){
+    var nm=nameOf(m.roster_id)||"", pr=0, any=false;
+    if(projWeek) (m.starters||[]).forEach(function(pid){
+      var p=pid&&pid!=="0"?projWeek[pid]:null;
+      if(p&&p.pts_ppr){ pr+=Number(p.pts_ppr)||0; any=true; }
+    });
+    return { id:memByName[nm.toLowerCase()]||null, name:nm,
+      pts:Math.round((Number(m.points)||0)*100)/100,
+      proj:any?Math.round(pr*10)/10:null,
+      mid:m.matchup_id==null?null:Number(m.matchup_id) };
+  });
+}
+
+// Has anything actually moved? league/scores is written from a timer, so an unchanged
+// week must not be rewritten — a write comes back as a snapshot, which draws, which
+// would write again.
+export function boardSig(rows){
+  return (rows||[]).map(function(r){ return r.name+":"+r.pts+":"+(r.proj==null?"":r.proj); }).sort().join("|");
+}
+
+// The fantasy board for the week being played, refreshed on the same tick as the NFL
+// scores and under the same lease. Reuses the roster map already on the doc, so this
+// is one call a minute rather than three. A settled week is never touched, and an
+// unchanged one is never rewritten.
+export function boardTick(db,ctx,w){
+  var sc=ctx.scores||{}, byRoster=sc.byRoster||{};
+  if(!Object.keys(byRoster).length) return Promise.resolve();   // runRefresh hasn't laid the map down yet
+  var k=String(w), was=(sc.weeks||{})[k];
+  if(was&&was.final) return Promise.resolve();
+  var lid=leagueIdOf(ctx.config), mem=(ctx.config&&ctx.config.members)||[];
+  var memByName={}; mem.forEach(function(m){ memByName[String(m.name).toLowerCase()]=m.id; });
+  return sj(SLEEPER+"/v1/league/"+lid+"/matchups/"+w).then(function(ms){
+    var rows=boardRows(ms,function(rid){ return byRoster[rid]||byRoster[String(rid)]||""; },memByName,Stats.projFor(w,ctx.proj));
+    if(!rows.length) return;
+    if(was&&boardSig(was.rows)===boardSig(rows)) return;         // nothing moved; writing would only loop
+    var weeks=Object.assign({},sc.weeks||{});
+    weeks[k]={ at:isoNow(), final:false, rows:rows };
+    return db.doc("league/scores").set(Object.assign({},sc,{ updatedAt:isoNow(), weeks:weeks }));
+  }).catch(function(){});
+}
+
 export function scoresTick(db,ctx){
   if(!db) return Promise.resolve();
   var season=seasonOf(ctx.config), w=Clock.currentWeek(ctx.config,ctx.games), weeks=[w]; if(w<18) weeks.push(w+1);
@@ -88,7 +134,7 @@ export function scoresTick(db,ctx){
       var keep=(cur.games||[]).filter(function(g){ return weeks.indexOf(g.week)<0; });
       var games=keep.concat(fresh).sort(function(a,b){ return a.week-b.week||a.date.localeCompare(b.date); });
       return db.doc("league/games").set(Object.assign({ season:season },cur,{ updatedAt:isoNow(), count:games.length, source:"Sleeper scores", games:games }));
-    });
+    }).then(function(){ return boardTick(db,ctx,w); });
   }).catch(function(){});
 }
 
@@ -129,24 +175,56 @@ export function runRefresh(db,by,forced,ctx){
             return db.doc("league/roster").set({ updatedAt:now, count:rows.length, players:rows }); }).catch(function(){}));
           // Weekly high / low from the Sleeper league's matchup scores, for every finished
           // week the book doesn't have yet. Owners map to managers by Sleeper display name.
+          // The same call carries every manager's score, not just the top and bottom, so the
+          // Scores tab is stored alongside the pool rather than fetched twice.
           var hlDoc=ctx.highlow||{}, hlWeeks=(hlDoc.weeks)||{}, hlMem=cfg.members||[];
-          var need=Clock.finalWeeks(ctx.games).filter(function(w){ return !hlWeeks[String(w)]; });
+          var scDoc=ctx.scores||{}, scWeeks=scDoc.weeks||{};
+          var finals=Clock.finalWeeks(ctx.games);
+          var isFinal={}; finals.forEach(function(w){ isFinal[String(w)]=true; });
+          var need=finals.filter(function(w){
+            var k=String(w);
+            return !hlWeeks[k]||!(scWeeks[k]&&scWeeks[k].final);
+          });
+          // the week being played is fetched every time, so the board is current
+          var liveW=Clock.currentWeek(cfg,ctx.games);
+          if(!isFinal[String(liveW)]&&need.indexOf(liveW)<0) need=need.concat([liveW]);
           if(need.length&&hlMem.length){
             var lid2=leagueIdOf(cfg);
             writes.push(Promise.all([sj(SLEEPER+"/v1/league/"+lid2+"/rosters"), sj(SLEEPER+"/v1/league/"+lid2+"/users")]).then(function(rs){
               var owner={}; (rs[0]||[]).forEach(function(r){ owner[r.roster_id]=r.owner_id; });
               var uname={}; (rs[1]||[]).forEach(function(u){ uname[u.user_id]=u.display_name||u.username||""; });
+              var nameOf=function(rid){ return uname[owner[rid]]||""; };
               var memByName={}; hlMem.forEach(function(m){ memByName[String(m.name).toLowerCase()]=m.id; });
+              // kept on the doc so the live tick can read a board with one call, not three
+              var byRoster={}; Object.keys(owner).forEach(function(rid){ byRoster[rid]=nameOf(rid); });
               return Promise.all(need.map(function(w){
                 return sj(SLEEPER+"/v1/league/"+lid2+"/matchups/"+w).then(function(ms){
-                  var rows=(ms||[]).map(function(m){ var nm=uname[owner[m.roster_id]]||""; return { id:memByName[nm.toLowerCase()]||null, name:nm, pts:Number(m.points) }; });
-                  return [w,Ledger.highLow(rows)];
+                  return [w,boardRows(ms,nameOf,memByName,Stats.projFor(w,ctx.proj))];
                 }).catch(function(){ return [w,null]; });
-              }));
+              })).then(function(pairs){ pairs.byRoster=byRoster; return pairs; });
             }).then(function(pairs){
-              var out=Object.assign({},hlWeeks), any=false;
-              pairs.forEach(function(pr){ if(pr[1]){ out[String(pr[0])]=pr[1]; any=true; } });
-              if(any) return db.doc("league/highlow").set({ updatedAt:now, leagueId:lid2, weeks:out });
+              // the pool: settled weeks only, and only ones the book hasn't got
+              var out=Object.assign({},hlWeeks), anyHL=false;
+              pairs.forEach(function(pr){
+                var w=pr[0], rows=pr[1];
+                if(!rows||!isFinal[String(w)]||hlWeeks[String(w)]) return;
+                var hl=Ledger.highLow(rows);
+                if(hl){ out[String(w)]=hl; anyHL=true; }
+              });
+              // the board: every week fetched, live ones included
+              var board=Object.assign({},scWeeks), anySC=false;
+              pairs.forEach(function(pr){
+                var w=pr[0], rows=pr[1], k=String(w);
+                if(!rows||!rows.length) return;
+                var was=board[k];
+                if(was&&was.final&&isFinal[k]) return;                       // settled, leave it
+                if(was&&boardSig(was.rows)===boardSig(rows)&&!!was.final===!!isFinal[k]) return;   // nothing moved
+                board[k]={ at:now, final:!!isFinal[k], rows:rows }; anySC=true;
+              });
+              var jobs=[];
+              if(anyHL) jobs.push(db.doc("league/highlow").set({ updatedAt:now, leagueId:lid2, weeks:out }));
+              if(anySC) jobs.push(db.doc("league/scores").set({ updatedAt:now, leagueId:lid2, season:season, byRoster:pairs.byRoster||{}, weeks:board }));
+              return Promise.all(jobs);
             }).catch(function(){}));
           }
           // The Sleeper league itself, daily or when a manager is new: every manager's team
