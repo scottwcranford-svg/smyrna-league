@@ -6,6 +6,7 @@ import * as Fmt from "./fmt.js?v=dev";
 import * as Clock from "./clock.js?v=dev";
 import * as Id from "./identity.js?v=dev";
 import * as Ledger from "./ledger.js?v=dev";
+import * as Sn from "./seasons.js?v=dev";
 import * as A from "./auth.js?v=dev";
 import { state, members, touch, shownSeason, setSeason } from "./state.js?v=dev";
 import { toast, showBet } from "./render.js?v=dev";
@@ -167,6 +168,27 @@ function addMember(){
   document.getElementById("rNewTeam").value="";
   D.drawRoster(); B.saveConfig();
 }
+// Start next season. Sleeper mints a new league every year and links the old one with
+// previous_league_id, so the app can walk forward from the league we already know rather
+// than asking anyone to paste nineteen digits. Nobody is carried over: the roster sync
+// adds whoever is actually in the new league, which is the rule participation follows.
+function startSeason(){
+  if(!state.admin) return toast("Only the admin can do that");
+  var yr=document.getElementById("rNewSeason").value.trim();
+  if(!/^\d{4}$/.test(yr)) return toast("Which year? Four digits");
+  var have=Sn.seasonList(state.config,state.allBets);
+  if(have.indexOf(yr)>=0) return toast(yr+" is already in the book");
+  var lid=document.getElementById("rNewLeague").value.trim();
+  var cfg=state.config;
+  cfg.bySeason=cfg.bySeason||{};
+  cfg.bySeason[yr]=Object.assign({},cfg.bySeason[yr]||{},{ stake:cfg.stake, leagueId:lid||"" });
+  cfg.season=yr;                      // the league is on the new season from now on
+  B.saveConfig();
+  setSeason(null);                    // and that is what everyone lands on
+  D.drawRoster(); touch();
+  toast(lid?("Season "+yr+" started"):("Season "+yr+" started — Sync from Sleeper to find its league"));
+}
+
 function saveLeague(){
   if(!state.admin) return toast("Only the admin can do that");
   state.config.leagueName=document.getElementById("rName").value.trim()||state.config.leagueName;
@@ -259,6 +281,7 @@ export function bindEvents(hooks){
   if(askDlg) askDlg.addEventListener("close",function(){ D.closeAsk(false); });
   on("seasonSel","change",function(e){ setSeason(e.target.value); touch(); });
   on("rAdd","click",function(e){ e.preventDefault(); addMember(); });
+  on("rSeasonGo","click",function(e){ e.preventDefault(); startSeason(); });
   on("rSync","click",function(e){ e.preventDefault(); B.requestRosterSync(); });
   on("rSave","click",function(e){ e.preventDefault(); saveLeague(); });
 }

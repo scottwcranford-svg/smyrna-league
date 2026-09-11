@@ -120,6 +120,8 @@ function seenHtml(id){
 export function drawRoster(){
   var adm=!!state.admin;
   document.getElementById("rSync").hidden=!adm;
+  document.getElementById("rSeasonRow").hidden=!adm;
+  document.getElementById("rSeasonGo").hidden=!adm;
   // What the last sync did, or that one is in flight. Written by the function.
   var rs=state.rosterSync||{}, note=document.getElementById("rSyncNote");
   var running=rs.requestedAt&&(!rs.finishedAt||String(rs.finishedAt)<String(rs.requestedAt));

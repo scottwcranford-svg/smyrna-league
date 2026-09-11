@@ -1344,3 +1344,42 @@ test("the season picker appears once there are two, and the past is read only", 
   assert.deepEqual(errors, []);
   await p.close();
 });
+
+test("starting a season moves the league on and carries nobody with it", { skip }, async () => {
+  const { p, errors } = await page();
+  const out = await p.evaluate(async () => {
+    const St = await import("./state.js?v=dev");
+    const D = await import("./dialogs.js?v=dev");
+    const { state } = St;
+    state.local = false; state.connected = true; state.admin = true;
+    state.db = { doc() { return { set: () => Promise.resolve() }; } };
+    state.config.members.forEach(m => { m.seasons = ["2026"]; });
+    D.drawRoster();
+    const go = document.getElementById("rSeasonGo");
+    const start = (yr, lid) => { document.getElementById("rNewSeason").value = yr;
+      document.getElementById("rNewLeague").value = lid || ""; go.click(); };
+
+    start("nope");                       // not a year
+    const bad = document.getElementById("toast").textContent;
+    start("2026");                       // already here
+    const dup = document.getElementById("toast").textContent;
+
+    start("2027", "L2027");
+    await new Promise(r => setTimeout(r, 40));
+    return { bad, dup, toast: document.getElementById("toast").textContent,
+      season: state.config.season, shown: St.shownSeason(),
+      settings: state.config.bySeason && state.config.bySeason["2027"],
+      playing: St.realMembers().map(m => m.id),
+      stillOn2026: state.config.members.map(m => (m.seasons || []).join(",")) };
+  });
+  assert.match(out.bad, /Which year/, "a year is four digits");
+  assert.match(out.dup, /2026 is already in the book/);
+  assert.equal(out.season, "2027", "the league moves on");
+  assert.equal(out.shown, "2027", "and everyone lands there, not on whatever was last looked at");
+  assert.deepEqual(out.settings, { stake: 25, leagueId: "L2027" }, "the season gets its own stake and Sleeper league");
+  assert.deepEqual(out.playing, [], "nobody is carried over — the roster sync adds whoever is actually in the new league");
+  assert.deepEqual(out.stillOn2026, ["2026", "2026", "2026"], "and last season's record is untouched");
+  assert.match(out.toast, /^Season 2027 started$/);
+  assert.deepEqual(errors, []);
+  await p.close();
+});

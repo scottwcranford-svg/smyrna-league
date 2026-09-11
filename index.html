@@ -224,8 +224,13 @@
       <label class="f"><span>Add a manager</span><input class="field" id="rNewName" maxlength="40" placeholder="Sleeper handle"></label>
       <label class="f"><span>Their team</span><input class="field" id="rNewTeam" maxlength="40" placeholder="Optional"></label>
     </div>
+    <div class="grid c2" id="rSeasonRow" hidden style="margin-top:13px">
+      <label class="f"><span>Start a season</span><input class="field" id="rNewSeason" maxlength="4" inputmode="numeric" placeholder="2027"></label>
+      <label class="f"><span>Its Sleeper league</span><input class="field" id="rNewLeague" placeholder="found from last season"></label>
+    </div>
     <div class="form-foot">
       <button class="btn" id="rAdd">Add manager</button>
+      <button class="btn" id="rSeasonGo" hidden>Start it</button>
       <button class="btn" id="rSync" hidden>Sync from Sleeper</button>
       <button class="btn pri" id="rSave">Save league</button>
       <span class="hint" id="rHint">Removing someone keeps their settled bets in the ledger.</span>
