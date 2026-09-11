@@ -1189,3 +1189,32 @@ test("a sync that never comes back doesn't lock the button", { skip }, async () 
   assert.deepEqual(errors, []);
   await p.close();
 });
+
+test("Remove refuses a manager the ledger still points at", { skip }, async () => {
+  const { p, errors } = await page();
+  const out = await p.evaluate(async () => {
+    const St = await import("./state.js?v=dev");
+    const D = await import("./dialogs.js?v=dev");
+    const { state } = St;
+    state.admin = true; state.isAdmin = true; state.me = "a"; state.local = true;
+    // Bob is in a settled bet; Cara is a handle typed wrong and has nothing
+    St.setBets([{ id: "b1", status: "settled", week: 1, amount: 10, winner: "a",
+      createdBy: "a", entries: [{ memberId: "a", pick: "x" }, { memberId: "b", pick: "y" }], paid: [] }]);
+    D.drawRoster();
+    const click = (id) => { const b = document.querySelector('#rosterList [data-act="rmMember"][data-id="' + id + '"]');
+      if (!b) return "no button"; b.click(); return null; };
+    const before = state.config.members.map(m => m.id);
+    click("b"); await new Promise(r => setTimeout(r, 30));
+    const afterBob = { ids: state.config.members.map(m => m.id), toast: document.getElementById("toast").textContent };
+    click("c"); await new Promise(r => setTimeout(r, 30));
+    const afterCara = state.config.members.map(m => m.id);
+    return { before, afterBob, afterCara };
+  });
+  assert.deepEqual(out.before, ["a", "b", "c"]);
+  assert.deepEqual(out.afterBob.ids, ["a", "b", "c"], "Bob stays — a settled bet points at him");
+  assert.match(out.afterBob.toast, /^Bob is in 1 bet — removing them would empty their name out of the ledger$/,
+    "and it says what would be lost, not just 'no'");
+  assert.deepEqual(out.afterCara, ["a", "b"], "Cara has nothing against her name, so a mistyped handle is still cleanable");
+  assert.deepEqual(errors, []);
+  await p.close();
+});

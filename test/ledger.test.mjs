@@ -89,3 +89,35 @@ test("drillRows: what's behind a season-table cell, newest first", () => {
   const total = Ledger.drillRows("a", "total", bets, hl, 5, members);
   assert.equal(total.length, 5); assert.equal(Math.round(total.reduce((s, r) => s + r.amount, 0) * 100) / 100, 17.5, "the total row adds everything up");
 });
+
+test("footprint: what a manager would take with them if they were removed", () => {
+  const bets = [
+    { id: "b1", createdBy: "a", entries: [{ memberId: "a" }, { memberId: "b" }] },
+    { id: "b2", createdBy: "c", entries: [{ memberId: "b" }, { memberId: null }] },
+    { id: "b3", createdBy: "c", entries: [{ memberId: "c" }, { memberId: "d" }] },
+  ];
+  const payments = [{ from: "a", to: "b", amount: 5 },
+                    { from: "b", to: "c", amount: 5, voided: true }];
+  const highlow = { weeks: {
+    "1": { high: [{ id: "a", pts: 140 }], low: [{ id: "d", pts: 80 }] },
+    "2": { high: [{ id: "c", pts: 150 }], low: [{ id: "a", pts: 70 }] } } };
+
+  const a = Ledger.footprint("a", bets, highlow, payments);
+  assert.deepEqual(a, { bets: 1, payments: 1, weeks: 2, any: true },
+    "one bet counted once though he both posted it and is in it");
+  assert.equal(Ledger.footprint("b", bets, highlow, payments).bets, 2, "in two, posted neither");
+  assert.equal(Ledger.footprint("b", bets, highlow, payments).payments, 1, "a voided payment is not history worth keeping");
+
+  const nobody = Ledger.footprint("zz", bets, highlow, payments);
+  assert.deepEqual(nobody, { bets: 0, payments: 0, weeks: 0, any: false },
+    "a handle typed wrong leaves nothing behind, and can still be deleted");
+  assert.equal(Ledger.footprint("x", [], null, null).any, false, "an empty book is not a reason to refuse");
+});
+
+test("footprintText reads as a sentence, however many kinds there are", () => {
+  assert.equal(Ledger.footprintText({ bets: 1, payments: 0, weeks: 0 }), "1 bet");
+  assert.equal(Ledger.footprintText({ bets: 7, payments: 2, weeks: 0 }), "7 bets and 2 payments");
+  assert.equal(Ledger.footprintText({ bets: 7, payments: 2, weeks: 3 }), "7 bets, 2 payments and 3 hi/low weeks");
+  assert.equal(Ledger.footprintText({ bets: 0, payments: 0, weeks: 1 }), "1 hi/low week");
+  assert.equal(Ledger.footprintText({ bets: 0, payments: 0, weeks: 0 }), "");
+});

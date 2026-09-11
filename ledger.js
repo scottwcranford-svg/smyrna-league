@@ -107,6 +107,36 @@ export function balances(config,bets,highlow,payments,stake){
   return { byId:byId, transfers:settleTransfers(byId), payments:all };
 }
 
+// What a manager would take with them. Removing someone deletes the record their bets,
+// payments and hi/low weeks all point at by id, so the money survives and the person does
+// not: every ticket they were on starts reading "Former manager" and their avatar is gone.
+// This counts the places that would break, so the League dialog can refuse. A manager with
+// nothing against their name — a handle typed wrong — is still safe to delete.
+export function footprint(id,bets,highlow,payments){
+  var out={ bets:0, payments:0, weeks:0, any:false };
+  (bets||[]).forEach(function(b){
+    if(b.createdBy===id||entriesOf(b).some(function(e){ return e.memberId===id; })) out.bets++;
+  });
+  (payments||[]).forEach(function(p){ if(!p.voided&&(p.from===id||p.to===id)) out.payments++; });
+  var weeks=(highlow&&highlow.weeks)||{};
+  Object.keys(weeks).forEach(function(w){
+    var e=weeks[w]||{}, hit=function(list){ return (list||[]).some(function(r){ return r.id===id; }); };
+    if(hit(e.high)||hit(e.low)) out.weeks++;
+  });
+  out.any=!!(out.bets||out.payments||out.weeks);
+  return out;
+}
+
+// "7 bets and 2 payments", for telling an admin what they would be throwing away.
+export function footprintText(f){
+  var bits=[];
+  if(f.bets) bits.push(f.bets+(f.bets===1?" bet":" bets"));
+  if(f.payments) bits.push(f.payments+(f.payments===1?" payment":" payments"));
+  if(f.weeks) bits.push(f.weeks+(f.weeks===1?" hi/low week":" hi/low weeks"));
+  if(bits.length<2) return bits[0]||"";
+  return bits.slice(0,-1).join(", ")+" and "+bits[bits.length-1];
+}
+
 export function computeLedger(config,bets){
   // risk: stake on live bets. offered: stake on bets still waiting for takers.
   // cancelled: stake on bets that reached the lock with no takers and cancelled themselves.

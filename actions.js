@@ -5,6 +5,7 @@
 import * as Fmt from "./fmt.js?v=dev";
 import * as Clock from "./clock.js?v=dev";
 import * as Id from "./identity.js?v=dev";
+import * as Ledger from "./ledger.js?v=dev";
 import * as A from "./auth.js?v=dev";
 import { state, members, touch, shownSeason } from "./state.js?v=dev";
 import { toast, showBet } from "./render.js?v=dev";
@@ -77,6 +78,9 @@ export const ACTIONS = {
   rmMember:function(t,id){
     if(!state.admin) return toast("Only the admin can do that");
     if(id===state.me) return toast("You can't remove yourself");
+    // Their history points at this record by id, across every season in the book.
+    var fp=Ledger.footprint(id,state.allBets,state.highlow,state.payments&&state.payments.list);
+    if(fp.any) return toast(Id.mName(id,members())+" is in "+Ledger.footprintText(fp)+" — removing them would empty their name out of the ledger");
     state.config.members=state.config.members.filter(function(m){ return m.id!==id; });
     D.drawRoster(); B.saveConfig();
   },
