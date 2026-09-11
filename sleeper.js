@@ -46,6 +46,25 @@ export function gamesFor(weeks,season){
     .then(function(lists){ return parseScores(lists,weeks); });
 }
 
+// Next season's league, found from this one. Sleeper mints a new league every year and
+// points it back at the old one with previous_league_id; there is no forward link, so the
+// way across is to ask a manager which leagues they are in for the new season and take the
+// one that points at ours.
+export function nextLeagueFrom(leagues,fromId){
+  var want=String(fromId||"");
+  var hit=(leagues||[]).filter(function(l){ return String(l.previous_league_id||"")===want; })[0];
+  return hit||null;
+}
+
+export function findNextLeague(fromId,season){
+  if(!fromId||!season) return Promise.resolve(null);
+  return sj(SLEEPER+"/v1/league/"+fromId+"/users").then(function(us){
+    var uid=(us&&us[0]&&us[0].user_id)||"";
+    if(!uid) return null;
+    return sj(SLEEPER+"/v1/user/"+uid+"/leagues/nfl/"+season).then(function(ls){ return nextLeagueFrom(ls,fromId); });
+  }).catch(function(){ return null; });
+}
+
 // Our Sleeper league: the id an admin put in league/config, else the Smyrna League.
 export function leagueIdOf(cfg){ return String((cfg&&cfg.sleeperLeagueId)||Roster.SLEEPER_LEAGUE_ID); }
 

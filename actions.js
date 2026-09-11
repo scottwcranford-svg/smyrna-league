@@ -7,6 +7,7 @@ import * as Clock from "./clock.js?v=dev";
 import * as Id from "./identity.js?v=dev";
 import * as Ledger from "./ledger.js?v=dev";
 import * as Sn from "./seasons.js?v=dev";
+import * as N from "./sleeper.js?v=dev";
 import * as A from "./auth.js?v=dev";
 import { state, members, touch, shownSeason, setSeason } from "./state.js?v=dev";
 import { toast, showBet } from "./render.js?v=dev";
@@ -178,15 +179,27 @@ function startSeason(){
   if(!/^\d{4}$/.test(yr)) return toast("Which year? Four digits");
   var have=Sn.seasonList(state.config,state.allBets);
   if(have.indexOf(yr)>=0) return toast(yr+" is already in the book");
-  var lid=document.getElementById("rNewLeague").value.trim();
-  var cfg=state.config;
-  cfg.bySeason=cfg.bySeason||{};
-  cfg.bySeason[yr]=Object.assign({},cfg.bySeason[yr]||{},{ stake:cfg.stake, leagueId:lid||"" });
-  cfg.season=yr;                      // the league is on the new season from now on
-  B.saveConfig();
-  setSeason(null);                    // and that is what everyone lands on
-  D.drawRoster(); touch();
-  toast(lid?("Season "+yr+" started"):("Season "+yr+" started — Sync from Sleeper to find its league"));
+  var typed=document.getElementById("rNewLeague").value.trim();
+  // Left blank, look it up: Sleeper's new league points back at the old one, so the way
+  // across is to ask. Typed in, that wins - a league the link cannot reach is exactly when
+  // somebody would paste an id.
+  var from=Sn.settingsFor(state.config,Sn.currentSeason(state.config)).leagueId;
+  var found=typed?Promise.resolve(null):N.findNextLeague(from,yr);
+  toast(typed?"Starting "+yr+"…":"Looking for "+yr+" on Sleeper…");
+  found.then(function(L){
+    var lid=typed||(L&&L.league_id)||"";
+    var cfg=state.config;
+    cfg.bySeason=cfg.bySeason||{};
+    cfg.bySeason[yr]=Object.assign({},cfg.bySeason[yr]||{},{ stake:cfg.stake, leagueId:lid });
+    cfg.season=yr;                      // the league is on the new season from now on
+    B.saveConfig();
+    setSeason(null);                    // and that is what everyone lands on
+    document.getElementById("rNewSeason").value=""; document.getElementById("rNewLeague").value="";
+    D.drawRoster(); touch();
+    toast(lid
+      ? ("Season "+yr+" started"+(L?" · found "+(L.name||"the league")+" on Sleeper":"")+" — Sync from Sleeper for the roster")
+      : ("Season "+yr+" started — no Sleeper league found, add its id in the League screen"));
+  });
 }
 
 function saveLeague(){

@@ -1379,7 +1379,8 @@ test("starting a season moves the league on and carries nobody with it", { skip 
   assert.deepEqual(out.settings, { stake: 25, leagueId: "L2027" }, "the season gets its own stake and Sleeper league");
   assert.deepEqual(out.playing, [], "nobody is carried over — the roster sync adds whoever is actually in the new league");
   assert.deepEqual(out.stillOn2026, ["2026", "2026", "2026"], "and last season's record is untouched");
-  assert.match(out.toast, /^Season 2027 started$/);
+  assert.match(out.toast, /^Season 2027 started — Sync from Sleeper for the roster$/,
+    "and says the next step, since the new season starts with nobody in it");
   assert.deepEqual(errors, []);
   await p.close();
 });

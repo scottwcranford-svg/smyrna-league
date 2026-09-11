@@ -212,3 +212,30 @@ test("runRefresh honours the hourly rule, then writes stats, games and the refre
   const stamp = db.writes[db.writes.length - 1]; assert.equal(stamp[1], "league/refresh"); assert.equal(stamp[2].status, "done"); assert.equal(stamp[2].by, "m1");
   const b1 = db.writes.find((w) => w[1] === "bets/b1")[2].stats; assert.equal(b1.rows[0].value, T.HOU.sack);
 });
+
+test("next season's league is found by the link back, not by guessing", async () => {
+  const leagues = [
+    { league_id: "other", name: "Work League", previous_league_id: "zzz" },
+    { league_id: "L2027", name: "Smyrna League", previous_league_id: "L2026" },
+  ];
+  assert.equal(N.nextLeagueFrom(leagues, "L2026").league_id, "L2027", "the one that points at ours");
+  assert.equal(N.nextLeagueFrom(leagues, "nope"), null, "and nothing when none does");
+  assert.equal(N.nextLeagueFrom(null, "L2026"), null);
+
+  const hits = [];
+  globalThis.fetch = async (u) => {
+    hits.push(u.replace(/^.*\/v1\//, ""));
+    const j = /league\/L2026\/users$/.test(u) ? [{ user_id: "u1", display_name: "hobnailboot" }]
+      : /user\/u1\/leagues\/nfl\/2027$/.test(u) ? leagues : [];
+    return { ok: true, json: async () => j };
+  };
+  const found = await N.findNextLeague("L2026", "2027");
+  assert.equal(found.league_id, "L2027");
+  assert.deepEqual(hits, ["league/L2026/users", "user/u1/leagues/nfl/2027"], "two calls, no guessing");
+
+  // a league nobody is in, or a season that does not exist yet, answers null rather than throwing
+  globalThis.fetch = async () => ({ ok: true, json: async () => [] });
+  assert.equal(await N.findNextLeague("L2026", "2027"), null);
+  globalThis.fetch = async () => { throw new Error("offline"); };
+  assert.equal(await N.findNextLeague("L2026", "2027"), null, "and offline is not a crash");
+});
