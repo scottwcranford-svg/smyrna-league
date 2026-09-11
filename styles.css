@@ -385,6 +385,11 @@ h1,h2,h3,.terms,.login-brand h1{font-family:"Poppins","Inter",system-ui,sans-ser
 .chip .n{background:rgba(0,0,0,.18)}
 .tag.pos-QB{color:#FF2B6D} .tag.pos-RB{color:#00CEB8} .tag.pos-WR{color:#58A7FF} .tag.pos-TE{color:#FFAE58} .tag.pos-K{color:#BD66FF}
 
+/* The season picker, beside the league name. Only shows once there is more than one. */
+.season-pick{display:inline-flex;align-items:center;gap:7px;margin-top:6px}
+.season-pick .lbl{font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3)}
+.season-pick .field{width:auto;min-height:0;padding:4px 26px 4px 10px;font-size:12px;font-weight:800;border-radius:99px}
+
 /* ---- Scores: the Sleeper league's week, and the pool riding on it ---- */
 #weekPick .chip .n{background:var(--gold-bg);color:var(--gold);font-style:normal}
 #weekPick .chip[aria-pressed="true"] .n{background:rgba(0,0,0,.18);color:var(--accent-ink)}

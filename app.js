@@ -9,7 +9,7 @@ import * as Badges from "./badges.js?v=dev";
 import * as S from "./store.js?v=dev";
 import * as A from "./auth.js?v=dev";
 import * as N from "./sleeper.js?v=dev";
-import { state, members, onRender, touch, setBets, setHighlow, setScores } from "./state.js?v=dev";
+import { state, members, onRender, touch, setBets, setHighlow, setScores, currentCfg } from "./state.js?v=dev";
 import { render, toast, ticker, statsBar, showBet } from "./render.js?v=dev";
 import { expireBets, settleFinished, syncBadges } from "./book.js?v=dev";
 import { drawScope, drawEntries, drawGameBox } from "./forms.js?v=dev";
@@ -24,7 +24,9 @@ mark("boot");
 
 /* ---- keeping the book current ----
    The loops need a snapshot of what this page knows; nothing in sleeper.js reads state. */
-function refreshCtx(){ return { config:state.config, games:state.games, refresh:state.refresh, bets:state.bets, roster:state.roster, proj:state.proj, sleeper:state.sleeper, highlow:state.allHighlow, scores:state.allScores, season:state.season,
+// Always the current season's settings: a refresh writes the season being played, not the
+// one someone happens to be reading.
+function refreshCtx(){ return { config:currentCfg(), games:state.games, refresh:state.refresh, bets:state.bets, roster:state.roster, proj:state.proj, sleeper:state.sleeper, highlow:state.allHighlow, scores:state.allScores, season:state.season,
                                 holder:state.me, mobile:/Mobi|Android/i.test(navigator.userAgent) }; }
 function scoresTick(db){ if(!db||state.local) return; N.scoresTick(db,refreshCtx()); }
 function runRefresh(db,by,forced){ return N.runRefresh(db,by,forced,refreshCtx()); }

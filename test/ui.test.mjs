@@ -1297,3 +1297,50 @@ test("asking for a password is the app's dialog, not the browser's", { skip }, a
   assert.deepEqual(errors, []);
   await p.close();
 });
+
+test("the season picker appears once there are two, and the past is read only", { skip }, async () => {
+  const { p, errors } = await page();
+  const out = await p.evaluate(async () => {
+    const St = await import("./state.js?v=dev"); const V = await import("./render.js?v=dev");
+    const B = await import("./book.js?v=dev");
+    const { state } = St;
+    state.local = false; state.connected = true; state.db = { doc() { return { set: () => Promise.resolve() }; } };
+    state.admin = true;
+    V.render(); await new Promise(r => setTimeout(r, 30));
+    const oneSeason = { hidden: document.getElementById("seasonPick").hidden };
+
+    // a second season exists the moment anything claims one
+    state.config = { ...state.config, season: "2027" };
+    state.config.members.forEach(m => { m.seasons = ["2026", "2027"]; });
+    St.setBets([{ id: "old", season: "2026", status: "settled", week: 1, amount: 10, entries: [] }]);
+    V.render(); await new Promise(r => setTimeout(r, 30));
+    const sel = document.getElementById("seasonSel");
+    const two = { hidden: document.getElementById("seasonPick").hidden,
+      options: [...sel.options].map(o => o.textContent), value: sel.value,
+      sub: document.getElementById("leagueSub").textContent };
+
+    // reading 2026 while the league is on 2027
+    sel.value = "2026"; sel.dispatchEvent(new Event("change", { bubbles: true }));
+    await new Promise(r => setTimeout(r, 40));
+    const past = { shown: St.shownSeason(), sub: document.getElementById("leagueSub").textContent };
+    const allowed = B.guard();
+    const toastText = document.getElementById("toast").textContent;
+
+    // back to now, and writing is allowed again
+    sel.value = "2027"; sel.dispatchEvent(new Event("change", { bubbles: true }));
+    await new Promise(r => setTimeout(r, 40));
+    return { oneSeason, two, past, allowed, toastText, backNow: B.guard() };
+  });
+  assert.equal(out.oneSeason.hidden, true, "one season needs no picker");
+  assert.equal(out.two.hidden, false, "two does");
+  assert.deepEqual(out.two.options, ["2026", "2027 · now"], "oldest first, and which one the league is on");
+  assert.equal(out.two.value, "2027", "opening on the season being played");
+  assert.match(out.two.sub, /side bets$/, "which reads as normal");
+  assert.equal(out.past.shown, "2026");
+  assert.match(out.past.sub, /closed · read only$/, "an older season says so in the header");
+  assert.equal(out.allowed, false, "and refuses every write, since guard() is the one gate they all pass");
+  assert.equal(out.toastText, "2026 is closed — switch to 2027 to make changes", "saying how to fix it");
+  assert.equal(out.backNow, true, "the season being played is writable as ever");
+  assert.deepEqual(errors, []);
+  await p.close();
+});

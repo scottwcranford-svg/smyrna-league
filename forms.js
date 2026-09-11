@@ -9,7 +9,7 @@ import * as Roster from "./roster.js?v=dev";
 import * as Sched from "./schedule.js?v=dev";
 import * as Stats from "./stats.js?v=dev";
 import * as Bets from "./bets.js?v=dev";
-import { state, members, realMembers, shownSeason } from "./state.js?v=dev";
+import { state, members, realMembers, shownSeason , seasonCfg } from "./state.js?v=dev";
 import { toast, statusTagsHtml, logoHtml } from "./render.js?v=dev";
 import { guard, findBet, saveBet } from "./book.js?v=dev";
 import { dbMsg } from "./store.js?v=dev";
@@ -18,9 +18,9 @@ const STATS=Stats.STATS, LAST_WEEK=Clock.LAST_WEEK, PLAYOFF_START=Clock.PLAYOFF_
 const esc=Fmt.esc, money=Fmt.money, uid=Fmt.uid, clone=Fmt.clone, entriesOf=Fmt.entriesOf, fmtWhen=Fmt.fmtWhen,
       shortName=Fmt.shortName, picksText=Fmt.picksText, statsKey=Stats.statsKey, autoName=Bets.autoName;
 const mName=function(id){ return Id.mName(id,members()); };
-const isLocked=function(b){ return Clock.isLocked(b,state.config); };
-const weekLocked=function(w){ return Clock.weekLocked(w,state.config); };
-const currentWeek=function(){ return Clock.currentWeek(state.config,state.games); };
+const isLocked=function(b){ return Clock.isLocked(b,seasonCfg()); };
+const weekLocked=function(w){ return Clock.weekLocked(w,seasonCfg()); };
+const currentWeek=function(){ return Clock.currentWeek(seasonCfg(),state.games); };
 const allGames=function(){ return Clock.allGames(state.games); };
 const teamName=function(code){ return Roster.teamName(code,state.roster); };
 const rosterRows=function(){ return Roster.rosterRows(state.roster); };
@@ -59,7 +59,7 @@ export function drawGameBox(){
   document.getElementById("bTermsRow").hidden=!!scope;
   document.getElementById("bWhoLbl").textContent=isGame?"Your side, and who you're betting":"Who's in, and what they're taking";
   // A game bet has no default stake — the proposer names it every time.
-  var amt=document.getElementById("bAmt"), dflt=String((state.config&&state.config.stake)||25);
+  var amt=document.getElementById("bAmt"), dflt=String((seasonCfg()&&seasonCfg().stake)||25);
   if(isGame){
     if(!state.editId&&amt.value===dflt) amt.value="";
     amt.placeholder="your stake";
@@ -300,7 +300,7 @@ export function openBetDlg(editId){
   }
   if(!opts.length) return toast("The season's over — nothing left to bet on");
   wk.innerHTML=opts.join("");
-  var stake=(state.config&&state.config.stake)||25;
+  var stake=(seasonCfg()&&seasonCfg().stake)||25;
   document.getElementById("bTitle").textContent=bet?"Edit bet":"Propose a bet";
   document.getElementById("bJoin").checked=bet?!!bet.joinable:true;
   document.getElementById("bSave").textContent=bet?"Save changes":"Post it";

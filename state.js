@@ -73,6 +73,29 @@ export function dropBet(id){
 // Look at a different season.
 export function setSeason(s){ state.season=s?String(s):null; syncBets(); syncWeekly(); }
 
+// The league's settings as the season being shown has them. A season sets its own stake,
+// its own kickoff and its own week starts - 2027's weeks do not begin when 2026's did -
+// and its own Sleeper league id, because Sleeper mints a new one every year. What a season
+// does not override it inherits from the top level, which is how 2026 keeps reading exactly
+// as it always has. Everything that asks the clock or the ledger a question passes this,
+// not the raw config.
+export function seasonCfg(){
+  var c=state.config;
+  if(!c) return c;
+  var s=Sn.settingsFor(c,shownSeason());
+  return Object.assign({},c,{ stake:s.stake, kickoff:s.kickoff, weekStarts:s.weekStarts, sleeperLeagueId:s.leagueId });
+}
+
+// The season the league is actually on, whatever is being looked at. The refresh loops use
+// this and never seasonCfg(): pulling Sleeper while an admin browses 2026 must still write
+// 2027's scores, not last year's.
+export function currentCfg(){
+  var c=state.config;
+  if(!c) return c;
+  var s=Sn.settingsFor(c,Sn.currentSeason(c));
+  return Object.assign({},c,{ stake:s.stake, kickoff:s.kickoff, weekStarts:s.weekStarts, sleeperLeagueId:s.leagueId });
+}
+
 export function members(){ return (state.config&&state.config.members)||[]; }
 // The roster as the league sees it: test accounts (member.test) are left out of the
 // ledger board and the pickers, but never out of name lookups. You always see yourself.

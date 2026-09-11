@@ -11,7 +11,7 @@ import * as Bets from "./bets.js?v=dev";
 import * as Badges from "./badges.js?v=dev";
 import * as S from "./store.js?v=dev";
 import * as A from "./auth.js?v=dev";
-import { state, members, realMembers, teamOf, touch } from "./state.js?v=dev";
+import { state, members, realMembers, teamOf, touch , seasonCfg } from "./state.js?v=dev";
 import { toast, avatarHtml } from "./render.js?v=dev";
 import { guard, findBet } from "./book.js?v=dev";
 import * as Nf from "./notify.js?v=dev";
@@ -96,7 +96,7 @@ export function openRoster(){
 // Drill-through from the season table: the bets or hi / low weeks behind one cell.
 export function openDrill(memberId,row){
   var m=member(memberId); if(!m) return;
-  var rows=Ledger.drillRows(memberId,row,state.bets,state.highlow,Ledger.hlStake(state.config),members());
+  var rows=Ledger.drillRows(memberId,row,state.bets,state.highlow,Ledger.hlStake(seasonCfg()),members());
   var title={ hl:"Hi / low", weekly:"Weekly bets", season:"Season bets", total:"Everything" }[row]||row;
   var net=rows.reduce(function(s,r){ return s+r.amount; },0);
   document.getElementById("drillTitle").innerHTML=avatarHtml(m.id,24)+" "+esc(m.name)+' <span class="drill-row">· '+esc(title)+"</span>";

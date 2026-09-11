@@ -7,7 +7,7 @@ import * as Clock from "./clock.js?v=dev";
 import * as Id from "./identity.js?v=dev";
 import * as Ledger from "./ledger.js?v=dev";
 import * as A from "./auth.js?v=dev";
-import { state, members, touch, shownSeason } from "./state.js?v=dev";
+import { state, members, touch, shownSeason, setSeason } from "./state.js?v=dev";
 import { toast, showBet } from "./render.js?v=dev";
 import * as B from "./book.js?v=dev";
 import * as F from "./forms.js?v=dev";
@@ -257,6 +257,7 @@ export function bindEvents(hooks){
   // closing it any other way - Escape, the header X - is a cancel, not a hang
   var askDlg=document.getElementById("askDlg");
   if(askDlg) askDlg.addEventListener("close",function(){ D.closeAsk(false); });
+  on("seasonSel","change",function(e){ setSeason(e.target.value); touch(); });
   on("rAdd","click",function(e){ e.preventDefault(); addMember(); });
   on("rSync","click",function(e){ e.preventDefault(); B.requestRosterSync(); });
   on("rSave","click",function(e){ e.preventDefault(); saveLeague(); });

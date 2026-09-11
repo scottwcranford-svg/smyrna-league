@@ -11,8 +11,9 @@ import * as Stats from "./stats.js?v=dev";
 import * as Ledger from "./ledger.js?v=dev";
 import * as Bets from "./bets.js?v=dev";
 import * as Rivals from "./rivals.js?v=dev";
+import * as Sn from "./seasons.js?v=dev";
 import * as Badges from "./badges.js?v=dev";
-import { state, members, realMembers, teamOf, touch } from "./state.js?v=dev";
+import { state, members, realMembers, teamOf, touch , seasonCfg } from "./state.js?v=dev";
 import * as Nf from "./notify.js?v=dev";
 
 // Under 600px the page takes its phone shape (styles.css does most of it; this is the
@@ -25,11 +26,11 @@ const esc=Fmt.esc, money=Fmt.money, signed=Fmt.signed, initials=Fmt.initials, we
 const member=function(id){ return Id.member(id,members()); };
 const mName=function(id){ return Id.mName(id,members()); };
 const mColor=function(id){ return Id.mColor(id,members()); };
-const betLock=function(b){ return Clock.betLock(b,state.config); };
-const isLocked=function(b){ return Clock.isLocked(b,state.config); };
+const betLock=function(b){ return Clock.betLock(b,seasonCfg()); };
+const isLocked=function(b){ return Clock.isLocked(b,seasonCfg()); };
 const gameOf=function(b){ return Bets.gameOf(b,state.games); };
-const currentWeek=function(){ return Clock.currentWeek(state.config,state.games); };
-const computeLedger=function(){ return Ledger.computeLedger(state.config,state.bets); };
+const currentWeek=function(){ return Clock.currentWeek(seasonCfg(),state.games); };
+const computeLedger=function(){ return Ledger.computeLedger(seasonCfg(),state.bets); };
 
 export function render(){ head(); ticker(); banner(); tabs(); glance(); badgesView(); board(); scoresView(); rivalsView(); settle(); filters(); tickets(); statsBar(); foot(); }
 
@@ -135,8 +136,24 @@ function head(){
   var c=state.config, league=state.sleeper&&state.sleeper.league;
   document.getElementById("leagueName").textContent=c?c.leagueName:"Smyrna League";
   // the league's settings line, Sleeper's way: "2026 · 10-Team Keeper SF PPR · side bets"
-  var line=Roster.leagueLine(league,c&&c.season);
-  document.getElementById("leagueSub").textContent=(line?line+" · ":"")+"side bets";
+  var shown=Sn.shownSeasonOf(state), current=Sn.currentSeason(c);
+  // league/sleeper holds the *current* league's settings, so "10-Team Keeper SF PPR" is
+  // this year's and we have no record of an older year's. Reading 2026 therefore shows the
+  // year and nothing it cannot vouch for.
+  var line=shown===current?Roster.leagueLine(league,shown):String(shown);
+  document.getElementById("leagueSub").textContent=(line?line+" · ":"")+(shown===current?"side bets":"closed · read only");
+  // The picker only appears once there is more than one season to pick.
+  var seasons=Sn.seasonList(c,state.allBets), pick=document.getElementById("seasonPick");
+  var sel=document.getElementById("seasonSel");
+  pick.hidden=seasons.length<2;
+  if(!pick.hidden){
+    var want=seasons.join("|");
+    if(sel.getAttribute("data-built")!==want){
+      sel.innerHTML=seasons.map(function(s){ return '<option value="'+esc(s)+'">'+esc(s)+(s===current?" · now":"")+"</option>"; }).join("");
+      sel.setAttribute("data-built",want);
+    }
+    sel.value=shown;
+  }
   // the league's own Sleeper avatar when it has one; our football mark otherwise
   var mark=document.getElementById("leagueBadge");
   if(league&&league.avatar&&!mark.querySelector("img")) mark.innerHTML='<img src="https://sleepercdn.com/avatars/thumbs/'+esc(league.avatar)+'" alt="">';
@@ -160,10 +177,10 @@ function head(){
 
 // The tab row: which panel is open, and a badge where something needs a look.
 function tabs(){
-  var L=computeLedger(), HL=Ledger.hlTally(state.highlow,members(),Ledger.hlStake(state.config));
+  var L=computeLedger(), HL=Ledger.hlTally(state.highlow,members(),Ledger.hlStake(seasonCfg()));
   var seats=0;
   state.bets.forEach(function(b){ if(b.status==="open"&&!isLocked(b)) entriesOf(b).forEach(function(e){ if(!e.memberId&&(!e.invite||e.declined)) seats++; }); });
-  var Bal=Ledger.balances(state.config,state.bets,state.highlow,state.payments&&state.payments.list,Ledger.hlStake(state.config));
+  var Bal=Ledger.balances(seasonCfg(),state.bets,state.highlow,state.payments&&state.payments.list,Ledger.hlStake(seasonCfg()));
   // Rivals badges the pairs you're behind on — the rivalries to fix.
   var RV=Rivals.rivals(realMembers().filter(function(m){ return !m.test; }),state.bets), owed=0;
   if(state.me&&RV.byId[state.me]) Object.keys(RV.byId[state.me]).forEach(function(b){ if(RV.byId[state.me][b].net<0) owed++; });
@@ -187,7 +204,7 @@ function glance(){
   });
   var parts=['<span><b>'+live+"</b> "+(live===1?"bet":"bets")+" running</span>",'<span><b>'+esc(money(pot))+"</b> on the table</span>"];
   if(state.me){
-    var Bg=Ledger.balances(state.config,state.bets,state.highlow,state.payments&&state.payments.list,Ledger.hlStake(state.config));
+    var Bg=Ledger.balances(seasonCfg(),state.bets,state.highlow,state.payments&&state.payments.list,Ledger.hlStake(seasonCfg()));
     var net=(Bg.byId[state.me]||{}).net||0;
     parts.push('<span>you <b class="'+(net>0?"pos":net<0?"neg":"")+'">'+esc(signed(net))+"</b> net"+
       (mineOpen?' · <b class="warn">'+mineOpen+(mineOpen===1?" seat":" seats")+"</b> waiting on takers":"")+"</span>");
@@ -263,7 +280,7 @@ function boardSide(r,best,lead){
 
 function scoresView(){
   var host=document.getElementById("scores"), note=document.getElementById("scoresNote");
-  var stake=Ledger.hlStake(state.config), HL=Ledger.hlTally(state.highlow,members(),stake);
+  var stake=Ledger.hlStake(seasonCfg()), HL=Ledger.hlTally(state.highlow,members(),stake);
   weekPicker();
   var w=shownWeek(), E=(state.scores&&state.scores.weeks)?state.scores.weeks[String(w)]:null;
   var rows=(E&&Array.isArray(E.rows))?E.rows:[];
@@ -375,7 +392,7 @@ export function showBet(id){
 
 // The season in one table: a column per manager, a row per pool, net all season, paid or not.
 function seasonTable(L){
-  var HL=Ledger.hlTally(state.highlow,members(),Ledger.hlStake(state.config));
+  var HL=Ledger.hlTally(state.highlow,members(),Ledger.hlStake(seasonCfg()));
   var cols=realMembers().filter(function(m){ return !m.test; });
   if(!cols.length) return "";
   if(phone()) return seasonTableByManager(L,HL,cols);
@@ -428,7 +445,7 @@ const BADGE_ICON={
 const badgeSvg=function(k){ return '<svg viewBox="0 0 24 24" aria-hidden="true">'+(BADGE_ICON[k]||"")+"</svg>"; };
 // The badges as they stand, with whatever history the book has recorded.
 function badgeList(){
-  return Badges.badges(state.config,state.bets,state.highlow,state.seen,state.payments&&state.payments.list,Date.now());
+  return Badges.badges(seasonCfg(),state.bets,state.highlow,state.seen,state.payments&&state.payments.list,Date.now());
 }
 function badgesView(){
   var host=document.getElementById("badges"), list=badgeList();
@@ -564,7 +581,7 @@ function rivalsView(){
 // clear them, and the payments made so far. Nothing is paid bet by bet.
 function settle(){
   var L=computeLedger(), host=document.getElementById("settle");
-  var B=Ledger.balances(state.config,state.bets,state.highlow,state.payments&&state.payments.list,Ledger.hlStake(state.config));
+  var B=Ledger.balances(seasonCfg(),state.bets,state.highlow,state.payments&&state.payments.list,Ledger.hlStake(seasonCfg()));
   var cols=realMembers().filter(function(m){ return !m.test; });
   var h=seasonTable(L);
 

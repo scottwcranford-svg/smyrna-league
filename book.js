@@ -8,18 +8,22 @@ import * as Id from "./identity.js?v=dev";
 import * as Bets from "./bets.js?v=dev";
 import * as Badges from "./badges.js?v=dev";
 import { dbMsg } from "./store.js?v=dev";
-import { state, members, touch, putBet, dropBet, shownSeason } from "./state.js?v=dev";
+import { state, members, touch, putBet, dropBet, shownSeason , seasonCfg } from "./state.js?v=dev";
 import * as Sn from "./seasons.js?v=dev";
 import { toast, statsBar } from "./render.js?v=dev";
 
 const entriesOf=Fmt.entriesOf, openSeats=Fmt.openSeats, clone=Fmt.clone;
 const mName=function(id){ return Id.mName(id,members()); };
 const money=Fmt.money, uid=Fmt.uid;
-const isLocked=function(b){ return Clock.isLocked(b,state.config); };
-const betLock=function(b){ return Clock.betLock(b,state.config); };
+const isLocked=function(b){ return Clock.isLocked(b,seasonCfg()); };
+const betLock=function(b){ return Clock.betLock(b,seasonCfg()); };
 
 export function guard(){
   if(state.local){ toast(state.connected?"Publish the league first":"Preview only — nothing saves"); return false; }
+  // A season that is over is a record, not a book. Every write goes through here, so this
+  // is the one place that has to say no - proposing, joining, settling, paying, all of it.
+  var shown=shownSeason(), now=Sn.currentSeason(state.config);
+  if(shown!==now){ toast(shown+" is closed — switch to "+now+" to make changes"); return false; }
   return true;
 }
 
@@ -88,7 +92,7 @@ export function syncBadges(){
   // This runs on the way to every draw, so nothing in here may throw: a failed
   // bookkeeping write must never stop the page from rendering.
   try{
-    var list=Badges.badges(state.config,state.bets,state.highlow,state.seen,state.payments&&state.payments.list,Date.now());
+    var list=Badges.badges(seasonCfg(),state.bets,state.highlow,state.seen,state.payments&&state.payments.list,Date.now());
     var chg=Badges.badgeChanges(list,state.badges,state.config,state.games,Date.now());
     if(!chg) return;
     var cur=(state.badges&&state.badges.byKey)||{};

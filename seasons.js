@@ -110,3 +110,9 @@ export function seasonsIn(doc){
   if(isFlat(weeks)) return [LEGACY_SEASON];
   return Object.keys(weeks).sort();
 }
+
+// The season on screen, given the shared state object. Lives here rather than being
+// imported from state.js so render.js has one place to ask.
+export function shownSeasonOf(state){
+  return (state&&state.season)||currentSeason(state&&state.config);
+}
