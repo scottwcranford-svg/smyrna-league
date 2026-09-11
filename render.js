@@ -95,7 +95,7 @@ export function ticker(){
   var G=state.games&&Array.isArray(state.games.games)?state.games.games:[];
   if(!G.length){ el.hidden=true; return; }
   var w=currentWeek(), now=Date.now();
-  var slate=G.filter(function(g){ return g.week===w; });
+  var slate=G.filter(function(g){ return g.week===w; }).sort(Clock.byKickoff);
   if(!slate.length){ el.hidden=true; return; }
   var items='<span class="tk-wk">Week '+w+"</span>"+slate.map(function(g){
     var t=Date.parse(g.date), scored=g.awayScore!=null&&g.homeScore!=null;
@@ -116,8 +116,11 @@ export function ticker(){
     }
     // before kickoff, what Vegas has on it — the same numbers the propose form prefills
     var L=Sched.lineFor(g,state.lines), sm=L?Sched.lineSummary(L):"";
-    return '<span class="game"><span class="tm">'+logoHtml(g.away,14)+esc(g.away)+'</span><span class="at">@</span><span class="tm">'+logoHtml(g.home,14)+esc(g.home)+"</span>"+
-      '<span class="when">'+esc(fmtKick(t))+"</span>"+(sm?'<span class="odds">'+esc(sm)+"</span>":"")+"</span>";
+    // inside the hour, the clock matters more than the date
+    var soon=Clock.kicksSoon(g,now);
+    return '<span class="game'+(soon?" soon":"")+'"><span class="tm">'+logoHtml(g.away,14)+esc(g.away)+'</span><span class="at">@</span><span class="tm">'+logoHtml(g.home,14)+esc(g.home)+"</span>"+
+      (soon?'<span class="kick">Kicks in '+esc(countdown(t))+"</span>":'<span class="when">'+esc(fmtKick(t))+"</span>")+
+      (sm?'<span class="odds">'+esc(sm)+"</span>":"")+"</span>";
   }).join("");
   // two copies make the loop seamless; speed scales with how much is on the strip
   el.style.setProperty("--tick",Math.max(30,slate.length*5)+"s");
@@ -604,7 +607,8 @@ function gamelineHtml(b){
   else if(st==="live"){
     var q=g.ot?"OT":(g.q?"Q"+g.q:(g.ql||"Live"));
     stateHtml='<span class="gl-state live">'+esc((q+" "+(g.clock||"")).trim())+(g.dd?" · "+esc(g.dd):"")+"</span>";
-  } else stateHtml='<span class="gl-state">'+esc(fmtWhen(t))+"</span>";
+  } else if(Clock.kicksSoon(g,now)) stateHtml='<span class="gl-state soon">Kicks in '+esc(countdown(t))+"</span>";
+  else stateHtml='<span class="gl-state">'+esc(fmtWhen(t))+"</span>";
   return '<div class="gameline">'+team(g.away,g.awayScore,hw)+'<span class="gl-at">@</span>'+team(g.home,g.homeScore,aw)+
     (b.market&&b.market!=="ml"?'<span class="gl-line">'+esc(lineText(b))+
       (function(){ var o=Bets.lineOrigin(b); return o?'<i class="src '+o+'">'+(o==="vegas"?"Vegas":"their number")+"</i>":""; })()+"</span>":"")+stateHtml+"</div>";

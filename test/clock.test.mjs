@@ -37,3 +37,33 @@ test("bye weeks: teams without a game that week can't be picked", () => {
   assert.equal(Clock.onBye("KC", Clock.teamsPlaying(17, games)), false, "a week with no schedule filters nobody");
   assert.equal(Clock.onBye("KC", Clock.teamsPlaying(5, null)), false, "no schedule loaded yet");
 });
+
+test("kickoff order: chronological, undated last, stable on a tie", () => {
+  const g = (id, date, away, home) => ({ id, date, away, home });
+  const slate = [
+    g("mon", "2026-09-14T00:15:00Z", "DEN", "KC"),
+    g("late", "2026-09-13T20:25:00Z", "GB", "MIN"),
+    g("early", "2026-09-13T17:00:00Z", "CHI", "CAR"),
+    g("tbd", "", "NYJ", "TEN"),
+    g("early2", "2026-09-13T17:00:00Z", "ATL", "PIT"),
+  ];
+  assert.deepEqual([...slate].sort(Clock.byKickoff).map(x => x.id),
+    ["early2", "early", "late", "mon", "tbd"], "same kickoff breaks on the matchup, ATL before CHI");
+  // sorting twice must not shuffle it again
+  assert.deepEqual([...slate].sort(Clock.byKickoff).sort(Clock.byKickoff).map(x => x.id),
+    ["early2", "early", "late", "mon", "tbd"]);
+});
+
+test("a game reads as kicking off soon only inside the hour before it starts", () => {
+  const now = Date.parse("2026-09-13T17:00:00Z");
+  const at = (mins, extra) => ({ id: "g", date: new Date(now + mins * 60e3).toISOString(), ...extra });
+  assert.equal(Clock.kicksSoon(at(30), now), true, "half an hour out");
+  assert.equal(Clock.kicksSoon(at(59), now), true);
+  assert.equal(Clock.kicksSoon(at(61), now), false, "more than an hour is just scheduled");
+  assert.equal(Clock.kicksSoon(at(-1), now), false, "already started is not 'soon'");
+  assert.equal(Clock.kicksSoon(at(30, { status: "live" }), now), false, "a live game is never soon");
+  assert.equal(Clock.kicksSoon(at(30, { status: "final" }), now), false);
+  assert.equal(Clock.kicksSoon(at(30, { awayScore: 7, homeScore: 3 }), now), false, "nor one with a score on it");
+  assert.equal(Clock.kicksSoon({ id: "x", date: "" }, now), false, "no date, no judgement");
+  assert.equal(Clock.kicksSoon(null, now), false);
+});

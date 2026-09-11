@@ -78,13 +78,18 @@ export function drawGameBox(){
   // when editing, the bet's own game stays listed even if it's near kickoff
   if(cur&&!weeks.some(function(w){ return byWeek[w].some(function(g){ return g.id===cur.id; }); })) add(cur);
   weeks.sort(function(a,b){ return a-b; });
+  // and within a week, in kickoff order — the feed's own order puts Monday night
+  // above Sunday afternoon
+  weeks.forEach(function(w){ byWeek[w].sort(Clock.byKickoff); });
   sel.innerHTML=weeks.length
     ? '<option value="">Pick a game…</option>'+weeks.map(function(w){
         return '<optgroup label="Week '+w+'">'+byWeek[w].map(function(g){
           // say up front whether this game has a published line, so nobody picks a game
           // expecting a spread and finds an empty box
           var sm=Sched.lineSummary(lineOf(g));
-          return '<option value="'+esc(g.id)+'"'+(cur&&cur.id===g.id?" selected":"")+">"+esc(g.away+" @ "+g.home)+" · "+esc(fmtWhen(Date.parse(g.date)))+" · "+esc(sm||"no line yet")+"</option>"; }).join("")+"</optgroup>"; }).join("")
+          // an option can't be styled, so a game inside the hour says so in words
+          var when=Clock.kicksSoon(g)?"kicks in "+Fmt.countdown(Date.parse(g.date)):fmtWhen(Date.parse(g.date));
+          return '<option value="'+esc(g.id)+'"'+(cur&&cur.id===g.id?" selected":"")+">"+esc(g.away+" @ "+g.home)+" · "+esc(when)+" · "+esc(sm||"no line yet")+"</option>"; }).join("")+"</optgroup>"; }).join("")
     : '<option value="">No games left to bet on</option>';
   if(cur) wk.value=String(cur.week);
   // Each market chip wears its published number, so what's available is visible before

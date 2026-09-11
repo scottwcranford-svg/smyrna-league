@@ -93,6 +93,10 @@ textarea.field,input.field{font-weight:500;letter-spacing:0}
 .game .live{color:var(--gold);font-size:10.5px;font-weight:800;letter-spacing:.04em;font-variant-numeric:tabular-nums}
 .game .ball{color:var(--accent);font-size:9px} .game .ball.rz{color:var(--loss)}
 .game .final{color:var(--ink-3);font-size:10.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase}
+/* Inside the hour before kickoff: the countdown replaces the date, in the same gold
+   the app already uses for "happening now", with the pulse that says it's moving. */
+.game .kick{color:var(--gold);font-size:10.5px;font-weight:800;letter-spacing:.04em;font-variant-numeric:tabular-nums;display:inline-flex;align-items:center;gap:5px}
+.game .kick::before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:currentColor;animation:pulse 1.6s ease-in-out infinite}
 @keyframes tick{from{transform:translateX(0)}to{transform:translateX(-50%)}}
 @media (prefers-reduced-motion: reduce){ .ticker{overflow-x:auto;mask-image:none;-webkit-mask-image:none} .ticker-track{animation:none} }
 
@@ -298,6 +302,9 @@ label.f > span{font-size:11px;font-weight:700;text-transform:uppercase;letter-sp
 .gameline .gl-at{color:var(--ink-3);font-weight:600}
 .gameline .gl-state{margin-left:auto;font-size:11px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-3);white-space:nowrap}
 .gameline .gl-state.live{color:var(--gold);text-transform:none;letter-spacing:.02em;font-variant-numeric:tabular-nums}
+/* about to kick off: same gold as live, with the pulse that says the clock is running */
+.gameline .gl-state.soon{color:var(--gold);text-transform:none;letter-spacing:.02em;font-variant-numeric:tabular-nums;display:inline-flex;align-items:center;gap:5px}
+.gameline .gl-state.soon::before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:currentColor;animation:pulse 1.6s ease-in-out infinite}
 .gameline .gl-line{font-size:12px;font-weight:700;color:var(--ink-2);background:var(--surface);border-radius:99px;padding:3px 10px;white-space:nowrap}
 .gameline .ball{color:var(--accent);font-size:10px} .gameline .ball.rz{color:var(--loss)}
 .side.cover .side-pick::after{content:" · covering";color:var(--gold);font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}

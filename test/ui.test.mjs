@@ -928,3 +928,42 @@ test("the refresh note stacks under the numbers and the buttons, not between the
   assert.deepEqual(errors, []);
   await p.close();
 });
+
+test("the slate lists in kickoff order, and a game inside the hour counts down", { skip }, async () => {
+  const { p, errors } = await page();
+  const out = await p.evaluate(async () => {
+    const { state } = await import("./state.js?v=dev"); const V = await import("./render.js?v=dev");
+    const F = await import("./forms.js?v=dev");
+    const now = Date.now(), mins = (m) => new Date(now + m * 60e3).toISOString();
+    state.local = false; state.connected = true; state.ready = true; state.db = { doc() { return {}; } };
+    // deliberately out of order, the way the schedule feed hands them over
+    state.games = { games: [
+      { id: "mon", week: 1, away: "DEN", home: "KC", date: mins(60 * 30), status: "pre" },
+      { id: "soon", week: 1, away: "ATL", home: "PIT", date: mins(42), status: "pre" },
+      { id: "late", week: 1, away: "GB", home: "MIN", date: mins(60 * 8), status: "pre" }] };
+    state.config = { ...state.config, kickoff: mins(-60), weekStarts: { "1": mins(-60) } };
+    state.bets = [];
+    document.getElementById("login").hidden = true; document.getElementById("app").hidden = false;
+    V.render(); await new Promise(r => setTimeout(r, 40));
+    const games = [...document.querySelectorAll("#ticker .ticker-track > .game")].slice(0, 3);
+    const order = games.map(g => [...g.querySelectorAll(".tm")].map(t => t.textContent.trim()).join("@"));
+    const soonEl = document.querySelector("#ticker .game.soon .kick");
+    // and the propose form's game list, grouped by week, in the same order
+    F.openBetDlg();
+    document.querySelector('#bScope [data-scope="game"]').click();
+    await new Promise(r => setTimeout(r, 40));
+    const opts = [...document.querySelectorAll("#bGame optgroup option")].map(o => o.textContent);
+    return { order, soon: soonEl ? soonEl.textContent : null,
+      soonGold: soonEl ? getComputedStyle(soonEl).color : null,
+      picker: opts.map(t => t.split(" · ")[0]), pickerSoon: opts.find(t => /kicks in/.test(t)) || null,
+      noBodyScroll: document.documentElement.scrollWidth <= innerWidth };
+  });
+  assert.deepEqual(out.order, ["ATL@PIT", "GB@MIN", "DEN@KC"], "the ticker runs in kickoff order, not feed order");
+  assert.match(out.soon, /^Kicks in 4[12]m$/, "the one inside the hour counts down instead of showing its date");
+  assert.equal(out.soonGold, "rgb(255, 174, 88)", "in the same gold the app uses for happening-now");
+  assert.deepEqual(out.picker, ["ATL @ PIT", "GB @ MIN", "DEN @ KC"], "and so does the propose form's list");
+  assert.match(out.pickerSoon, /ATL @ PIT · kicks in 4[12]m/, "which says so in words, since an option can't be styled");
+  assert.equal(out.noBodyScroll, true);
+  assert.deepEqual(errors, []);
+  await p.close();
+});

@@ -46,6 +46,32 @@ export function currentWeek(config,games){
   if(last&&now>last+5*3600000&&w<18) w++;
   return w;
 }
+export const SOON_LEAD=60*60*1000;   // a game reads as "about to start" an hour out
+
+// A game that hasn't kicked off but is about to. Live and final games are never
+// "soon", however their date reads, and a game with no date can't be judged.
+export function kicksSoon(g,now){
+  if(!g||g.status==="live"||g.status==="final") return false;
+  if(g.awayScore!=null&&g.homeScore!=null) return false;
+  var t=Date.parse(g.date||"");
+  if(isNaN(t)) return false;
+  now=now||Date.now();
+  return t>now&&t-now<=SOON_LEAD;
+}
+
+// Kickoff order. The schedule feed arrives in its own order — Monday night can sit
+// above Sunday afternoon — so anything listing a slate sorts through here. Undated
+// games go last, and same-kickoff games break on the matchup so two renders of the
+// same slate never disagree.
+export function byKickoff(a,b){
+  var ta=Date.parse((a&&a.date)||""), tb=Date.parse((b&&b.date)||"");
+  if(isNaN(ta)&&isNaN(tb)) return String((a&&a.id)||"").localeCompare(String((b&&b.id)||""));
+  if(isNaN(ta)) return 1;
+  if(isNaN(tb)) return -1;
+  if(ta!==tb) return ta-tb;
+  return String((a.away||"")+(a.home||"")).localeCompare(String((b.away||"")+(b.home||"")));
+}
+
 // Weeks whose games are all final (and that have games at all).
 export function finalWeeks(games){
   var G=allGames(games), by={};
