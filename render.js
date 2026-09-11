@@ -49,7 +49,7 @@ export function avatarHtml(id,size){
   if(!m) return '<span class="avatar" style="width:'+size+'px;height:'+size+'px;background:var(--ink-3);font-size:'+fs+'px">?</span>';
   // The manager's Sleeper avatar when the book has one; their initials otherwise.
   var hash=state.sleeper&&state.sleeper.byId&&state.sleeper.byId[id]?state.sleeper.byId[id].avatar:"";
-  if(hash) return '<img class="avatar" src="https://sleepercdn.com/avatars/thumbs/'+esc(hash)+'" width="'+size+'" height="'+size+'" alt="" title="'+esc(m.name)+'" style="width:'+size+'px;height:'+size+'px">';
+  if(hash) return '<img class="avatar" src="https://sleepercdn.com/avatars/thumbs/'+esc(hash)+'" width="'+size+'" height="'+size+'" alt="" data-tip="'+esc(m.name)+'" style="width:'+size+'px;height:'+size+'px">';
   return '<span class="avatar" style="width:'+size+'px;height:'+size+'px;background:'+esc(m.color)+';font-size:'+fs+'px">'+esc(initials(m.name))+"</span>";
 }
 // An NFL team's logo from Sleeper's CDN, by team code; nothing for over/under, free agents or blanks.
@@ -64,7 +64,10 @@ function teamLogos(text,size){ return String(text||"").split(" · ").map(functio
 export function statusTagsHtml(id){
   return Roster.statusOf(id,state.roster).map(function(c){
     var hard=c==="Q"?"soft":"hard";
-    return '<span class="st-tag '+hard+'" title="'+esc(Roster.STATUS_LABEL[c]||c)+'">'+esc(c)+"</span>";
+    // the tag reads as a bare letter, so the full word rides along for screen readers
+    // as well as in the tip — `title` used to do both jobs
+    var label=Roster.STATUS_LABEL[c]||c;
+    return '<span class="st-tag '+hard+'" data-tip="'+esc(label)+'" aria-label="'+esc(label)+'">'+esc(c)+"</span>";
   }).join("");
 }
 
@@ -273,7 +276,7 @@ function board(){
           (played?p.w+"–"+p.l+(p.p?"–"+p.p:"")+" settled":"settled")+"</span></div>"+
       "</div>"+
       ((worn[m.id]||[]).length?'<div class="seat-bdgs">'+worn[m.id].map(function(b){
-        return '<span class="bdg '+esc(b.fam)+' sm" title="'+esc(b.label+" · "+b.blurb)+'">'+badgeSvg(b.icon)+esc(b.label)+"</span>"; }).join("")+"</div>":"")+
+        return '<span class="bdg '+esc(b.fam)+' sm" data-tip="'+esc(b.label+" · "+b.blurb)+'">'+badgeSvg(b.icon)+esc(b.label)+"</span>"; }).join("")+"</div>":"")+
       '<div class="seat-picks'+(mine.length?"":" none")+'">'+
         (mine.length?esc(mine.join(" · ")):"no action yet")+"</div>"+
     "</div>";
@@ -308,7 +311,7 @@ function seasonTable(L){
   var val=function(m,row){ var p=L.pnl[m.id]||{}, h=HL.byId[m.id]||{};
     return row==="hl"?(h.net||0):row==="weekly"?(p.weekly||0):row==="season"?(p.season||0):(h.net||0)+(p.weekly||0)+(p.season||0); };
   var cell=function(v,total,m,row){ v=Math.round(v*100)/100;
-    return '<td class="num '+(v>0?"pos":v<0?"neg":"flat")+(total?" total":"")+'" data-act="drill" data-m="'+esc(m.id)+'" data-row="'+row+'" title="What\u2019s behind this" tabindex="0">'+signed(v)+"</td>"; };
+    return '<td class="num '+(v>0?"pos":v<0?"neg":"flat")+(total?" total":"")+'" data-act="drill" data-m="'+esc(m.id)+'" data-row="'+row+'" data-tip="What\u2019s behind this" tabindex="0">'+signed(v)+"</td>"; };
   var rows=[["hl","Hi / low"],["weekly","Weekly bets"],["season","Season bets"],["total","Total"]];
   return '<div class="pivot-wrap"><table class="pivot"><thead><tr><th></th>'+cols.map(function(m){
       return '<th'+(m.id===state.me?' class="me"':"")+'><span class="pv-head">'+avatarHtml(m.id,22)+'<span>'+esc(m.name)+"</span></span></th>"; }).join("")+"</tr></thead><tbody>"+
@@ -366,7 +369,7 @@ function badgesView(){
   }
   var isMine=function(b){ return !!state.me&&b.holders.indexOf(state.me)>=0; };
   var mine=held.filter(isMine);
-  var chip=function(b,small){ return '<span class="bdg '+esc(b.fam)+(small?" sm":"")+'" title="'+esc(b.blurb)+'">'+badgeSvg(b.icon)+esc(b.label)+(small?"":" · "+esc(b.text))+"</span>"; };
+  var chip=function(b,small){ return '<span class="bdg '+esc(b.fam)+(small?" sm":"")+'" data-tip="'+esc(b.blurb)+'">'+badgeSvg(b.icon)+esc(b.label)+(small?"":" · "+esc(b.text))+"</span>"; };
   var h="";
   if(state.me) h+='<div class="bdg-mine"><span class="lbl">You hold</span>'+
     (mine.length?mine.map(function(b){ return chip(b); }).join("")
@@ -429,7 +432,7 @@ function rivalsView(){
   var order=list.slice().sort(function(x,y){ return (RV.totals[y.id].net-RV.totals[x.id].net)||x.name.localeCompare(y.name); });
   var sel=state.rival;
   h+='<div class="riv-wrap"><table class="riv"><thead><tr><th></th>'+
-    order.map(function(m){ return '<th'+(m.id===state.me?' class="me"':"")+' title="'+esc(m.name)+'">'+avatarHtml(m.id,22)+"<span>"+esc(m.name)+"</span></th>"; }).join("")+
+    order.map(function(m){ return '<th'+(m.id===state.me?' class="me"':"")+' data-tip="'+esc(m.name)+'">'+avatarHtml(m.id,22)+"<span>"+esc(m.name)+"</span></th>"; }).join("")+
     '<th class="tot">Season</th></tr></thead><tbody>'+
     order.map(function(a){
       var t=RV.totals[a.id];
@@ -440,7 +443,7 @@ function rivalsView(){
           if(!n) return '<td class="c none"><b>·</b></td>';
           var on=sel&&((sel.a===a.id&&sel.b===b.id)||(sel.a===b.id&&sel.b===a.id));
           return '<td class="c '+(r.net>0?"pos":r.net<0?"neg":"flat")+(on?" sel":"")+'" data-act="rival" data-a="'+esc(a.id)+'" data-b="'+esc(b.id)+'" tabindex="0"'+
-            ' title="'+esc(a.name+" vs "+b.name+" · "+rec(r))+'"><b>'+esc(signed(r.net))+"</b><small>"+rec(r)+"</small></td>";
+            ' data-tip="'+esc(a.name+" vs "+b.name+" · "+rec(r))+'"><b>'+esc(signed(r.net))+"</b><small>"+rec(r)+"</small></td>";
         }).join("")+
         '<td class="tot '+(t.net>0?"pos":t.net<0?"neg":"flat")+'"><b>'+esc(signed(t.net))+"</b><small>"+rec(t)+"</small></td></tr>";
     }).join("")+"</tbody></table></div>";
@@ -523,7 +526,7 @@ function settle(){
     return '<div class="paid"><span class="paid-when">'+esc(p.at?fmtWhen(Date.parse(p.at)):"")+"</span>"+
       '<span class="paid-txt">'+esc(mName(p.from))+" \u2192 "+esc(mName(p.to))+(p.by?'<small> · marked by '+esc(mName(p.by))+"</small>":"")+(p.legacy?"<small> · from a bet marked paid</small>":"")+"</span>"+
       '<b class="num">'+esc(money(p.amount))+"</b>"+
-      (state.admin&&!p.legacy?'<button class="btn" data-act="unpay" data-id="'+esc(p.id)+'" title="Admin: undo this payment">Undo</button>':"")+"</div>"; }).join("")+"</div>";
+      (state.admin&&!p.legacy?'<button class="btn" data-act="unpay" data-id="'+esc(p.id)+'" data-tip="Admin: undo this payment">Undo</button>':"")+"</div>"; }).join("")+"</div>";
   host.innerHTML=h;
 }
 
@@ -645,17 +648,17 @@ function stripHtml(S,ents,week){
         '<span class="s-lab">'+esc(label||r.label||(owner?mName(owner):"Open seat"))+"</span>"+
         (r.team?'<span class="s-team">'+teamLogos(r.team,12)+esc(r.team)+"</span>":"")+
         statusTagsHtml(r.id||r.key)+
-        (onBye(r)?'<span class="s-bye" title="Off this week">bye</span>':"")+
+        (onBye(r)?'<span class="s-bye" data-tip="Off this week">bye</span>':"")+
         (owner&&(label||r.label)?'<span class="s-own">'+esc(mName(owner))+"</span>":"")+
       "</span>";
     };
     var barHtml=function(v,pv,owner,barMax){
       return '<span class="sbar"><i style="width:'+(barMax>0?Math.round(v/barMax*100):0)+'%;background:'+esc(owner?mColor(owner):"var(--ink-3)")+'"></i>'+
-        (!pre&&pv?'<u class="ptick" style="left:'+Math.round(pv/barMax*100)+'%" title="Sleeper projected '+esc(String(pv))+'"></u>':"")+"</span>";
+        (!pre&&pv?'<u class="ptick" style="left:'+Math.round(pv/barMax*100)+'%" data-tip="Sleeper projected '+esc(String(pv))+'"></u>':"")+"</span>";
     };
     var valHtml=function(v,pv){
-      return pre?'<b class="proj" title="Sleeper projection">'+esc(String(v))+"<small>proj</small></b>"
-                :"<b>"+esc(String(v))+(pv!=null?'<small class="proj-was" title="Sleeper projected '+esc(String(pv))+'">p '+esc(String(pv))+"</small>":"")+"</b>";
+      return pre?'<b class="proj" data-tip="Sleeper projection">'+esc(String(v))+"<small>proj</small></b>"
+                :"<b>"+esc(String(v))+(pv!=null?'<small class="proj-was" data-tip="Sleeper projected '+esc(String(pv))+'">p '+esc(String(pv))+"</small>":"")+"</b>";
     };
     var title=multiTrack?'<div class="track-title">'+esc(t.metric||t.stat||"")+"</div>":"";
 
@@ -721,18 +724,18 @@ function actionsHtml(b,ents,live,mine){
     });
   }
   // Results record themselves when the game or the period is done; an admin can still call one by hand.
-  if(b.status==="active"&&state.admin) acts.push('<button class="btn" data-act="settle" data-id="'+esc(b.id)+'" title="Admin: record the result by hand">Settle</button>');
+  if(b.status==="active"&&state.admin) acts.push('<button class="btn" data-act="settle" data-id="'+esc(b.id)+'" data-tip="Admin: record the result by hand">Settle</button>');
   if(b.status==="settled") acts.push('<button class="btn" data-act="reopen" data-id="'+esc(b.id)+'">Reopen</button>');
   // only the proposer can edit a bet
   if((b.status==="open"||b.status==="active")&&!isLocked(b)&&(!b.createdBy||b.createdBy===state.me)) acts.push('<button class="btn" data-act="edit" data-id="'+esc(b.id)+'">Edit</button>');
   // the app admin can correct any live or open bet, even after lock
-  else if((b.status==="open"||b.status==="active")&&state.admin) acts.push('<button class="btn" data-act="edit" data-id="'+esc(b.id)+'" title="Admin: fix this bet">Update</button>');
+  else if((b.status==="open"||b.status==="active")&&state.admin) acts.push('<button class="btn" data-act="edit" data-id="'+esc(b.id)+'" data-tip="Admin: fix this bet">Update</button>');
   // Still waiting on takers: the proposer can pull it. Live: only people in it can void it.
   var proposer=!b.createdBy||b.createdBy===state.me;
   // Only the proposer can cancel, and only while it's still waiting on takers. Once
   // both sides are in it stands; an admin can void a live bet to undo a mistake.
   if(b.status==="open"&&proposer) acts.push('<button class="btn danger" data-act="void" data-id="'+esc(b.id)+'">Cancel</button>');
-  else if(b.status==="active"&&state.admin) acts.push('<button class="btn danger" data-act="void" data-id="'+esc(b.id)+'" title="Admin: void this bet">Void</button>');
+  else if(b.status==="active"&&state.admin) acts.push('<button class="btn danger" data-act="void" data-id="'+esc(b.id)+'" data-tip="Admin: void this bet">Void</button>');
   // a voided bet can come back only while its week is still open; after lock it would just cancel again
   if(b.status==="void"&&Date.now()<betLock(b)) acts.push('<button class="btn" data-act="restore" data-id="'+esc(b.id)+'">Restore</button>');
   if(b.status==="void") acts.push('<button class="btn danger" data-act="del" data-id="'+esc(b.id)+'">Delete</button>');
@@ -745,7 +748,7 @@ function ticketHtml(b){
   var mine=state.me&&live.some(function(e){ return e.memberId===state.me; });
 
   var chip;
-  var how=b.settledNote?' title="'+esc(b.settledNote)+'"':"";
+  var how=b.settledNote?' data-tip="'+esc(b.settledNote)+'"':"";
   if(b.status==="settled"&&b.winner==="push") chip='<span class="status push"'+how+'>Push</span>';
   else if(b.status==="settled") chip='<span class="status settled"'+how+'>'+esc(mName(b.winner))+" wins</span>";
   else if(b.status==="active") chip='<span class="status active">Live</span>';
@@ -773,7 +776,7 @@ function ticketHtml(b){
     "</div>"+'<div class="t-meta-r">'+
       ((b.status==="open"||b.status==="active")
         ? (isLocked(b)?'<span class="status locked">Locked</span>'
-                      :'<span class="lock-when" data-lock="'+betLock(b)+'" title="'+esc(fmtWhen(betLock(b)))+'">Locks in '+esc(countdown(betLock(b)))+"</span>")
+                      :'<span class="lock-when" data-lock="'+betLock(b)+'" data-tip="'+esc(fmtWhen(betLock(b)))+'">Locks in '+esc(countdown(betLock(b)))+"</span>")
         : "")+
       chip+"</div></div>"+
     '<p class="terms">'+esc(b.name||b.terms)+"</p>"+
@@ -813,14 +816,14 @@ export function statsBar(){
   // after 15 minutes let it be asked again instead of looking stuck.
   var age=pending?(Date.now()-Date.parse(r.requestedAt)):0, stale=pending&&age>15*60000;
   var h="";
-  if(pending) h='<span class="pending" title="Waiting on a refresh">Refresh requested '+esc(ago(r.requestedAt))+(r.requestedBy?" by "+esc(mName(r.requestedBy)):"")+"</span>"+
+  if(pending) h='<span class="pending" data-tip="Waiting on a refresh">Refresh requested '+esc(ago(r.requestedAt))+(r.requestedBy?" by "+esc(mName(r.requestedBy)):"")+"</span>"+
     (latest?' <span>· stats updated '+esc(ago(latest))+"</span>":"");
   else if(latest) h="Stats"+(through?" · "+esc(through):"")+" · updated "+esc(ago(latest));
   bar.innerHTML=h;
   btn.hidden=!(state.db&&!state.local);
   btn.disabled=pending&&!stale;
   btn.textContent=pending&&!stale?(phone()?"…":"Requested"):(phone()?"↻":"Refresh stats");
-  btn.title=pending&&!stale?"Refresh requested":"Refresh stats";
+  btn.dataset.tip=pending&&!stale?"Refresh requested":"Refresh stats";
 }
 
 function foot(){

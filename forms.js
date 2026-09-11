@@ -200,7 +200,7 @@ export function drawEntries(hostId){
       var chips=(e.picks||[]).map(function(p){
         var pt=projText(p.id);
         return '<span class="pick-chip">'+esc(p.name)+(p.pos!=="DEF"?" <small>"+esc(p.pos+" · "+p.team)+"</small>":"")+statusTagsHtml(p.id)+
-          (pt?'<small class="proj" title="Sleeper projection">'+esc(pt)+"</small>":"")+
+          (pt?'<small class="proj" data-tip="Sleeper projection">'+esc(pt)+"</small>":"")+
           '<button type="button" data-act="dDrop" data-i="'+i+'" data-id="'+esc(p.id)+'" aria-label="Remove">✕</button></span>';
       }).join("");
       pickUi='<div class="picker">'+
@@ -251,9 +251,9 @@ export function drawSugg(i,q){
   box.hidden=!hits.length;
   box.innerHTML=hits.map(function(r){
     var bye=Clock.onBye(r[3],playing), pt=projText(r[0]);
-    return '<button type="button" data-act="dAdd" data-i="'+i+'" data-id="'+esc(r[0])+'"'+(bye?' disabled title="Off this week"':"")+'>'+esc(r[1])+
+    return '<button type="button" data-act="dAdd" data-i="'+i+'" data-id="'+esc(r[0])+'"'+(bye?' disabled data-tip="Off this week"':"")+'>'+esc(r[1])+
       (r[2]!=="DEF"?'<span class="tag pos-'+esc(r[2])+'">'+esc(r[2])+"</span>":"")+statusTagsHtml(r[0])+(bye?'<span class="tag bye">bye</span>':"")+
-      (pt?'<span class="proj" title="Sleeper projection">'+esc(pt)+"</span>":"")+'<span class="team">'+logoHtml(r[3],14)+esc(r[3])+"</span></button>";
+      (pt?'<span class="proj" data-tip="Sleeper projection">'+esc(pt)+"</span>":"")+'<span class="team">'+logoHtml(r[3],14)+esc(r[3])+"</span></button>";
   }).join("");
 }
 export function addPick(i,id){

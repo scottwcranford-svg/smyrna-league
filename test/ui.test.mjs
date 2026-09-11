@@ -89,7 +89,7 @@ test("a proposer sees the open seat, not a Take it button; anyone else gets the 
     res.playedNote = !!document.querySelector(".proj-note");
     pot.stats.rows[0].values = {}; state.proj = null; V.render();
     res.byeTags = [...document.querySelectorAll(".srow")].map(r => [r.querySelector(".s-lab").textContent, !!r.querySelector(".s-bye")]);
-    res.statusTags = [...document.querySelectorAll(".srow")].map(r => [r.querySelector(".s-lab").textContent, [...r.querySelectorAll(".st-tag")].map(t => t.textContent + ":" + t.title + ":" + (getComputedStyle(t).display !== "none"))]);
+    res.statusTags = [...document.querySelectorAll(".srow")].map(r => [r.querySelector(".s-lab").textContent, [...r.querySelectorAll(".st-tag")].map(t => t.textContent + ":" + t.dataset.tip + ":" + (getComputedStyle(t).display !== "none"))]);
     res.proposerTake = document.querySelectorAll('[data-act="take"]').length;
     res.seeking = [...document.querySelectorAll("article.ticket")].map(a => [a.querySelector(".terms").textContent, a.classList.contains("seeking")]);
     const glow = document.querySelector("article.ticket.seeking"), flat = document.querySelector("article.ticket:not(.seeking)");
@@ -378,7 +378,7 @@ test("League dialog: when each manager was last in", { skip }, async () => {
     const { state } = await import("./state.js?v=dev"); const D = await import("./dialogs.js?v=dev");
     state.seen = { a: new Date(Date.now() - 5 * 60e3).toISOString(), b: "2026-09-01T18:00:00Z" };
     D.drawRoster();
-    return [...document.querySelectorAll("#rosterList .rrow")].map(r => { const s = r.querySelector(".r-seen"); return [r.querySelector(".r-name").textContent, s.textContent, !!s.title]; });
+    return [...document.querySelectorAll("#rosterList .rrow")].map(r => { const s = r.querySelector(".r-seen"); return [r.querySelector(".r-name").textContent, s.textContent, !!s.dataset.tip]; });
   });
   assert.deepEqual(out, [["Alice", "Last in 5m ago", true], ["Bob", "Last in Sep 1", true], ["Cara", "Never signed in", false]]);
   assert.deepEqual(errors, []);
@@ -964,6 +964,50 @@ test("the slate lists in kickoff order, and a game inside the hour counts down",
   assert.deepEqual(out.picker, ["ATL @ PIT", "GB @ MIN", "DEN @ KC"], "and so does the propose form's list");
   assert.match(out.pickerSoon, /ATL @ PIT · kicks in 4[12]m/, "which says so in words, since an option can't be styled");
   assert.equal(out.noBodyScroll, true);
+  assert.deepEqual(errors, []);
+  await p.close();
+});
+
+test("tooltips are the app's own, not the browser's, and none are left native", { skip }, async () => {
+  const { p, errors } = await page();
+  await p.evaluate(async () => {
+    const { state } = await import("./state.js?v=dev"); const V = await import("./render.js?v=dev");
+    state.tab = "settle";
+    state.bets = [
+      { id: "s1", status: "settled", week: 0, amount: 25, winner: "a", entries: [{ memberId: "a", pick: "x" }, { memberId: "b", pick: "y" }], paid: ["b"] },
+      { id: "w1", status: "settled", week: 2, amount: 10, winner: "c", entries: [{ memberId: "a", pick: "x" }, { memberId: "c", pick: "y" }], paid: [] }];
+    state.highlow = { weeks: { "1": { high: [{ id: "b", name: "Bob", pts: 140 }], low: [{ id: "c", name: "Cara", pts: 90 }] } } };
+    document.getElementById("login").hidden = true; document.getElementById("app").hidden = false;
+    V.render(); await new Promise(r => setTimeout(r, 40));
+  });
+  // nothing anywhere still asks the OS to draw a tooltip
+  const natives = await p.evaluate(() => [...document.querySelectorAll("[title]")].map(e => e.tagName + ":" + e.getAttribute("title")));
+  assert.deepEqual(natives, [], "every title= became data-tip; a stray one would draw the OS box again");
+
+  await p.hover('#settle td[data-act="drill"][data-m="b"][data-row="total"]');
+  await p.waitForFunction(() => { const t = document.getElementById("tip"); return t && t.classList.contains("show"); }, { timeout: 4000 });
+  const tip = await p.evaluate(() => {
+    const t = document.getElementById("tip"), cs = getComputedStyle(t), r = t.getBoundingClientRect();
+    const cell = document.querySelector('#settle td[data-act="drill"][data-m="b"][data-row="total"]').getBoundingClientRect();
+    const root = getComputedStyle(document.documentElement);
+    const paint = (v) => { const d = document.createElement("i"); d.style.color = root.getPropertyValue(v).trim();
+      document.body.appendChild(d); const c = getComputedStyle(d).color; d.remove(); return c; };
+    return { text: t.textContent, bg: cs.backgroundColor, color: cs.color, ink: paint("--ink"), page: paint("--bg"),
+      above: r.bottom <= cell.top + 1, centred: Math.abs((r.left + r.width / 2) - (cell.left + cell.width / 2)) < 2,
+      onScreen: r.top >= 0 && r.left >= 0 && r.right <= innerWidth && r.bottom <= innerHeight,
+      notClipped: r.top < document.querySelector("#settle .pivot-wrap").getBoundingClientRect().top + 400 };
+  });
+  assert.equal(tip.text, "What’s behind this");
+  assert.equal(tip.bg, tip.ink, "the app's ink, the same inversion the toast uses — not a system box");
+  assert.equal(tip.color, tip.page, "and the page colour for the text, so it reads in either theme");
+  assert.equal(tip.above, true, "it sits above what it describes");
+  assert.equal(tip.centred, true, "and points at the middle of it");
+  assert.equal(tip.onScreen, true, "never off the edge of the viewport");
+  // it must survive the scrolling wrapper the season table lives in
+  assert.equal(tip.notClipped, true);
+  // and go away when the pointer leaves
+  await p.hover("#settle .you-line");
+  await p.waitForFunction(() => !document.getElementById("tip").classList.contains("show"), { timeout: 4000 });
   assert.deepEqual(errors, []);
   await p.close();
 });

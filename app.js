@@ -15,6 +15,7 @@ import { expireBets, settleFinished, syncBadges } from "./book.js?v=dev";
 import { drawScope, drawEntries, drawGameBox } from "./forms.js?v=dev";
 import { showLogin, enforceFreshPassword, drawRoster } from "./dialogs.js?v=dev";
 import { bindEvents } from "./actions.js?v=dev";
+import { bindTips, checkTip } from "./tips.js?v=dev";
 import * as Nf from "./notify.js?v=dev";
 
 const memberForEmail=function(email){ return Id.memberForEmail(email,members()); };
@@ -199,9 +200,10 @@ function subscribeBook(db){
 }
 
 /* ---- boot ---- */
-onRender(function(){ expireBets(); settleFinished(); syncBadges(); render(); });
+onRender(function(){ expireBets(); settleFinished(); syncBadges(); render(); checkTip(); });
 try{ window.matchMedia("(max-width: 600px)").addEventListener("change",function(){ touch(); }); }catch(e){}
 bindEvents({ enterBook:enterBook, toggleAdmin:toggleAdmin });
+bindTips();
 state.config={ leagueName:"Smyrna League", season:"2026", stake:25, kickoff:Clock.DEFAULT_KICKOFF, members:[] };
 state.bets=[];
 render();

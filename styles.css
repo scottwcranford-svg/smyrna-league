@@ -360,6 +360,20 @@ dialog::backdrop{background:rgba(10,12,18,.6)}
 
 #toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:11px 20px;border-radius:99px;font-size:13px;font-weight:700;box-shadow:0 10px 30px -10px rgba(0,0,0,.6);z-index:99;opacity:0;pointer-events:none;transition:opacity .18s ease,transform .18s ease}
 #toast.show{opacity:1;transform:translateX(-50%) translateY(-4px)}
+
+/* The app's own tooltip, in place of the OS one. Same card language as everything
+   else — surface, rule, the shared shadow — with a small arrow so it points at what
+   it is talking about. Fixed to the viewport so a scrolling wrapper can't clip it. */
+#tip{position:fixed;z-index:100;max-width:260px;padding:7px 11px;border-radius:9px;
+  background:var(--ink);color:var(--bg);box-shadow:0 8px 24px -8px rgba(0,0,0,.55);
+  font-size:12px;font-weight:700;line-height:1.35;
+  pointer-events:none;opacity:0;transform:translateY(2px);transition:opacity .12s ease,transform .12s ease}
+#tip.show{opacity:1;transform:translateY(0)}
+#tip::after{content:"";position:absolute;left:50%;margin-left:-4px;width:8px;height:8px;
+  background:var(--ink);transform:rotate(45deg)}
+#tip:not(.below)::after{bottom:-4px}
+#tip.below::after{top:-4px}
+@media (prefers-reduced-motion: reduce){ #tip{transition:none} }
 @media (prefers-reduced-motion: reduce){ *{animation:none!important;transition:none!important} }
 
 footer.foot{margin-top:36px;padding-top:16px;border-top:1px solid var(--rule);font-size:12.5px;color:var(--ink-3)}
