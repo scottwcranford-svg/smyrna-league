@@ -65,6 +65,54 @@ export function findNextLeague(fromId,season){
   }).catch(function(){ return null; });
 }
 
+// The draft, trimmed to what the board draws. Sleeper's roster_id on a pick is who *got*
+// the player, not whose slot it was, so a traded pick already credits the right manager;
+// draft_slot is the original slot, and traded_picks says which ones moved. Keeping both
+// means the board can say "hobnailboot, from JPorch" rather than quietly crediting one of
+// them wrongly.
+export function draftRows(picks,traded){
+  var moved={};
+  (traded||[]).forEach(function(t){ moved[String(t.round)+"|"+String(t.roster_id)]=true; });
+  return (picks||[]).map(function(x){
+    var m=x.metadata||{};
+    var slot=x.draft_slot==null?null:Number(x.draft_slot);
+    var from=(slot!=null&&moved[String(x.round)+"|"+String(slot)])?slot:null;
+    return { r:Number(x.round), p:Number(x.pick_no), slot:slot, roster:Number(x.roster_id),
+      name:((m.first_name||"")+" "+(m.last_name||"")).trim(), pos:m.position||"", team:m.team||"",
+      keeper:!!x.is_keeper, from:(from!=null&&from!==Number(x.roster_id))?from:null };
+  }).sort(function(a,b){ return a.p-b.p; });
+}
+
+// A draft is written once and then never changes, so this only runs when the book has no
+// draft for the season being played.
+export function draftTick(db,ctx){
+  var cfg=ctx.config||{}, here=Sn.currentSeason(cfg);
+  var have=(ctx.draft&&ctx.draft.bySeason)||{};
+  if(have[here]&&(have[here].picks||[]).length) return Promise.resolve();
+  var lid=leagueIdOf(cfg);
+  if(!lid) return Promise.resolve();
+  return sj(SLEEPER+"/v1/league/"+lid+"/drafts").then(function(ds){
+    var d=(ds||[]).filter(function(x){ return String(x.season)===here; })[0]||(ds||[])[0];
+    if(!d||!d.draft_id) return;
+    return Promise.all([
+      sj(SLEEPER+"/v1/draft/"+d.draft_id+"/picks"),
+      sj(SLEEPER+"/v1/draft/"+d.draft_id+"/traded_picks").catch(function(){ return []; }),
+      sj(SLEEPER+"/v1/league/"+lid+"/rosters"),
+      sj(SLEEPER+"/v1/league/"+lid+"/users")
+    ]).then(function(all){
+      var rows=draftRows(all[0],all[1]);
+      if(!rows.length) return;
+      var owner={}; (all[2]||[]).forEach(function(r){ owner[r.roster_id]=r.owner_id; });
+      var uname={}; (all[3]||[]).forEach(function(u){ uname[u.user_id]=u.display_name||u.username||""; });
+      var byRoster={}; Object.keys(owner).forEach(function(rid){ byRoster[rid]=uname[owner[rid]]||""; });
+      var out=Object.assign({},have);
+      out[here]={ draftId:String(d.draft_id), at:isoNow(), type:d.type||"", rounds:Number((d.settings||{}).rounds)||0,
+        byRoster:byRoster, picks:rows };
+      return db.doc("league/draft").set(Object.assign({},ctx.draft||{},{ updatedAt:isoNow(), bySeason:out }));
+    });
+  }).catch(function(){});
+}
+
 // Our Sleeper league: the id an admin put in league/config, else the Smyrna League.
 export function leagueIdOf(cfg){ return String((cfg&&cfg.sleeperLeagueId)||Roster.SLEEPER_LEAGUE_ID); }
 
@@ -203,6 +251,8 @@ export function runRefresh(db,by,forced,ctx){
           var here=Sn.currentSeason(cfg);
           var hlDoc=ctx.highlow||{}, hlWeeks=Sn.weeksOf(hlDoc,here), hlMem=cfg.members||[];
           var scDoc=ctx.scores||{}, scWeeks=Sn.weeksOf(scDoc,here);
+          // the draft, once, whenever the book has none for this season
+          writes.push(draftTick(db,ctx));
           var finals=Clock.finalWeeks(ctx.games);
           var isFinal={}; finals.forEach(function(w){ isFinal[String(w)]=true; });
           var need=finals.filter(function(w){

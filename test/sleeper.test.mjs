@@ -182,8 +182,8 @@ test("runRefresh: the Sleeper league's team names and avatars, one call for ever
   // the identity block asks for everyone at once rather than per member; the board block
   // asks again for the week being played, which is one extra pair on the hourly refresh
   assert.deepEqual([...new Set(hits.filter((h) => /^league\/L1/.test(h)))].sort(),
-    ["league/L1", "league/L1/matchups/1", "league/L1/rosters", "league/L1/users"],
-    "the league's users and settings once each, plus the live week's board");
+    ["league/L1", "league/L1/drafts", "league/L1/matchups/1", "league/L1/rosters", "league/L1/users"],
+    "the league's users and settings once each, plus the live week's board and a look for the draft");
   assert.equal(hits.filter((h) => h === "league/L1").length, 1, "the settings are not fetched per manager");
   // all known, fresh, league cached: no identity lookups (the live board still refreshes)
   hits.length = 0; const db2 = fakeDb();
@@ -238,4 +238,32 @@ test("next season's league is found by the link back, not by guessing", async ()
   assert.equal(await N.findNextLeague("L2026", "2027"), null);
   globalThis.fetch = async () => { throw new Error("offline"); };
   assert.equal(await N.findNextLeague("L2026", "2027"), null, "and offline is not a crash");
+});
+
+test("draftRows: a traded pick credits who got the player, and says where it came from", () => {
+  const picks = [
+    { round: 1, pick_no: 1, draft_slot: 1, roster_id: 1, is_keeper: null,
+      metadata: { first_name: "Jahmyr", last_name: "Gibbs", position: "RB", team: "DET" } },
+    { round: 4, pick_no: 40, draft_slot: 1, roster_id: 8, is_keeper: null,
+      metadata: { first_name: "Bo", last_name: "Nix", position: "QB", team: "DEN" } },
+    { round: 5, pick_no: 47, draft_slot: 7, roster_id: 7, is_keeper: true,
+      metadata: { first_name: "Rashee", last_name: "Rice", position: "WR", team: "KC" } },
+  ];
+  const traded = [{ round: 4, roster_id: 1, owner_id: 8, previous_owner_id: 1 }];
+  const rows = N.draftRows(picks, traded);
+  assert.deepEqual(rows.map((r) => [r.p, r.roster, r.from, r.name]), [
+    [1, 1, null, "Jahmyr Gibbs"],
+    [40, 8, 1, "Bo Nix"],
+    [47, 7, null, "Rashee Rice"]], "only the traded one carries a from, and it is the slot's owner");
+  assert.equal(rows[2].keeper, true, "keepers are flagged where Sleeper flags them");
+  assert.equal(rows[0].keeper, false, "and absence is not a keeper — Sleeper sends null, not false");
+  assert.deepEqual(N.draftRows(null, null), [], "no draft is not a crash");
+});
+
+test("draftRows sorts into pick order whatever order Sleeper sends", () => {
+  const out = N.draftRows([
+    { round: 2, pick_no: 15, roster_id: 2, metadata: {} },
+    { round: 1, pick_no: 3, roster_id: 3, metadata: {} },
+    { round: 1, pick_no: 1, roster_id: 1, metadata: {} }], []);
+  assert.deepEqual(out.map((r) => r.p), [1, 3, 15]);
 });
