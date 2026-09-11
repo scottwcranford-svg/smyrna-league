@@ -1383,3 +1383,29 @@ test("starting a season moves the league on and carries nobody with it", { skip 
   assert.deepEqual(errors, []);
   await p.close();
 });
+
+test("the season is not editable as a label — only Start a season moves it", { skip }, async () => {
+  const { p, errors } = await page();
+  const out = await p.evaluate(async () => {
+    const { state } = await import("./state.js?v=dev");
+    const D = await import("./dialogs.js?v=dev");
+    state.local = false; state.connected = true; state.admin = true;
+    state.db = { doc() { return { set: () => Promise.resolve() }; } };
+    D.openRoster();
+    const box = document.getElementById("rSeason");
+    const shown = { value: box.value, disabled: box.disabled,
+      nameEditable: !document.getElementById("rName").disabled };
+    // typing into it and saving must not move the league
+    box.disabled = false; box.value = "2027";
+    document.getElementById("rSave").click();
+    await new Promise(r => setTimeout(r, 40));
+    return { shown, after: state.config.season };
+  });
+  assert.equal(out.shown.value, "2026", "it still shows which season the league is on");
+  assert.equal(out.shown.disabled, true, "but it cannot be typed into");
+  assert.equal(out.shown.nameEditable, true, "while the league's name still can be, for an admin");
+  assert.equal(out.after, "2026",
+    "and even forced, saving does not move the league — that would empty the board and lock last season silently");
+  assert.deepEqual(errors, []);
+  await p.close();
+});

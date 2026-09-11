@@ -83,7 +83,8 @@ export function openRoster(){
   document.getElementById("rSeason").value=state.config.season;
   document.getElementById("rStake").value=String(state.config.stake||25);
   document.getElementById("rKickoff").value=toLocalInput(state.config.kickoff||DEFAULT_KICKOFF);
-  ["rName","rSeason","rStake","rKickoff"].forEach(function(id){ document.getElementById(id).disabled=!adm; });
+  ["rName","rStake","rKickoff"].forEach(function(id){ document.getElementById(id).disabled=!adm; });
+  document.getElementById("rSeason").disabled=true;   // shown, never typed into - see Start a season
   document.getElementById("rAddRow").hidden=!adm;
   document.getElementById("rAdd").hidden=!adm;
   document.getElementById("rSave").hidden=!adm;

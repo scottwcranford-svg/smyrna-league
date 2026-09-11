@@ -192,7 +192,9 @@ function startSeason(){
 function saveLeague(){
   if(!state.admin) return toast("Only the admin can do that");
   state.config.leagueName=document.getElementById("rName").value.trim()||state.config.leagueName;
-  state.config.season=document.getElementById("rSeason").value.trim()||state.config.season;
+  // The season is not a label any more - it decides who is on the board, which settings
+  // apply and what is writable - so it is not edited here. Start a season does it properly,
+  // and the picker reads the others.
   var s=parseFloat(document.getElementById("rStake").value);
   if(s>0) state.config.stake=Math.round(s*100)/100;
   var ko=new Date(document.getElementById("rKickoff").value);   // datetime-local reads as local time
