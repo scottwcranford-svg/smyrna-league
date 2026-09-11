@@ -101,7 +101,7 @@ exports.highLowChanged = onDocumentWritten("books/{book}/league/highlow", async 
 
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { getAuth } = require("firebase-admin/auth");
-const { reconcile, applyPlan, isNoop } = require("./roster");
+const { reconcile, applyPlan, isNoop, emailFor } = require("./roster");
 
 const SLEEPER = "https://api.sleeper.app";
 const memberId = () => "b" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -157,5 +157,46 @@ exports.syncRoster = onSchedule({ schedule: "every day 06:00", timeZone: "Americ
   for (const b of books) {
     try { logger.info("sync", await syncBook(b.id)); }
     catch (e) { logger.error("sync failed", { key: b.id, message: e && e.message }); }
+  }
+});
+
+// The same sync, on demand. The app has no Cloud Functions SDK vendored, so the button
+// writes a request into the book the way "Refresh stats" already does, and this picks it
+// up. The result goes back on the same document so the League dialog can say what
+// happened instead of leaving the admin to read the logs.
+//
+// Writing the result is itself a write to this document, so the trigger fires again: the
+// guard is that only a *new* requestedAt is work. Without it this is a loop, which is the
+// same trap the badge sync hit in September.
+exports.rosterSyncRequested = onDocumentWritten("books/{book}/league/rosterSync", async (ev) => {
+  const before = doc(ev.data.before), after = doc(ev.data.after);
+  if (!after || !after.requestedAt) return;
+  if (before && before.requestedAt === after.requestedAt) return;   // our own result write
+
+  const key = ev.params.book;
+  const ref = book(key).collection("league").doc("rosterSync");
+  const stamp = { requestedAt: after.requestedAt, finishedAt: new Date().toISOString() };
+
+  // Firestore rules let any signed-in manager write league/{doc}, so the real check is
+  // here, where it cannot be skipped by writing the document directly.
+  const cfg = doc(await book(key).collection("league").doc("config").get());
+  const admins = (cfg && Array.isArray(cfg.adminEmails) ? cfg.adminEmails : []).map(e => String(e).toLowerCase());
+  const me = (cfg && cfg.members || []).find(m => m.id === after.requestedBy);
+  if (!me || admins.indexOf(emailFor(me.name)) < 0) {
+    logger.warn("roster sync refused", { key, by: after.requestedBy });
+    await ref.update(Object.assign(stamp, { note: "Only an admin can sync the roster" }));
+    return;
+  }
+
+  try {
+    const r = await syncBook(key);
+    await ref.update(Object.assign(stamp, {
+      added: r.added || 0, carried: r.carried || 0,
+      note: r.skipped ? r.skipped : (r.added || r.carried ? "" : "Already up to date"),
+    }));
+    logger.info("roster sync on request", r);
+  } catch (e) {
+    logger.error("roster sync failed", { key, message: e && e.message });
+    await ref.update(Object.assign(stamp, { note: "Sync failed — check the logs" }));
   }
 });

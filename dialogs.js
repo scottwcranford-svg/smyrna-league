@@ -89,6 +89,16 @@ function seenHtml(id){
 }
 export function drawRoster(){
   var adm=!!state.admin;
+  document.getElementById("rSync").hidden=!adm;
+  // What the last sync did, or that one is in flight. Written by the function.
+  var rs=state.rosterSync||{}, note=document.getElementById("rSyncNote");
+  var running=rs.requestedAt&&(!rs.finishedAt||String(rs.finishedAt)<String(rs.requestedAt));
+  document.getElementById("rSync").disabled=!!running;
+  note.textContent=!adm?""
+    :running?"Checking Sleeper…"
+    :rs.note?rs.note
+    :rs.finishedAt?((rs.added||0)+(rs.added===1?" manager added · ":" managers added · ")+(rs.carried||0)+" carried into "+Fmt.esc(String(state.config&&state.config.season||""))+" · "+Fmt.ago(rs.finishedAt))
+    :"";
   // Test accounts show to admins (to manage them) and to themselves; nobody else sees them.
   document.getElementById("rosterList").innerHTML=(adm?members():realMembers()).map(function(m){
     return '<div class="rrow'+(m.test?" test":"")+'">'+avatarHtml(m.id,26)+

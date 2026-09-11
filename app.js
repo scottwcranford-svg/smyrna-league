@@ -167,6 +167,12 @@ function subscribeBook(db){
     touch();
   },function(){ /* no high/low until the first week is final anyway */ });
 
+  db.doc("league/rosterSync").onSnapshot(function(snap){
+    state.rosterSync=snap.exists?snap.data():null;   // written by the app, answered by the function
+    if(document.getElementById("rosterDlg").open) drawRoster();
+    touch();
+  },function(){ /* the button just won't report back */ });
+
   db.doc("league/scores").onSnapshot(function(snap){
     state.scores=snap.exists?snap.data():null;   // read-only
     touch();

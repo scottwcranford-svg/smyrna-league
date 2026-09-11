@@ -17,6 +17,7 @@ export const state = {
   scores:null,    // league/scores: every manager's fantasy points and projection, by week
   scoreWeek:null, // which week the Scores tab is showing; null follows the current week
   season:null,    // which season is being shown; null follows config.season
+  rosterSync:null, // league/rosterSync: the Sync from Sleeper request, and what came back
   payments:null,  // league/payments: { list: [{ id, from, to, amount, at, by, voided? }] } — settled once, at the end
   lines:null,     // league/lines: Vegas's spread and total per game, from the schedule file
   badges:null,    // league/badges: { byKey: { <badge>: { holder, value, at, week, from, since } } }

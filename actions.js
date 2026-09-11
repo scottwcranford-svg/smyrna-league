@@ -249,5 +249,6 @@ export function bindEvents(hooks){
   on("siReset","click",D.startOver);
   ["siName","siPw","siKey"].forEach(function(id){ on(id,"keydown",function(e){ if(e.key==="Enter"){ e.preventDefault(); D.submitLogin(hooks.enterBook); } }); });
   on("rAdd","click",function(e){ e.preventDefault(); addMember(); });
+  on("rSync","click",function(e){ e.preventDefault(); B.requestRosterSync(); });
   on("rSave","click",function(e){ e.preventDefault(); saveLeague(); });
 }

@@ -217,6 +217,22 @@ export function deleteBet(id){
 }
 
 // Ask this page to pull Sleeper now (the book's refresh hook does the work).
+// Ask the server to reconcile the roster against Sleeper now, rather than waiting for the
+// nightly run. The app has no Cloud Functions SDK, so this writes a request the way
+// "Refresh stats" does and a Firestore trigger picks it up; the answer comes back on the
+// same document. The trigger checks admin itself — this check is only so the button
+// behaves honestly.
+export function requestRosterSync(){
+  if(!guard()) return;
+  if(!state.admin) return toast("Only the admin can do that");
+  var at=new Date().toISOString();
+  state.rosterSync=Object.assign({},state.rosterSync||{},{ requestedAt:at, requestedBy:state.me||null, finishedAt:null, note:"" });
+  touch();
+  state.db.doc("league/rosterSync").set({ requestedAt:at, requestedBy:state.me||null })
+    .then(function(){ toast("Checking Sleeper…"); })
+    .catch(function(e){ toast(dbMsg(e)); });
+}
+
 export function requestRefresh(){
   if(!guard()) return;
   var cur=state.refresh||{};

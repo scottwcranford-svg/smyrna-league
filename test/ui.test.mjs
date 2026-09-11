@@ -1099,3 +1099,69 @@ test("the season seam: the book holds every season, the app shows one", { skip }
   assert.deepEqual(errors, []);
   await p.close();
 });
+
+test("Sync from Sleeper: admin only, says what it did, and won't be hit twice", { skip }, async () => {
+  const { p, errors } = await page();
+  const out = await p.evaluate(async () => {
+    const { state } = await import("./state.js?v=dev");
+    const D = await import("./dialogs.js?v=dev");
+    state.local = false; state.connected = true; state.db = { doc() { return {}; } };
+    const read = () => ({ shown: !document.getElementById("rSync").hidden,
+      disabled: document.getElementById("rSync").disabled,
+      note: document.getElementById("rSyncNote").textContent });
+    state.admin = false; D.drawRoster();
+    const asManager = read();
+    state.admin = true; D.drawRoster();
+    const asAdminIdle = read();
+    // a request in flight
+    state.rosterSync = { requestedAt: new Date().toISOString(), requestedBy: "a", finishedAt: null };
+    D.drawRoster();
+    const running = read();
+    // and the answer
+    state.rosterSync = { requestedAt: new Date(Date.now() - 4000).toISOString(),
+      finishedAt: new Date(Date.now() - 2000).toISOString(), added: 2, carried: 8, note: "" };
+    D.drawRoster();
+    const done = read();
+    state.rosterSync = { requestedAt: new Date(Date.now() - 4000).toISOString(),
+      finishedAt: new Date(Date.now() - 2000).toISOString(), added: 0, carried: 0, note: "Already up to date" };
+    D.drawRoster();
+    return { asManager, asAdminIdle, running, done, quiet: read() };
+  });
+  assert.equal(out.asManager.shown, false, "a manager never sees it");
+  assert.equal(out.asManager.note, "");
+  assert.equal(out.asAdminIdle.shown, true);
+  assert.equal(out.asAdminIdle.disabled, false);
+  assert.equal(out.running.note, "Checking Sleeper…", "it says so while the function is working");
+  assert.equal(out.running.disabled, true, "and cannot be fired again mid-flight");
+  assert.match(out.done.note, /^2 managers added · 8 carried into 2026 · /, "then what actually happened");
+  assert.equal(out.done.disabled, false);
+  assert.equal(out.quiet.note, "Already up to date", "a no-op says so rather than reading as a failure");
+  assert.deepEqual(errors, []);
+  await p.close();
+});
+
+test("season context follows the league and resets on every load", { skip }, async () => {
+  const first = await page();
+  const picked = await first.p.evaluate(async () => {
+    const St = await import("./state.js?v=dev");
+    St.setSeason("2027");
+    // a choice is a choice for this visit only — nothing about it is written down
+    const stored = Object.keys(localStorage).filter(k => /season/i.test(k));
+    return { shown: St.shownSeason(), stored };
+  });
+  assert.equal(picked.shown, "2027", "you can look at another season while you are here");
+  assert.deepEqual(picked.stored, [], "but it is never persisted, unlike the tab");
+  await first.p.close();
+
+  // a fresh load is a fresh sign-in: back to the season the league is on
+  const next = await page();
+  const onLoad = await next.p.evaluate(async () => {
+    const St = await import("./state.js?v=dev");
+    return { season: St.state.season, shown: St.shownSeason(), config: St.state.config.season };
+  });
+  assert.equal(onLoad.season, null, "nothing is carried over");
+  assert.equal(onLoad.shown, "2026");
+  assert.equal(onLoad.shown, onLoad.config, "the season context is whatever the league says it is on");
+  assert.deepEqual(next.errors, []);
+  await next.p.close();
+});
