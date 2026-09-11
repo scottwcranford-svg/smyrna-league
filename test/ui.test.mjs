@@ -1165,3 +1165,27 @@ test("season context follows the league and resets on every load", { skip }, asy
   assert.deepEqual(next.errors, []);
   await next.p.close();
 });
+
+test("a sync that never comes back doesn't lock the button", { skip }, async () => {
+  const { p, errors } = await page();
+  const out = await p.evaluate(async () => {
+    const { state } = await import("./state.js?v=dev");
+    const D = await import("./dialogs.js?v=dev");
+    state.admin = true;
+    const read = () => ({ disabled: document.getElementById("rSync").disabled,
+      note: document.getElementById("rSyncNote").textContent });
+    // asked for just now, nothing has answered
+    state.rosterSync = { requestedAt: new Date(Date.now() - 5000).toISOString(), requestedBy: "a" };
+    D.drawRoster(); const fresh = read();
+    // asked for long enough ago that nothing is coming
+    state.rosterSync = { requestedAt: new Date(Date.now() - 5 * 60000).toISOString(), requestedBy: "a" };
+    D.drawRoster(); const lost = read();
+    return { fresh, lost };
+  });
+  assert.equal(out.fresh.disabled, true, "while it might still answer, one ask is enough");
+  assert.equal(out.fresh.note, "Checking Sleeper…");
+  assert.equal(out.lost.disabled, false, "but a request nothing answered must never be a dead end");
+  assert.equal(out.lost.note, "That didn't come back — press to try again");
+  assert.deepEqual(errors, []);
+  await p.close();
+});

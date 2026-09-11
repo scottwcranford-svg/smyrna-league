@@ -93,8 +93,14 @@ export function drawRoster(){
   // What the last sync did, or that one is in flight. Written by the function.
   var rs=state.rosterSync||{}, note=document.getElementById("rSyncNote");
   var running=rs.requestedAt&&(!rs.finishedAt||String(rs.finishedAt)<String(rs.requestedAt));
-  document.getElementById("rSync").disabled=!!running;
+  // A request nothing ever answers must not lock the button forever — which is exactly
+  // what happened when the button shipped before its function did. After two minutes the
+  // ask is treated as lost and can be made again, the same way a stuck refresh is.
+  var waited=running?(Date.now()-Date.parse(rs.requestedAt)):0;
+  var lost=running&&!(waited<2*60000);
+  document.getElementById("rSync").disabled=!!running&&!lost;
   note.textContent=!adm?""
+    :lost?"That didn't come back — press to try again"
     :running?"Checking Sleeper…"
     :rs.note?rs.note
     :rs.finishedAt?((rs.added||0)+(rs.added===1?" manager added · ":" managers added · ")+(rs.carried||0)+" carried into "+Fmt.esc(String(state.config&&state.config.season||""))+" · "+Fmt.ago(rs.finishedAt))
