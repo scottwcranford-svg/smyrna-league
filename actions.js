@@ -2,7 +2,9 @@
 // each to a function, so adding a button is one row here, not another branch in a
 // chain. bindEvents() runs once at boot with what it needs from app.js.
 
-import * as R from "./rules.js?v=dev";
+import * as Fmt from "./fmt.js?v=dev";
+import * as Clock from "./clock.js?v=dev";
+import * as Id from "./identity.js?v=dev";
 import * as A from "./auth.js?v=dev";
 import { state, members, touch } from "./state.js?v=dev";
 import { toast, showBet } from "./render.js?v=dev";
@@ -11,10 +13,10 @@ import * as F from "./forms.js?v=dev";
 import * as D from "./dialogs.js?v=dev";
 import * as Nf from "./notify.js?v=dev";
 
-const COLORS=R.COLORS, uid=R.uid, defaultPw=R.defaultPw, emailFor=R.emailFor;
-const member=function(id){ return R.member(id,members()); };
-const adminEmails=function(){ return R.adminEmails(state.config); };
-const allGames=function(){ return R.allGames(state.games); };
+const COLORS=Fmt.COLORS, uid=Fmt.uid, defaultPw=Id.defaultPw, emailFor=Id.emailFor;
+const member=function(id){ return Id.member(id,members()); };
+const adminEmails=function(){ return Id.adminEmails(state.config); };
+const allGames=function(){ return Clock.allGames(state.games); };
 const attr=function(t,n){ return t.getAttribute(n); };
 const num=function(t,n){ return Number(t.getAttribute(n)); };
 

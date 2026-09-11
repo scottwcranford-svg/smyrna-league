@@ -5,7 +5,11 @@
 // ones that touch the network; nothing here reads the page or the shared state —
 // callers pass a `ctx` snapshot: { config, games, refresh, bets, roster, holder, mobile }.
 
-import * as R from "./rules.js?v=dev";
+import * as Clock from "./clock.js?v=dev";
+import * as Roster from "./roster.js?v=dev";
+import * as Sched from "./schedule.js?v=dev";
+import * as Stats from "./stats.js?v=dev";
+import * as Ledger from "./ledger.js?v=dev";
 import { lease } from "./store.js?v=dev";
 
 export const SLEEPER="https://api.sleeper.app";
@@ -42,7 +46,7 @@ export function gamesFor(weeks,season){
 }
 
 // Our Sleeper league: the id an admin put in league/config, else the Smyrna League.
-export function leagueIdOf(cfg){ return String((cfg&&cfg.sleeperLeagueId)||R.SLEEPER_LEAGUE_ID); }
+export function leagueIdOf(cfg){ return String((cfg&&cfg.sleeperLeagueId)||Roster.SLEEPER_LEAGUE_ID); }
 
 // Sleeper's player index → [id, name, pos, team] rows: fantasy positions on a team,
 // plus every defense; defenses last, otherwise by name.
@@ -50,8 +54,8 @@ export function parseRoster(players){
   var rows=[];
   Object.keys(players||{}).forEach(function(pid){ var v=players[pid]||{};
     if(v.position==="DEF") rows.push([pid,((v.first_name||"")+" "+(v.last_name||"")).trim(),"DEF",pid]);
-    else if(v.team&&(v.fantasy_positions||[]).some(function(p){ return R.FANTASY_POS[p]; })){
-      var row=[pid,v.full_name||"",v.position||"",v.team], st=R.statusCode(v);
+    else if(v.team&&(v.fantasy_positions||[]).some(function(p){ return Roster.FANTASY_POS[p]; })){
+      var row=[pid,v.full_name||"",v.position||"",v.team], st=Roster.statusCode(v);
       if(st) row.push(st);   // Q, OUT, IR… only when there's something to say
       rows.push(row);
     } });
@@ -63,7 +67,7 @@ export function parseRoster(players){
 export function restat(S,totals,through,now){
   if(!S||!Array.isArray(S.rows)) return null;
   var kind=S.stat||"pts_ppr", tracks=(Array.isArray(S.tracks)&&S.tracks.length)?S.tracks:[{stat:kind}];
-  var rows=S.rows.map(function(r){ var o=Object.assign({},r); o.values={}; tracks.forEach(function(t){ if(t.stat) o.values[t.stat]=R.valueFor(r.key,t.stat,totals); }); o.value=R.valueFor(r.key,kind,totals); return o; });
+  var rows=S.rows.map(function(r){ var o=Object.assign({},r); o.values={}; tracks.forEach(function(t){ if(t.stat) o.values[t.stat]=Stats.valueFor(r.key,t.stat,totals); }); o.value=Stats.valueFor(r.key,kind,totals); return o; });
   return Object.assign({},S,{ rows:rows, through:through, source:"Sleeper", updatedAt:now });
 }
 
@@ -72,8 +76,8 @@ export function restat(S,totals,through,now){
 // This week's (and next week's) scores — every minute while a game is on, else every ten.
 export function scoresTick(db,ctx){
   if(!db) return Promise.resolve();
-  var season=seasonOf(ctx.config), w=R.currentWeek(ctx.config,ctx.games), weeks=[w]; if(w<18) weeks.push(w+1);
-  var G=R.allGames(ctx.games), now=Date.now();
+  var season=seasonOf(ctx.config), w=Clock.currentWeek(ctx.config,ctx.games), weeks=[w]; if(w<18) weeks.push(w+1);
+  var G=Clock.allGames(ctx.games), now=Date.now();
   var hot=G.some(function(g){ return g.week===w&&(g.status==="live"||(now>=Date.parse(g.date)-3600000&&now<Date.parse(g.date)+4*3600000)); });
   var cur=ctx.games||{};
   if(ageMin(cur.updatedAt)<(hot?0.9:9.5)) return Promise.resolve();          // fresh enough, or someone else just did it
@@ -113,10 +117,10 @@ export function runRefresh(db,by,forced,ctx){
           // and never from a phone (the player index is 10 MB)
           var roster=ctx.roster||{}, cfg=ctx.config||{};
           if(ageMin(cfg.scheduleUpdatedAt)>24*60) writes.push(fetch(NFLVERSE_GAMES).then(function(r){ return r.text(); }).then(function(csv){
-            var starts=R.weekStartsFromCsv(csv,season);
+            var starts=Sched.weekStartsFromCsv(csv,season);
             // the same file carries Vegas's spread and total per game; they arrive a few
             // weeks ahead of kickoff, so this is re-read every day for the new ones
-            var lines=R.linesFromCsv(csv,season), jobs=[];
+            var lines=Sched.linesFromCsv(csv,season), jobs=[];
             if(Object.keys(lines).length) jobs.push(db.doc("league/lines").set({ updatedAt:now, season:String(season), byGame:lines }));
             if(Object.keys(starts).length) jobs.push(db.doc("league/config").update({ weekStarts:starts, scheduleUpdatedAt:now }));
             return Promise.all(jobs); }).catch(function(){}));
@@ -126,7 +130,7 @@ export function runRefresh(db,by,forced,ctx){
           // Weekly high / low from the Sleeper league's matchup scores, for every finished
           // week the book doesn't have yet. Owners map to managers by Sleeper display name.
           var hlDoc=ctx.highlow||{}, hlWeeks=(hlDoc.weeks)||{}, hlMem=cfg.members||[];
-          var need=R.finalWeeks(ctx.games).filter(function(w){ return !hlWeeks[String(w)]; });
+          var need=Clock.finalWeeks(ctx.games).filter(function(w){ return !hlWeeks[String(w)]; });
           if(need.length&&hlMem.length){
             var lid2=leagueIdOf(cfg);
             writes.push(Promise.all([sj(SLEEPER+"/v1/league/"+lid2+"/rosters"), sj(SLEEPER+"/v1/league/"+lid2+"/users")]).then(function(rs){
@@ -136,7 +140,7 @@ export function runRefresh(db,by,forced,ctx){
               return Promise.all(need.map(function(w){
                 return sj(SLEEPER+"/v1/league/"+lid2+"/matchups/"+w).then(function(ms){
                   var rows=(ms||[]).map(function(m){ var nm=uname[owner[m.roster_id]]||""; return { id:memByName[nm.toLowerCase()]||null, name:nm, pts:Number(m.points) }; });
-                  return [w,R.highLow(rows)];
+                  return [w,Ledger.highLow(rows)];
                 }).catch(function(){ return [w,null]; });
               }));
             }).then(function(pairs){
@@ -157,7 +161,7 @@ export function runRefresh(db,by,forced,ctx){
                 if(!L||typeof L!=="object") return null;
                 var st=L.settings||{}, pos=Array.isArray(L.roster_positions)?L.roster_positions:[];
                 return { name:L.name||"", season:String(L.season||""), teams:Number(L.total_rosters)||0, keeper:Number(st.type)===1, dynasty:Number(st.type)===2,
-                         sf:pos.indexOf("SUPER_FLEX")>=0, scoring:R.scoringName((L.scoring_settings||{}).rec), avatar:(typeof L.avatar==="string")?L.avatar:"" };
+                         sf:pos.indexOf("SUPER_FLEX")>=0, scoring:Roster.scoringName((L.scoring_settings||{}).rec), avatar:(typeof L.avatar==="string")?L.avatar:"" };
               }).catch(function(){ return null; }):Promise.resolve(null);
               return Promise.all([lid?sj(SLEEPER+"/v1/league/"+lid+"/users").catch(function(){ return []; }):Promise.resolve([]), leagueP]).then(function(both){
                 var users=both[0], league=both[1];
@@ -177,14 +181,14 @@ export function runRefresh(db,by,forced,ctx){
           }
           // Projections for the weeks in play: the season ("0"), this week, next, and any week
           // with a live weekly stat bet. Trimmed to the roster and the tracked stats, written only when changed.
-          var rosterIds=R.rosterRows(ctx.roster).map(function(r){ return r[0]; });
+          var rosterIds=Roster.rosterRows(ctx.roster).map(function(r){ return r[0]; });
           if(rosterIds.length){
             var want={0:1}, cw=Math.min(18,Math.max(1,Number(st.week)||1)); want[cw]=1; if(cw<18) want[cw+1]=1;
             (ctx.bets||[]).forEach(function(b){ if(b.stats&&!b.game&&(b.status==="open"||b.status==="active")&&Number(b.week)>0) want[Number(b.week)]=1; });
             var prevW=(ctx.proj&&ctx.proj.weeks)||{}, weeksOut={}, changed=false;
             writes.push(Promise.all(Object.keys(want).map(function(w){
               return sj(SLEEPER+"/v1/projections/nfl/regular/"+season+(w==="0"?"":"/"+w)).then(function(raw){
-                var s=JSON.stringify(R.trimProjections(raw,rosterIds)); weeksOut[w]=s; if(prevW[w]!==s) changed=true;
+                var s=JSON.stringify(Stats.trimProjections(raw,rosterIds)); weeksOut[w]=s; if(prevW[w]!==s) changed=true;
               }).catch(function(){ if(prevW[w]) weeksOut[w]=prevW[w]; });
             })).then(function(){
               if(changed||Object.keys(weeksOut).join()!==Object.keys(prevW).join()) return db.doc("league/proj").set({ season:season, updatedAt:now, weeks:weeksOut });

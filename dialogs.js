@@ -3,7 +3,12 @@
 // on the starting password), and the login card that is the whole page until
 // you're in. DOM in, auth.js/store.js out.
 
-import * as R from "./rules.js?v=dev";
+import * as Fmt from "./fmt.js?v=dev";
+import * as Clock from "./clock.js?v=dev";
+import * as Id from "./identity.js?v=dev";
+import * as Ledger from "./ledger.js?v=dev";
+import * as Bets from "./bets.js?v=dev";
+import * as Badges from "./badges.js?v=dev";
 import * as S from "./store.js?v=dev";
 import * as A from "./auth.js?v=dev";
 import { state, members, realMembers, teamOf, touch } from "./state.js?v=dev";
@@ -11,13 +16,13 @@ import { toast, avatarHtml } from "./render.js?v=dev";
 import { guard, findBet } from "./book.js?v=dev";
 import * as Nf from "./notify.js?v=dev";
 
-const esc=R.esc, money=R.money, entriesOf=R.entriesOf, toLocalInput=R.toLocalInput, defaultPw=R.defaultPw, DEFAULT_KICKOFF=R.DEFAULT_KICKOFF;
-const member=function(id){ return R.member(id,members()); };
-const mName=function(id){ return R.mName(id,members()); };
-const gameOf=function(b){ return R.gameOf(b,state.games); };
-const memberForEmail=function(email){ return R.memberForEmail(email,members()); };
-const adminIds=function(){ return R.adminIds(state.config); };
-const isAdminMember=function(id){ return R.isAdminMember(id,state.config); };
+const esc=Fmt.esc, money=Fmt.money, entriesOf=Fmt.entriesOf, toLocalInput=Fmt.toLocalInput, defaultPw=Id.defaultPw, DEFAULT_KICKOFF=Clock.DEFAULT_KICKOFF;
+const member=function(id){ return Id.member(id,members()); };
+const mName=function(id){ return Id.mName(id,members()); };
+const gameOf=function(b){ return Bets.gameOf(b,state.games); };
+const memberForEmail=function(email){ return Id.memberForEmail(email,members()); };
+const adminIds=function(){ return Id.adminIds(state.config); };
+const isAdminMember=function(id){ return Id.isAdminMember(id,state.config); };
 
 /* ---- settle ---- */
 export function openSettleDlg(id){
@@ -61,26 +66,26 @@ export function openRoster(){
 // Drill-through from the season table: the bets or hi / low weeks behind one cell.
 export function openDrill(memberId,row){
   var m=member(memberId); if(!m) return;
-  var rows=R.drillRows(memberId,row,state.bets,state.highlow,R.hlStake(state.config),members());
+  var rows=Ledger.drillRows(memberId,row,state.bets,state.highlow,Ledger.hlStake(state.config),members());
   var title={ hl:"Hi / low", weekly:"Weekly bets", season:"Season bets", total:"Everything" }[row]||row;
   var net=rows.reduce(function(s,r){ return s+r.amount; },0);
   document.getElementById("drillTitle").innerHTML=avatarHtml(m.id,24)+" "+esc(m.name)+' <span class="drill-row">· '+esc(title)+"</span>";
   document.getElementById("drillList").innerHTML=rows.length?rows.map(function(r){
     var v=Math.round(r.amount*100)/100, cls=v>0?"pos":v<0?"neg":"flat";
     return '<div class="drill"'+(r.kind==="bet"?' data-act="goBet" data-id="'+esc(r.id)+'" role="button" tabindex="0"':"")+'>'+
-      '<span class="wk">'+esc(R.weekLabel(r.week))+"</span>"+
+      '<span class="wk">'+esc(Fmt.weekLabel(r.week))+"</span>"+
       '<span class="drill-txt"><b>'+esc(r.label)+"</b><small>"+esc(r.note)+"</small></span>"+
-      '<b class="num '+cls+'">'+R.signed(v)+"</b></div>";
-  }).join("")+'<div class="drill-net">Net <b class="'+(net>0?"pos":net<0?"neg":"flat")+'">'+R.signed(Math.round(net*100)/100)+"</b></div>"
+      '<b class="num '+cls+'">'+Fmt.signed(v)+"</b></div>";
+  }).join("")+'<div class="drill-net">Net <b class="'+(net>0?"pos":net<0?"neg":"flat")+'">'+Fmt.signed(Math.round(net*100)/100)+"</b></div>"
   :'<div class="empty">Nothing here yet.</div>';
   document.getElementById("drillDlg").showModal();
 }
 // When a manager last opened the app, from league/seen.
 function seenHtml(id){
-  var iso=R.seenAt(state.seen,id), t=Date.parse(iso||"");
+  var iso=Badges.seenAt(state.seen,id), t=Date.parse(iso||"");
   if(isNaN(t)) return '<span class="r-seen never">Never signed in</span>';
-  var when; try{ when=new Date(t).toLocaleDateString(undefined,{month:"short",day:"numeric"}); }catch(e){ when=R.ago(iso); }
-  return '<span class="r-seen" title="'+esc(R.fmtWhen(t))+'">Last in '+esc(Date.now()-t<86400e3?R.ago(iso):when)+"</span>";
+  var when; try{ when=new Date(t).toLocaleDateString(undefined,{month:"short",day:"numeric"}); }catch(e){ when=Fmt.ago(iso); }
+  return '<span class="r-seen" title="'+esc(Fmt.fmtWhen(t))+'">Last in '+esc(Date.now()-t<86400e3?Fmt.ago(iso):when)+"</span>";
 }
 export function drawRoster(){
   var adm=!!state.admin;

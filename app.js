@@ -2,7 +2,10 @@
 // signed in with the passcode, and keep it current. Everything else lives in the
 // modules below; this file is the only one that knows about all of them.
 
-import * as R from "./rules.js?v=dev";
+import * as Fmt from "./fmt.js?v=dev";
+import * as Clock from "./clock.js?v=dev";
+import * as Id from "./identity.js?v=dev";
+import * as Badges from "./badges.js?v=dev";
 import * as S from "./store.js?v=dev";
 import * as A from "./auth.js?v=dev";
 import * as N from "./sleeper.js?v=dev";
@@ -14,7 +17,7 @@ import { showLogin, enforceFreshPassword, drawRoster } from "./dialogs.js?v=dev"
 import { bindEvents } from "./actions.js?v=dev";
 import * as Nf from "./notify.js?v=dev";
 
-const memberForEmail=function(email){ return R.memberForEmail(email,members()); };
+const memberForEmail=function(email){ return Id.memberForEmail(email,members()); };
 const mark=function(k){ if(!state.timing[k]) state.timing[k]=Math.round(performance.now()); };
 mark("boot");
 
@@ -41,7 +44,7 @@ function applyAuth(user){ var w=A.whoAmI(user,state.config); state.me=w.me; stat
 function stampSeen(){
   if(!state.me||!state.db||state.local||state.seenStamped===state.me) return;
   state.seenStamped=state.me;
-  var d={}; d[state.me]={ at:new Date().toISOString(), n:R.seenCount(state.seen,state.me)+1 };
+  var d={}; d[state.me]={ at:new Date().toISOString(), n:Badges.seenCount(state.seen,state.me)+1 };
   state.db.doc("league/seen").update(d).catch(function(){ /* a missed stamp is no loss */ });
 }
 export function toggleAdmin(){
@@ -91,11 +94,11 @@ function subscribeBook(db){
 
   db.doc("league/config").onSnapshot(function(snap){
     if(snap.exists){
-      var d=R.clone(snap.data());
+      var d=Fmt.clone(snap.data());
       if(d&&Array.isArray(d.members)&&d.members.length){
         state.config={ leagueName:d.leagueName||"Smyrna League", season:d.season||"",
                        stake:Number(d.stake)||25, members:d.members,
-                       kickoff:d.kickoff||R.DEFAULT_KICKOFF,
+                       kickoff:d.kickoff||Clock.DEFAULT_KICKOFF,
                        weekStarts:(d.weekStarts&&typeof d.weekStarts==="object")?d.weekStarts:null };
         state.config.adminEmails=Array.isArray(d.adminEmails)?d.adminEmails:(d.adminEmail?[d.adminEmail]:[]);
         if(state.local){
@@ -120,7 +123,7 @@ function subscribeBook(db){
   },function(e){ state.bookError=e; console.error("league/config:",e); toast(S.dbMsg(e)); });
 
   db.doc("league/refresh").onSnapshot(function(snap){
-    state.refresh=snap.exists?R.clone(snap.data()):null;
+    state.refresh=snap.exists?Fmt.clone(snap.data()):null;
     statsBar();
   },function(){ /* freshness strip is optional; stay quiet */ });
 
@@ -141,7 +144,7 @@ function subscribeBook(db){
   },function(){ /* picker falls back to free text */ });
 
   db.doc("league/payments").onSnapshot(function(snap){
-    state.payments=snap.exists?R.clone(snap.data()):null;
+    state.payments=snap.exists?Fmt.clone(snap.data()):null;
     touch();
   },function(){ /* nothing paid yet */ });
 
@@ -151,7 +154,7 @@ function subscribeBook(db){
   },function(){ /* no published lines, so every number is typed by hand */ });
 
   db.doc("league/badges").onSnapshot(function(snap){
-    state.badges=snap.exists?R.clone(snap.data()):null;   // who has held what, and since when
+    state.badges=snap.exists?Fmt.clone(snap.data()):null;   // who has held what, and since when
     touch();
   },function(){ /* the case still shows today's holders, just no history */ });
 
@@ -181,7 +184,7 @@ function subscribeBook(db){
 
   db.collection("bets").limit(1000).onSnapshot(function(snap){
     remoteBets=snap.docs.map(function(d){
-      var v=R.clone(d.data())||{};
+      var v=Fmt.clone(d.data())||{};
       v.id=d.id;
       if(!Array.isArray(v.entries)) v.entries=[];
       if(!Array.isArray(v.paid)) v.paid=[];
@@ -199,7 +202,7 @@ function subscribeBook(db){
 onRender(function(){ expireBets(); settleFinished(); syncBadges(); render(); });
 try{ window.matchMedia("(max-width: 600px)").addEventListener("change",function(){ touch(); }); }catch(e){}
 bindEvents({ enterBook:enterBook, toggleAdmin:toggleAdmin });
-state.config={ leagueName:"Smyrna League", season:"2026", stake:25, kickoff:R.DEFAULT_KICKOFF, members:[] };
+state.config={ leagueName:"Smyrna League", season:"2026", stake:25, kickoff:Clock.DEFAULT_KICKOFF, members:[] };
 state.bets=[];
 render();
 

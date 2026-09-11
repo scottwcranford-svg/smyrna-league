@@ -2,7 +2,16 @@
 // list, filters, tickets, the stats strip and the footer. Reads state, writes the
 // DOM, never the book. forms.js and actions.js are the other DOM writers.
 
-import * as R from "./rules.js?v=dev";
+import * as Fmt from "./fmt.js?v=dev";
+import * as Clock from "./clock.js?v=dev";
+import * as Id from "./identity.js?v=dev";
+import * as Roster from "./roster.js?v=dev";
+import * as Sched from "./schedule.js?v=dev";
+import * as Stats from "./stats.js?v=dev";
+import * as Ledger from "./ledger.js?v=dev";
+import * as Bets from "./bets.js?v=dev";
+import * as Rivals from "./rivals.js?v=dev";
+import * as Badges from "./badges.js?v=dev";
 import { state, members, realMembers, teamOf, touch } from "./state.js?v=dev";
 import * as Nf from "./notify.js?v=dev";
 
@@ -10,17 +19,17 @@ import * as Nf from "./notify.js?v=dev";
 // markup that differs: folded tickets and ledger rows, the season table by manager).
 export function phone(){ try{ return window.matchMedia("(max-width: 600px)").matches; }catch(e){ return false; } }
 
-const esc=R.esc, money=R.money, signed=R.signed, initials=R.initials, weekLabel=R.weekLabel, isPlayoff=R.isPlayoff,
-      kindLabel=R.kindLabel, entriesOf=R.entriesOf, fmtWhen=R.fmtWhen, countdown=R.countdown, lineText=R.lineText,
-      coverSide=R.coverSide, ago=R.ago;
-const member=function(id){ return R.member(id,members()); };
-const mName=function(id){ return R.mName(id,members()); };
-const mColor=function(id){ return R.mColor(id,members()); };
-const betLock=function(b){ return R.betLock(b,state.config); };
-const isLocked=function(b){ return R.isLocked(b,state.config); };
-const gameOf=function(b){ return R.gameOf(b,state.games); };
-const currentWeek=function(){ return R.currentWeek(state.config,state.games); };
-const computeLedger=function(){ return R.computeLedger(state.config,state.bets); };
+const esc=Fmt.esc, money=Fmt.money, signed=Fmt.signed, initials=Fmt.initials, weekLabel=Fmt.weekLabel, isPlayoff=Clock.isPlayoff,
+      kindLabel=Fmt.kindLabel, entriesOf=Fmt.entriesOf, fmtWhen=Fmt.fmtWhen, countdown=Fmt.countdown, lineText=Bets.lineText,
+      coverSide=Bets.coverSide, ago=Fmt.ago;
+const member=function(id){ return Id.member(id,members()); };
+const mName=function(id){ return Id.mName(id,members()); };
+const mColor=function(id){ return Id.mColor(id,members()); };
+const betLock=function(b){ return Clock.betLock(b,state.config); };
+const isLocked=function(b){ return Clock.isLocked(b,state.config); };
+const gameOf=function(b){ return Bets.gameOf(b,state.games); };
+const currentWeek=function(){ return Clock.currentWeek(state.config,state.games); };
+const computeLedger=function(){ return Ledger.computeLedger(state.config,state.bets); };
 
 export function render(){ head(); ticker(); banner(); tabs(); glance(); badgesView(); board(); highLow(); rivalsView(); settle(); filters(); tickets(); statsBar(); foot(); }
 
@@ -53,9 +62,9 @@ export function logoHtml(code,size){
 function teamLogos(text,size){ return String(text||"").split(" · ").map(function(c){ return logoHtml(c,size); }).join(""); }
 // Status tags for a pick id: Q, OUT, IR… from the roster as it is now, not as it was when the bet was made.
 export function statusTagsHtml(id){
-  return R.statusOf(id,state.roster).map(function(c){
+  return Roster.statusOf(id,state.roster).map(function(c){
     var hard=c==="Q"?"soft":"hard";
-    return '<span class="st-tag '+hard+'" title="'+esc(R.STATUS_LABEL[c]||c)+'">'+esc(c)+"</span>";
+    return '<span class="st-tag '+hard+'" title="'+esc(Roster.STATUS_LABEL[c]||c)+'">'+esc(c)+"</span>";
   }).join("");
 }
 
@@ -106,7 +115,7 @@ export function ticker(){
         '<span class="live">'+esc((qlabel+" "+(g.clock||"")).trim()||"Live")+"</span></span>";
     }
     // before kickoff, what Vegas has on it — the same numbers the propose form prefills
-    var L=R.lineFor(g,state.lines), sm=L?R.lineSummary(L):"";
+    var L=Sched.lineFor(g,state.lines), sm=L?Sched.lineSummary(L):"";
     return '<span class="game"><span class="tm">'+logoHtml(g.away,14)+esc(g.away)+'</span><span class="at">@</span><span class="tm">'+logoHtml(g.home,14)+esc(g.home)+"</span>"+
       '<span class="when">'+esc(fmtKick(t))+"</span>"+(sm?'<span class="odds">'+esc(sm)+"</span>":"")+"</span>";
   }).join("");
@@ -120,7 +129,7 @@ function head(){
   var c=state.config, league=state.sleeper&&state.sleeper.league;
   document.getElementById("leagueName").textContent=c?c.leagueName:"Smyrna League";
   // the league's settings line, Sleeper's way: "2026 · 10-Team Keeper SF PPR · side bets"
-  var line=R.leagueLine(league,c&&c.season);
+  var line=Roster.leagueLine(league,c&&c.season);
   document.getElementById("leagueSub").textContent=(line?line+" · ":"")+"side bets";
   // the league's own Sleeper avatar when it has one; our football mark otherwise
   var mark=document.getElementById("leagueBadge");
@@ -145,12 +154,12 @@ function head(){
 
 // The tab row: which panel is open, and a badge where something needs a look.
 function tabs(){
-  var L=computeLedger(), HL=R.hlTally(state.highlow,members(),R.hlStake(state.config));
+  var L=computeLedger(), HL=Ledger.hlTally(state.highlow,members(),Ledger.hlStake(state.config));
   var seats=0;
   state.bets.forEach(function(b){ if(b.status==="open"&&!isLocked(b)) entriesOf(b).forEach(function(e){ if(!e.memberId&&(!e.invite||e.declined)) seats++; }); });
-  var Bal=R.balances(state.config,state.bets,state.highlow,state.payments&&state.payments.list,R.hlStake(state.config));
+  var Bal=Ledger.balances(state.config,state.bets,state.highlow,state.payments&&state.payments.list,Ledger.hlStake(state.config));
   // Rivals badges the pairs you're behind on — the rivalries to fix.
-  var RV=R.rivals(realMembers().filter(function(m){ return !m.test; }),state.bets), owed=0;
+  var RV=Rivals.rivals(realMembers().filter(function(m){ return !m.test; }),state.bets), owed=0;
   if(state.me&&RV.byId[state.me]) Object.keys(RV.byId[state.me]).forEach(function(b){ if(RV.byId[state.me][b].net<0) owed++; });
   // Badges badges how many titles you're holding right now
   var mineBadges=0;
@@ -172,7 +181,7 @@ function glance(){
   });
   var parts=['<span><b>'+live+"</b> "+(live===1?"bet":"bets")+" running</span>",'<span><b>'+esc(money(pot))+"</b> on the table</span>"];
   if(state.me){
-    var Bg=R.balances(state.config,state.bets,state.highlow,state.payments&&state.payments.list,R.hlStake(state.config));
+    var Bg=Ledger.balances(state.config,state.bets,state.highlow,state.payments&&state.payments.list,Ledger.hlStake(state.config));
     var net=(Bg.byId[state.me]||{}).net||0;
     parts.push('<span>you <b class="'+(net>0?"pos":net<0?"neg":"")+'">'+esc(signed(net))+"</b> net"+
       (mineOpen?' · <b class="warn">'+mineOpen+(mineOpen===1?" seat":" seats")+"</b> waiting on takers":"")+"</span>");
@@ -203,7 +212,7 @@ function banner(){
 // Week by week: who topped the league on Sleeper and who finished last, and what moved.
 function highLow(){
   var host=document.getElementById("highlow"), note=document.getElementById("hlNote");
-  var stake=R.hlStake(state.config), HL=R.hlTally(state.highlow,members(),stake);
+  var stake=Ledger.hlStake(state.config), HL=Ledger.hlTally(state.highlow,members(),stake);
   if(!HL.weeks.length){
     host.innerHTML='<div class="empty">Each week the top Sleeper score takes '+money(stake)+" from the bottom score. Runs all season, settles at the end.</div>";
     note.textContent=""; return;
@@ -289,7 +298,7 @@ export function showBet(id){
 
 // The season in one table: a column per manager, a row per pool, net all season, paid or not.
 function seasonTable(L){
-  var HL=R.hlTally(state.highlow,members(),R.hlStake(state.config));
+  var HL=Ledger.hlTally(state.highlow,members(),Ledger.hlStake(state.config));
   var cols=realMembers().filter(function(m){ return !m.test; });
   if(!cols.length) return "";
   if(phone()) return seasonTableByManager(L,HL,cols);
@@ -342,7 +351,7 @@ const BADGE_ICON={
 const badgeSvg=function(k){ return '<svg viewBox="0 0 24 24" aria-hidden="true">'+(BADGE_ICON[k]||"")+"</svg>"; };
 // The badges as they stand, with whatever history the book has recorded.
 function badgeList(){
-  return R.badges(state.config,state.bets,state.highlow,state.seen,state.payments&&state.payments.list,Date.now());
+  return Badges.badges(state.config,state.bets,state.highlow,state.seen,state.payments&&state.payments.list,Date.now());
 }
 function badgesView(){
   var host=document.getElementById("badges"), list=badgeList();
@@ -364,12 +373,12 @@ function badgesView(){
     // a tie is shared: every holder's face, then the names, and the title goes plural
     var who=n
       ? '<span class="bdg-who"><span class="bdg-faces">'+b.holders.slice(0,4).map(function(id){ return avatarHtml(id,22); }).join("")+"</span>"+
-        "<b>"+esc(R.nameList(b.holderNames))+'</b><b class="bdg-v">'+esc(b.text)+"</b></span>"
+        "<b>"+esc(Fmt.nameList(b.holderNames))+'</b><b class="bdg-v">'+esc(b.text)+"</b></span>"
       : '<span class="bdg-who"><b class="bdg-none">Nobody yet</b></span>';
     return '<div class="bdg-card '+(n?esc(b.fam):"vacant")+(isMine(b)?" me":"")+'">'+
       '<span class="bdg-ic">'+badgeSvg(b.icon)+"</span>"+
       "<span>"+'<span class="bdg-nm">'+esc(b.label)+(b.shared?'<i class="bdg-share">shared · '+n+"</i>":"")+"</span>"+who+
-      '<span class="bdg-sub">'+(function(){ var st=R.badgeStory(rec,members(),b.holders); return st?'<span class="took">'+esc(st)+"</span> · ":""; })()+esc(b.blurb)+"</span></span></div>";
+      '<span class="bdg-sub">'+(function(){ var st=Badges.badgeStory(rec,members(),b.holders); return st?'<span class="took">'+esc(st)+"</span> · ":""; })()+esc(b.blurb)+"</span></span></div>";
   }).join("")+"</div>";
   host.innerHTML=h;
 }
@@ -381,7 +390,7 @@ function badgesView(){
 function rivalsView(){
   var host=document.getElementById("rivals");
   var list=realMembers().filter(function(m){ return !m.test; });
-  var RV=R.rivals(list,state.bets);
+  var RV=Rivals.rivals(list,state.bets);
   var played=Object.keys(RV.totals).some(function(id){ return RV.totals[id].w||RV.totals[id].l; });
   if(!played){
     host.innerHTML='<div class="empty">Nothing has settled yet. Once bets start paying out, this is where you see who owns whom — every pair, all season.</div>';
@@ -450,14 +459,14 @@ function rivalsView(){
   }
 
   // bragging rights, and the last few results
-  var H=R.rivalHighlights(RV,state.bets,list);
+  var H=Rivals.rivalHighlights(RV,state.bets,list);
   var rows=[];
   if(H.rivalry) rows.push(["Biggest rivalry",esc(name(H.rivalry.a))+" vs "+esc(name(H.rivalry.b))+" · "+money(H.rivalry.moved)+" has changed hands",H.rivalry.w+"–"+H.rivalry.l,"gold",[H.rivalry.a,H.rivalry.b]]);
   if(H.lopsided) rows.push(["Most lopsided",esc(name(H.lopsided.a))+" owns "+esc(name(H.lopsided.b)),money(H.lopsided.net),"pos",[H.lopsided.a]]);
   if(H.hammer) rows.push(["The hammer",esc(name(H.hammer.id))+" · most bets won off people",H.hammer.v+" W","pos",[H.hammer.id]]);
   if(H.nail) rows.push(["The nail",esc(name(H.nail.id))+" · most bets lost to people",H.nail.v+" L","neg",[H.nail.id]]);
   if(H.haul) rows.push(["Biggest haul",esc(name(H.haul.winner))+" took "+esc(H.haul.name)+" · "+H.haul.losers+" losers",money(H.haul.pot),"pos",[H.haul.winner]]);
-  var feed=R.rivalFeed(state.bets,5);
+  var feed=Rivals.rivalFeed(state.bets,5);
   h+='<div class="riv-side">'+
     '<div class="riv-box"><div class="lbl">Bragging rights</div>'+rows.map(function(x){
       return '<div class="riv-brag"><span class="riv-pair">'+x[4].map(function(id){ return avatarHtml(id,22); }).join("")+"</span>"+
@@ -478,7 +487,7 @@ function rivalsView(){
 // clear them, and the payments made so far. Nothing is paid bet by bet.
 function settle(){
   var L=computeLedger(), host=document.getElementById("settle");
-  var B=R.balances(state.config,state.bets,state.highlow,state.payments&&state.payments.list,R.hlStake(state.config));
+  var B=Ledger.balances(state.config,state.bets,state.highlow,state.payments&&state.payments.list,Ledger.hlStake(state.config));
   var cols=realMembers().filter(function(m){ return !m.test; });
   var h=seasonTable(L);
 
@@ -598,7 +607,7 @@ function gamelineHtml(b){
   } else stateHtml='<span class="gl-state">'+esc(fmtWhen(t))+"</span>";
   return '<div class="gameline">'+team(g.away,g.awayScore,hw)+'<span class="gl-at">@</span>'+team(g.home,g.homeScore,aw)+
     (b.market&&b.market!=="ml"?'<span class="gl-line">'+esc(lineText(b))+
-      (function(){ var o=R.lineOrigin(b); return o?'<i class="src '+o+'">'+(o==="vegas"?"Vegas":"their number")+"</i>":""; })()+"</span>":"")+stateHtml+"</div>";
+      (function(){ var o=Bets.lineOrigin(b); return o?'<i class="src '+o+'">'+(o==="vegas"?"Vegas":"their number")+"</i>":""; })()+"</span>":"")+stateHtml+"</div>";
 }
 
 // The standings strip: a bet tracks one stat or several. Older bets carry a single
@@ -611,18 +620,18 @@ function stripHtml(S,ents,week){
   var multiTrack=tracks.length>1;
   // Sleeper's projections for this week, if the app has them: shown in place of the
   // actuals until something has been played, then as a small reference beside them.
-  var P=R.projFor(Number(week)||0,state.proj), anyPre=false;   // week 0: the season projections
+  var P=Stats.projFor(Number(week)||0,state.proj), anyPre=false;   // week 0: the season projections
   var blocks=tracks.map(function(t){
     var anyPlayed=false;
     S.rows.forEach(function(r){ if(valueOf(r,t)) anyPlayed=true; });
-    var projOf=function(r){ return P?R.valueFor(r.key||r.id,t.stat,P):null; };
+    var projOf=function(r){ return P?Stats.valueFor(r.key||r.id,t.stat,P):null; };
     var pre=!anyPlayed&&!!P&&S.rows.some(function(r){ return projOf(r); });
     if(pre) anyPre=true;
     var shownOf=function(r){ return pre?projOf(r):valueOf(r,t); };
     var better=function(a,b){ return t.lower?a<b:a>b; };
     // On a weekly bet, a row whose team sits out the week says so (a combined pick: any of its teams).
-    var playing=R.teamsPlaying(week,state.games);
-    var onBye=function(r){ return !!r.team&&String(r.team).split(" · ").some(function(tm){ return R.onBye(tm,playing); }); };
+    var playing=Clock.teamsPlaying(week,state.games);
+    var onBye=function(r){ return !!r.team&&String(r.team).split(" · ").some(function(tm){ return Clock.onBye(tm,playing); }); };
     var ownerOf=function(r){ return r.memberId||((r.entry!=null&&ents[r.entry])?ents[r.entry].memberId:null); };
     // The name cell: the dot, tag and bar colour say whose side a row is on.
     var nameHtml=function(r,owner,label){
@@ -696,7 +705,7 @@ function stripHtml(S,ents,week){
 function actionsHtml(b,ents,live,mine){
   var acts=[];
   // Pot-style bet you're not in yet? Add yourself.
-  if(state.me&&R.canJoin(b)&&!isLocked(b)&&!mine)
+  if(state.me&&Bets.canJoin(b)&&!isLocked(b)&&!mine)
     acts.push('<button class="btn pri" data-act="join" data-id="'+esc(b.id)+'">Join</button>');
   // Proposed to you? Accept or pass, right on the ticket.
   if(state.me&&(b.status==="open")&&!isLocked(b)){
@@ -748,7 +757,7 @@ function ticketHtml(b){
   var pot=(Number(b.amount)||0)*live.length;
   var paidStamp="";   // nothing is paid bet by bet: balances net out at the end of the year
   // Still looking for people: a seat to fill, or a pot you could add yourself to.
-  var seeking=!isLocked(b)&&(b.status==="open"||(state.me&&R.canJoin(b)&&!mine));
+  var seeking=!isLocked(b)&&(b.status==="open"||(state.me&&Bets.canJoin(b)&&!mine));
   var strip=stripHtml(b.stats,ents,b.week);
   // On a phone a ticket folds to its name, sides and numbers; a tap opens the rest.
   // One still looking for people stays fully drawn, its button in reach.

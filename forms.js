@@ -2,25 +2,31 @@
 // picker, game mode (winner or over/under), and the submit that turns a draft into
 // a bet. Reads state, writes the dialogs' DOM, saves through book.js.
 
-import * as R from "./rules.js?v=dev";
+import * as Fmt from "./fmt.js?v=dev";
+import * as Clock from "./clock.js?v=dev";
+import * as Id from "./identity.js?v=dev";
+import * as Roster from "./roster.js?v=dev";
+import * as Sched from "./schedule.js?v=dev";
+import * as Stats from "./stats.js?v=dev";
+import * as Bets from "./bets.js?v=dev";
 import { state, members, realMembers } from "./state.js?v=dev";
 import { toast, statusTagsHtml, logoHtml } from "./render.js?v=dev";
 import { guard, findBet, saveBet } from "./book.js?v=dev";
 import { dbMsg } from "./store.js?v=dev";
 
-const STATS=R.STATS, LAST_WEEK=R.LAST_WEEK, PLAYOFF_START=R.PLAYOFF_START, LOCK_LEAD=R.LOCK_LEAD;
-const esc=R.esc, money=R.money, uid=R.uid, clone=R.clone, entriesOf=R.entriesOf, fmtWhen=R.fmtWhen,
-      shortName=R.shortName, picksText=R.picksText, statsKey=R.statsKey, autoName=R.autoName;
-const mName=function(id){ return R.mName(id,members()); };
-const isLocked=function(b){ return R.isLocked(b,state.config); };
-const weekLocked=function(w){ return R.weekLocked(w,state.config); };
-const allGames=function(){ return R.allGames(state.games); };
-const teamName=function(code){ return R.teamName(code,state.roster); };
-const rosterRows=function(){ return R.rosterRows(state.roster); };
-const rosterFind=function(id){ return R.rosterFind(id,state.roster); };
-const rosterSearch=function(q,scope){ return R.rosterSearch(q,scope,state.roster); };
-const autoTerms=function(scope,tracks,week,entries){ return R.autoTerms(scope,tracks,week,entries,members()); };
-const buildStats=function(entries){ return R.buildStats(entries,state.draftScope,state.draftStats); };
+const STATS=Stats.STATS, LAST_WEEK=Clock.LAST_WEEK, PLAYOFF_START=Clock.PLAYOFF_START, LOCK_LEAD=Clock.LOCK_LEAD;
+const esc=Fmt.esc, money=Fmt.money, uid=Fmt.uid, clone=Fmt.clone, entriesOf=Fmt.entriesOf, fmtWhen=Fmt.fmtWhen,
+      shortName=Fmt.shortName, picksText=Fmt.picksText, statsKey=Stats.statsKey, autoName=Bets.autoName;
+const mName=function(id){ return Id.mName(id,members()); };
+const isLocked=function(b){ return Clock.isLocked(b,state.config); };
+const weekLocked=function(w){ return Clock.weekLocked(w,state.config); };
+const allGames=function(){ return Clock.allGames(state.games); };
+const teamName=function(code){ return Roster.teamName(code,state.roster); };
+const rosterRows=function(){ return Roster.rosterRows(state.roster); };
+const rosterFind=function(id){ return Roster.rosterFind(id,state.roster); };
+const rosterSearch=function(q,scope){ return Roster.rosterSearch(q,scope,state.roster); };
+const autoTerms=function(scope,tracks,week,entries){ return Bets.autoTerms(scope,tracks,week,entries,members()); };
+const buildStats=function(entries){ return Stats.buildStats(entries,state.draftScope,state.draftStats); };
 
 // Games still open for a bet in a week: not yet within five minutes of kickoff.
 export function openGames(week){
@@ -28,7 +34,7 @@ export function openGames(week){
   return allGames().filter(function(g){ return g.week===Number(week)&&now<Date.parse(g.date)-LOCK_LEAD; });
 }
 // What Vegas has published for a game, if anything (league/lines, from the schedule file).
-export function lineOf(g){ return R.lineFor(g,state.lines); }
+export function lineOf(g){ return Sched.lineFor(g,state.lines); }
 
 // Drop the published number into the form when a game or market is chosen. Everything
 // stays editable — this is a starting point, not a rule, and plenty of games have no line.
@@ -76,7 +82,7 @@ export function drawGameBox(){
         return '<optgroup label="Week '+w+'">'+byWeek[w].map(function(g){
           // say up front whether this game has a published line, so nobody picks a game
           // expecting a spread and finds an empty box
-          var sm=R.lineSummary(lineOf(g));
+          var sm=Sched.lineSummary(lineOf(g));
           return '<option value="'+esc(g.id)+'"'+(cur&&cur.id===g.id?" selected":"")+">"+esc(g.away+" @ "+g.home)+" · "+esc(fmtWhen(Date.parse(g.date)))+" · "+esc(sm||"no line yet")+"</option>"; }).join("")+"</optgroup>"; }).join("")
     : '<option value="">No games left to bet on</option>';
   if(cur) wk.value=String(cur.week);
@@ -218,14 +224,14 @@ function draftWeek(){
 }
 // "82 rec yds · 5 rec": a pick's projection for the form's week and the stats it tracks.
 function projText(id){
-  var wk=draftWeek(), P=R.projFor(wk||0,state.proj);   // week 0: the season projections
+  var wk=draftWeek(), P=Stats.projFor(wk||0,state.proj);   // week 0: the season projections
   if(!P) return "";
-  return (state.draftStats||[]).slice(0,2).map(function(st){ return R.valueFor(id,st,P)+" "+(R.STAT_SHORT[st]||st); }).join(" · ");
+  return (state.draftStats||[]).slice(0,2).map(function(st){ return Stats.valueFor(id,st,P)+" "+(Stats.STAT_SHORT[st]||st); }).join(" · ");
 }
 // The first pick whose team is off in the week, or null.
 function byePick(entries,week){
-  var playing=R.teamsPlaying(week,state.games), hit=null;
-  entries.forEach(function(e){ (e.picks||[]).forEach(function(p){ if(!hit&&R.onBye(p.team,playing)) hit=p; }); });
+  var playing=Clock.teamsPlaying(week,state.games), hit=null;
+  entries.forEach(function(e){ (e.picks||[]).forEach(function(p){ if(!hit&&Clock.onBye(p.team,playing)) hit=p; }); });
   return hit;
 }
 
@@ -235,10 +241,10 @@ export function drawSugg(i,q){
   var taken={}; state.draft.forEach(function(e){ (e.picks||[]).forEach(function(p){ taken[p.id]=1; }); });
   var hits=rosterSearch(q,state.draftScope).filter(function(r){ return !taken[r[0]]; });
   // On a weekly bet, anyone whose team is off that week is shown but can't be picked.
-  var playing=R.teamsPlaying(draftWeek(),state.games);
+  var playing=Clock.teamsPlaying(draftWeek(),state.games);
   box.hidden=!hits.length;
   box.innerHTML=hits.map(function(r){
-    var bye=R.onBye(r[3],playing), pt=projText(r[0]);
+    var bye=Clock.onBye(r[3],playing), pt=projText(r[0]);
     return '<button type="button" data-act="dAdd" data-i="'+i+'" data-id="'+esc(r[0])+'"'+(bye?' disabled title="Off this week"':"")+'>'+esc(r[1])+
       (r[2]!=="DEF"?'<span class="tag pos-'+esc(r[2])+'">'+esc(r[2])+"</span>":"")+statusTagsHtml(r[0])+(bye?'<span class="tag bye">bye</span>':"")+
       (pt?'<span class="proj" title="Sleeper projection">'+esc(pt)+"</span>":"")+'<span class="team">'+logoHtml(r[3],14)+esc(r[3])+"</span></button>";
@@ -461,7 +467,7 @@ export function openJoinDlg(id){
   if(!guard()) return;
   if(!state.me) return toast("Pick your name first");
   var bet=findBet(id);
-  if(!bet||!R.canJoin(bet)) return toast("This one isn't open to joiners");
+  if(!bet||!Bets.canJoin(bet)) return toast("This one isn't open to joiners");
   if(isLocked(bet)) return toast("Locked — too close to kickoff");
   if(entriesOf(bet).some(function(e){ return e.memberId===state.me; })) return toast("You’re already in this one");
   state.joinId=id;

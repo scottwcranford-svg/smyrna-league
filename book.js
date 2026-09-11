@@ -2,16 +2,20 @@
 // to the local copy first (so the page answers at once) and then to Firestore.
 // The lease-guarded ones (taking a seat) re-read before they write.
 
-import * as R from "./rules.js?v=dev";
+import * as Fmt from "./fmt.js?v=dev";
+import * as Clock from "./clock.js?v=dev";
+import * as Id from "./identity.js?v=dev";
+import * as Bets from "./bets.js?v=dev";
+import * as Badges from "./badges.js?v=dev";
 import { dbMsg } from "./store.js?v=dev";
 import { state, members, touch } from "./state.js?v=dev";
 import { toast, statsBar } from "./render.js?v=dev";
 
-const entriesOf=R.entriesOf, openSeats=R.openSeats, clone=R.clone;
-const mName=function(id){ return R.mName(id,members()); };
-const money=R.money, uid=R.uid;
-const isLocked=function(b){ return R.isLocked(b,state.config); };
-const betLock=function(b){ return R.betLock(b,state.config); };
+const entriesOf=Fmt.entriesOf, openSeats=Fmt.openSeats, clone=Fmt.clone;
+const mName=function(id){ return Id.mName(id,members()); };
+const money=Fmt.money, uid=Fmt.uid;
+const isLocked=function(b){ return Clock.isLocked(b,state.config); };
+const betLock=function(b){ return Clock.betLock(b,state.config); };
 
 export function guard(){
   if(state.local){ toast(state.connected?"Publish the league first":"Preview only — nothing saves"); return false; }
@@ -59,7 +63,7 @@ export function expireBets(){
 export function settleFinished(){
   var now=Date.now();
   state.bets.forEach(function(b){
-    var r=R.autoResult(b,state.games,now); if(!r) return;
+    var r=Bets.autoResult(b,state.games,now); if(!r) return;
     b.status="settled"; b.winner=r.winner; b.settledAt=new Date(now).toISOString(); b.settledBy="auto"; b.settledNote=r.note;
     if(!Array.isArray(b.paid)) b.paid=[];
     if(state.db&&!state.local) state.db.doc("bets/"+b.id).update({ status:"settled", winner:r.winner, settledAt:b.settledAt, settledBy:"auto", settledNote:r.note })
@@ -76,8 +80,8 @@ export function syncBadges(){
   // This runs on the way to every draw, so nothing in here may throw: a failed
   // bookkeeping write must never stop the page from rendering.
   try{
-    var list=R.badges(state.config,state.bets,state.highlow,state.seen,state.payments&&state.payments.list,Date.now());
-    var chg=R.badgeChanges(list,state.badges,state.config,state.games,Date.now());
+    var list=Badges.badges(state.config,state.bets,state.highlow,state.seen,state.payments&&state.payments.list,Date.now());
+    var chg=Badges.badgeChanges(list,state.badges,state.config,state.games,Date.now());
     if(!chg) return;
     var cur=(state.badges&&state.badges.byKey)||{};
     state.badges={ updatedAt:new Date().toISOString(), byKey:Object.assign({},cur,chg) };
