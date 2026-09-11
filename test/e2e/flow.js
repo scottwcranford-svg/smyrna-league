@@ -165,7 +165,7 @@ let browser; const errors = [], checks = {};
   await browser.close();
 
   const ok = checks.appDisplay !== "none" && checks.me === USER && checks.tickets >= 1 && checks.seats >= 1 && checks.liveOnly === true
-    && checks.joinOn.every(t => !/White Men Can Catch|@/.test(t)) && (process.env.E2E_ADMIN ? checks.adminSwitchShown === true && checks.adminSwitchOff === true : checks.adminSwitchHidden === true && checks.adminSwitchShown === false)
+    && checks.joinOn.every(t => !/White Men Can Catch|@/.test(t)) && (asAdmin ? checks.adminSwitchShown === true && checks.adminSwitchOff === true : checks.adminSwitchHidden === true && checks.adminSwitchShown === false)
     && /Book/.test(checks.tabOn) && checks.panelsShown.join() === "book" && /bets running/.test(checks.glance) && /side bets/.test(checks.leagueLine)
     && checks.ledgerTab.board === true && checks.ledgerTab.book === true && checks.ledgerTab.saved === "ledger" && (checks.unlocked === 0 || (checks.seeking >= 1 && checks.seekingGlow === true))
     && checks.rosterRows >= 1 && checks.rosterReadOnly === true && /Last in/.test(checks.seenSelf) && checks.onBoard === !checks.selfIsTest
