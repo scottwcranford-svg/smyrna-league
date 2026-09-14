@@ -566,6 +566,42 @@ test("League dialog: when each manager was last in", { skip }, async () => {
   await p.close();
 });
 
+test("League dialog: dues paid per season — an admin taps to change it, everyone else sees it, a new season starts unpaid", { skip }, async () => {
+  const { p, errors } = await page();
+  const out = await p.evaluate(async () => {
+    const { state } = await import("./state.js?v=dev"); const D = await import("./dialogs.js?v=dev");
+    state.config.members = [{ id: "a", name: "Alice", seasons: ["2026", "2027"] }, { id: "b", name: "Bob", seasons: ["2026"] }, { id: "c", name: "Cara", seasons: ["2026", "2027"] }, { id: "t", name: "Testy", test: true }];
+    const rows = () => [...document.querySelectorAll("#rosterList .rrow")].map(r => { const d = r.querySelector(".r-dues"); return [r.querySelector(".r-name").textContent, d ? d.tagName + ":" + d.textContent : ""]; });
+    const sum = () => document.getElementById("rDues").textContent;
+    const res = {};
+    state.admin = true; D.drawRoster(); res.adminBefore = rows(); res.sumBefore = sum();
+    document.querySelector('#rosterList [data-act="duesToggle"][data-id="b"]').click();
+    document.querySelector('#rosterList [data-act="duesToggle"][data-id="c"]').click();
+    res.adminAfter = rows(); res.sumAfter = sum();
+    const paid = document.querySelector('#rosterList .r-dues.paid');
+    res.paidStyle = [getComputedStyle(paid).backgroundColor !== getComputedStyle(document.querySelector('#rosterList .r-dues:not(.paid)')).backgroundColor];
+    res.record = Object.keys(state.config.bySeason["2026"].duesPaid).sort();
+    state.admin = false; state.me = "a"; D.drawRoster(); res.manager = rows();
+    document.querySelector("#rosterList .r-dues").click(); res.managerCantChange = Object.keys(state.config.bySeason["2026"].duesPaid).length;
+    // the next season: its own list, everyone unpaid, last year's record kept
+    state.config.season = "2027"; state.season = null; state.admin = true; D.drawRoster(); res.next = rows(); res.nextSum = sum();
+    res.lastYearKept = Object.keys(state.config.bySeason["2026"].duesPaid).sort();
+    return res;
+  });
+  assert.equal(out.sumBefore, "· 2026 dues 0 of 3 paid");
+  assert.deepEqual(out.adminBefore, [["Alice", "BUTTON:Dues unpaid"], ["Bob", "BUTTON:Dues unpaid"], ["Cara", "BUTTON:Dues unpaid"], ["Testy", ""]], "a test account owes nothing");
+  assert.deepEqual(out.adminAfter.slice(0, 3), [["Alice", "BUTTON:Dues unpaid"], ["Bob", "BUTTON:Dues paid"], ["Cara", "BUTTON:Dues paid"]]);
+  assert.equal(out.sumAfter, "· 2026 dues 2 of 3 paid"); assert.deepEqual(out.paidStyle, [true], "paid looks different on screen");
+  assert.deepEqual(out.record, ["b", "c"]);
+  assert.deepEqual(out.manager, [["Alice", "SPAN:Dues unpaid"], ["Bob", "SPAN:Dues paid"], ["Cara", "SPAN:Dues paid"]], "a manager sees it but can't press it");
+  assert.equal(out.managerCantChange, 2);
+  assert.deepEqual(out.next, [["Alice", "BUTTON:Dues unpaid"], ["Bob", ""], ["Cara", "BUTTON:Dues unpaid"], ["Testy", ""]], "2027 is Alice and Cara, both unpaid; Bob didn't play");
+  assert.equal(out.nextSum, "· 2027 dues 0 of 2 paid");
+  assert.deepEqual(out.lastYearKept, ["b", "c"]);
+  assert.deepEqual(errors, []);
+  await p.close();
+});
+
 test("notifications: the menu button says where they stand; the nudge shows once and takes 'not now'", { skip }, async () => {
   const { p, errors } = await page();
   const out = await p.evaluate(async () => {

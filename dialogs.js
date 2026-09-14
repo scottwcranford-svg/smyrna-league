@@ -11,7 +11,8 @@ import * as Bets from "./bets.js?v=dev";
 import * as Badges from "./badges.js?v=dev";
 import * as S from "./store.js?v=dev";
 import * as A from "./auth.js?v=dev";
-import { state, members, realMembers, teamOf, touch , seasonCfg } from "./state.js?v=dev";
+import { state, members, realMembers, teamOf, touch , seasonCfg, shownSeason } from "./state.js?v=dev";
+import * as Sn from "./seasons.js?v=dev";
 import { toast, avatarHtml } from "./render.js?v=dev";
 import { guard, findBet } from "./book.js?v=dev";
 import * as Nf from "./notify.js?v=dev";
@@ -138,13 +139,24 @@ export function drawRoster(){
     :rs.note?rs.note
     :rs.finishedAt?((rs.added||0)+(rs.added===1?" manager added · ":" managers added · ")+(rs.carried||0)+" carried into "+Fmt.esc(String(state.config&&state.config.season||""))+" · "+Fmt.ago(rs.finishedAt))
     :"";
+  // League dues for the season on screen: who's paid, set by an admin, kept per season.
+  var season=shownSeason(), tally=Sn.duesTally(state.config,season);
+  document.getElementById("rDues").textContent=tally.of?"· "+season+" dues "+tally.paid+" of "+tally.of+" paid":"";
+  var duesHtml=function(m){
+    if(m.test||!Sn.inSeason(m,season)) return "";
+    var paid=Sn.duesPaid(state.config,season,m.id), cls="r-dues"+(paid?" paid":"");
+    var label=paid?"Dues paid":"Dues unpaid";
+    return adm
+      ? '<button type="button" class="'+cls+'" data-act="duesToggle" data-id="'+esc(m.id)+'" aria-pressed="'+paid+'" data-tip="'+esc(season)+' league dues — tap to change">'+label+"</button>"
+      : '<span class="'+cls+'" data-tip="'+esc(season)+' league dues">'+label+"</span>";
+  };
   // Test accounts show to admins (to manage them) and to themselves; nobody else sees them.
   document.getElementById("rosterList").innerHTML=(adm?members():realMembers()).map(function(m){
     return '<div class="rrow'+(m.test?" test":"")+'">'+avatarHtml(m.id,26)+
       '<span class="r-name">'+esc(m.name)+"</span>"+
       (isAdminMember(m.id)?'<span class="r-adm">Admin</span>':"")+
       (m.test?'<span class="r-adm r-test" data-tip="Left out of the ledger and the pickers">Test</span>':"")+
-      '<span class="r-team">'+esc(teamOf(m)||"—")+"</span>"+seenHtml(m.id)+
+      '<span class="r-team">'+esc(teamOf(m)||"—")+"</span>"+duesHtml(m)+seenHtml(m.id)+
       (adm?'<input class="field r-pw" type="password" data-pw="'+esc(m.id)+'" autocomplete="new-password" placeholder="Set password">'+
            '<button class="btn" data-act="setPw" data-id="'+esc(m.id)+'">Set</button>'+
            '<button class="btn" data-act="pwDefault" data-id="'+esc(m.id)+'" data-tip="'+esc(defaultPw(m))+'">Default</button>':"")+

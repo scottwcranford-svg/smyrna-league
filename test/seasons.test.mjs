@@ -95,3 +95,21 @@ test("writing a season's weeks lifts the old shape rather than dropping it", () 
   assert.deepEqual(again["2027"], { "1": { high: ["z"] } }, "the other season is untouched");
   assert.deepEqual(again["2026"], { "1": { high: ["b"] }, "2": { high: ["c"] } });
 });
+
+test("league dues: kept per season, unpaid until marked, test accounts owe nothing", () => {
+  const config = { season: "2027", members: [{ id: "a", name: "A" }, { id: "b", name: "B", seasons: ["2026", "2027"] }, { id: "c", name: "C", seasons: ["2027"] }, { id: "t", name: "T", test: true, seasons: ["2026", "2027"] }],
+    bySeason: { "2027": { stake: 25, leagueId: "L27" } } };
+  assert.equal(S.duesPaid(config, "2026", "a"), false, "nobody has paid before anything is marked");
+  S.setDues(config, "2026", "a", true, "b", "2026-09-14T12:00:00Z");
+  S.setDues(config, "2026", "b", true, "b");
+  assert.equal(S.duesPaid(config, "2026", "a"), true);
+  assert.deepEqual(config.bySeason["2026"].duesPaid.a, { at: "2026-09-14T12:00:00Z", by: "b" });
+  assert.deepEqual(S.duesTally(config, "2026"), { paid: 2, of: 2 }, "2026 is a and b; the test account doesn't count");
+  assert.equal(S.duesPaid(config, "2027", "b"), false, "a new season starts unpaid");
+  assert.deepEqual(S.duesTally(config, "2027"), { paid: 0, of: 2 }, "2027 is b and c");
+  assert.equal(config.bySeason["2027"].leagueId, "L27", "the season's other settings are untouched");
+  S.setDues(config, "2027", "c", true, "b"); S.setDues(config, "2027", "c", false, "b");
+  assert.deepEqual(S.duesTally(config, "2027"), { paid: 0, of: 2 }, "and can be unmarked");
+  assert.equal(S.duesPaid(config, "2026", "b"), true, "without touching last year");
+  assert.equal(S.settingsFor(config, "2026").stake, undefined, "a dues record doesn't invent settings for the season");
+});

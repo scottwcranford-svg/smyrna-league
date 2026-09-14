@@ -72,6 +72,11 @@ header.top{display:flex;flex-wrap:wrap;gap:14px;align-items:center;padding-botto
 .rrow .r-chk{margin:0;flex:none;font-size:12px}
 .rrow .r-test{color:var(--ink-3);background:var(--surface-2)}
 .rrow.test .r-name{color:var(--ink-2)}
+/* league dues: a pill on each manager's row; a button when an admin is looking */
+.rrow .r-dues{flex:none;font:inherit;font-size:10.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:3px 9px;border-radius:99px;color:var(--ink-3);background:transparent;border:1px solid var(--rule-2);white-space:nowrap}
+.rrow .r-dues.paid{color:var(--win);background:var(--win-bg);border-color:transparent}
+.rrow button.r-dues{cursor:pointer}
+.r-dues-sum{text-transform:none;letter-spacing:0;font-weight:600;color:var(--ink-2)}
 
 select,input,textarea,button{font:inherit;color:inherit}
 .field{appearance:none;background:var(--surface-2);border:1px solid var(--rule);border-radius:10px;padding:8px 12px;font-size:13.5px;font-weight:600;color:var(--ink);min-height:38px;width:100%}

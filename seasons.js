@@ -76,6 +76,32 @@ export function settingsFor(config,season){
   };
 }
 
+// ---- league dues ----
+// Who has paid a season's league dues, kept with that season's settings in league/config
+// (which only an admin can write): bySeason[season].duesPaid = { memberId: { at, by } }.
+// A season with no record has everyone unpaid, so starting a season needs nothing extra,
+// and each year's record stays where it was.
+export function duesPaid(config,season,memberId){
+  var per=config&&config.bySeason&&config.bySeason[String(season)];
+  return !!(per&&per.duesPaid&&per.duesPaid[memberId]);
+}
+// Mark a manager paid or unpaid for a season, in place. Returns the config.
+export function setDues(config,season,memberId,paid,by,at){
+  var s=String(season);
+  config.bySeason=config.bySeason||{};
+  var per=config.bySeason[s]=Object.assign({},config.bySeason[s]||{});
+  var list=Object.assign({},per.duesPaid||{});
+  if(paid) list[memberId]={ at:at||new Date().toISOString(), by:by||null };
+  else delete list[memberId];
+  per.duesPaid=list;
+  return config;
+}
+// How many of a season's league have paid: { paid, of }. Test accounts don't owe dues.
+export function duesTally(config,season){
+  var league=((config&&config.members)||[]).filter(function(m){ return !m.test&&inSeason(m,season); });
+  return { paid:league.filter(function(m){ return duesPaid(config,season,m.id); }).length, of:league.length };
+}
+
 // ---- weekly documents ----
 // league/highlow and league/scores hold { weeks: { "3": {...} } }. That shape has no room
 // for a season, so it gains one above the week: { weeks: { "2027": { "3": {...} } } }. The
