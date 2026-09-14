@@ -726,7 +726,7 @@ test("dues payouts: set in the League dialog; on Settle Up the treasurer, the pl
     res.champ = [champ.querySelector("b").textContent, who(champ)];
     res.bracket = [[...card().querySelectorAll(".brk-h")].map(x => x.textContent), [...card().querySelectorAll(".brk-col.r1 .brk-name, .brk-col.r2 .brk-name")].map(x => x.textContent), [...card().querySelectorAll(".brk-tag")].map(x => x.textContent)];
     res.note = card().querySelector(".dues-note").textContent;
-    res.cards = Object.fromEntries([...document.querySelectorAll("#settle .bal")].map(b => [b.dataset.m, [b.querySelector("b").textContent, (b.querySelector(".bal-ln.dues") || {}).textContent || ""]]));
+    res.cards = Object.fromEntries([...document.querySelectorAll("#settle .bal")].map(b => [b.dataset.m, [b.querySelector("b").textContent, b.querySelector('.bal-ln[data-row="dues"]').textContent, !!b.querySelector(".bal-ln.dues")]]));
     res.you = (document.querySelector("#settle .you-dues") || {}).textContent;
     res.transfers = [...document.querySelectorAll("#settle .debt")].length;
     // the drill-through behind Alice's dues cell
@@ -744,7 +744,7 @@ test("dues payouts: set in the League dialog; on Settle Up the treasurer, the pl
   assert.deepEqual(out.champ, ["$100", "Alice"], "the bracket ends in the champion");
   assert.deepEqual(out.bracket, [["Round 1 · Week 15", "Semifinals · Week 16", "Final · Week 17", "Champion"], ["Seed 4", "Seed 5", "Seed 3", "Seed 6", "Seed 1", "Winner 4 / 5", "Seed 2", "Winner 3 / 6"], ["$50", "$300", "$150"]], "six seeds, 1 and 2 on a bye, the top three wearing their regular-season money");
   assert.match(out.note, /One manager can win a regular-season place and the playoff pool\..*balance card, but Cara pays it from the dues/);
-  assert.deepEqual(out.cards, { a: ["$0", "dues +$400"], b: ["$0", "dues +$150"], c: ["$0", ""] }, "the dues each won sit on the card, outside the number the managers settle between them");
+  assert.deepEqual(out.cards, { a: ["$0", "dues +$400", true], b: ["$0", "dues +$150", true], c: ["$0", "dues $0", false] }, "every card shows its dues once payouts are set; gold only for a winner; "+"the dues each won sit on the card, outside the number the managers settle between them");
   assert.match(out.you, /plus \$400 in dues payouts, from Cara/);
   assert.equal(out.transfers, 0, "dues aren't a manager-to-manager transfer");
   assert.deepEqual(out.drill, ["League dues · Regular season · 1st | paid by Cara | +$300", "League dues · Playoff champion | paid by Cara | +$100"]);
