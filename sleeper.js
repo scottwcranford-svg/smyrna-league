@@ -184,6 +184,29 @@ export function parseRoster(players){
   return rows;
 }
 
+// Season totals, summed from the weekly feeds.
+//
+// Sleeper has a /stats/nfl/regular/<season> endpoint that looks like exactly this, and it
+// cannot be trusted: on 13 Sep 2026 it carried 52 players while week 1 alone had 353, and
+// its top scorer disagreed with the week's. Bets scored from it showed numbers that had
+// nothing to do with what happened. The weekly feeds are right, and the refresh already
+// fetches them to work out which week we are through - so add them up rather than asking
+// for an aggregate somebody else got wrong.
+export function sumWeeks(weeks){
+  var out={};
+  (weeks||[]).forEach(function(d){
+    Object.keys(d||{}).forEach(function(pid){
+      var v=d[pid]; if(!v||typeof v!=="object") return;
+      var to=out[pid]||(out[pid]={});
+      Object.keys(v).forEach(function(k){
+        var n=Number(v[k]);
+        if(!isNaN(n)&&typeof v[k]!=="string") to[k]=(Number(to[k])||0)+n;
+      });
+    });
+  });
+  return out;
+}
+
 // A bet's stats block re-scored from season totals; null if the bet tracks nothing.
 export function restat(S,totals,through,now){
   if(!S||!Array.isArray(S.rows)) return null;
@@ -264,7 +287,14 @@ export function statsTick(db,ctx){
   if(latest&&ageMin(latest)<RESTAT_EVERY) return Promise.resolve();
   return lease(db,"restat",50000,holder(ctx)).then(function(ok){
     if(!ok) return;
-    return sj(SLEEPER+"/v1/stats/nfl/regular/"+seasonOf(ctx.config)).then(function(totals){
+    // the same weekly feeds, so the four-minute pass and the hourly one never disagree
+    var season=seasonOf(ctx.config), upto=Math.min(18,Math.max(1,Clock.currentWeek(ctx.config,ctx.games)));
+    var got=[];
+    var chain=Promise.resolve();
+    for(var w=1;w<=upto;w++)(function(w){ chain=chain.then(function(){
+      return sj(SLEEPER+"/v1/stats/nfl/regular/"+season+"/"+w).then(function(d){ if(d&&Object.keys(d).length) got.push(d); }).catch(function(){});
+    }); })(w);
+    return chain.then(function(){ return sumWeeks(got); }).then(function(totals){
       var now=isoNow(), jobs=[];
       (ctx.bets||[]).forEach(function(b){
         // keep whatever "through week N" the hourly pass worked out; only the numbers move
@@ -306,10 +336,10 @@ export function runRefresh(db,by,forced,ctx){
     return sj(SLEEPER+"/v1/state/nfl").catch(function(){ return {}; }).then(function(st){
       var maxW=Math.min(18,Math.max(1,Number(st.week)||18));
       // through: the highest week with stats posted, bounded by the NFL's current week
-      var seq=Promise.resolve(0);
-      for(var w=1;w<=maxW;w++)(function(w){ seq=seq.then(function(last){ if(last<w-1) return last; return sj(SLEEPER+"/v1/stats/nfl/regular/"+season+"/"+w).then(function(d){ return (d&&Object.keys(d).length)?w:last; }).catch(function(){ return last; }); }); })(w);
+      var seq=Promise.resolve(0), weekly=[];
+      for(var w=1;w<=maxW;w++)(function(w){ seq=seq.then(function(last){ if(last<w-1) return last; return sj(SLEEPER+"/v1/stats/nfl/regular/"+season+"/"+w).then(function(d){ if(d&&Object.keys(d).length){ weekly.push(d); return w; } return last; }).catch(function(){ return last; }); }); })(w);
       return seq.then(function(week){
-        return sj(SLEEPER+"/v1/stats/nfl/regular/"+season).catch(function(){ return {}; }).then(function(totals){
+        return Promise.resolve(sumWeeks(weekly)).then(function(totals){
           var through=week?"Through week "+week:"No games played yet", writes=[], n=0;
           (ctx.bets||[]).forEach(function(b){
             var S=restat(b.stats,totals,through,now); if(!S) return;

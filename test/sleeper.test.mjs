@@ -342,3 +342,44 @@ test("statsTick: bets re-score while games are live, and stay quiet when they ar
   await N.statsTick(db, { ...base, games: live, bets: [{ id: "g1", game: { id: "x" } }] });
   assert.equal(calls, 0, "a game bet tracks no stat, so there is nothing to re-score");
 });
+
+test("sumWeeks: season totals are added up from the weeks, not taken on trust", () => {
+  const w1 = { p1: { pts_ppr: 12.5, rec_yd: 80, rec: 5 }, p2: { pts_ppr: 3 } };
+  const w2 = { p1: { pts_ppr: 8.5, rec_yd: 40, rec: 3 }, p3: { pts_ppr: 20 } };
+  assert.deepEqual(N.sumWeeks([w1, w2]), {
+    p1: { pts_ppr: 21, rec_yd: 120, rec: 8 },
+    p2: { pts_ppr: 3 },
+    p3: { pts_ppr: 20 } }, "every player, every stat, across the weeks given");
+  assert.deepEqual(N.sumWeeks([w1]), w1, "one week is that week");
+  assert.deepEqual(N.sumWeeks([]), {}, "and no weeks is nothing, not a crash");
+  assert.deepEqual(N.sumWeeks(null), {});
+  assert.deepEqual(N.sumWeeks([{ p1: null }, { p1: { pts_ppr: 4 } }]), { p1: { pts_ppr: 4 } },
+    "a missing week for a player is skipped, not counted as zero-and-broken");
+  assert.deepEqual(N.sumWeeks([{ p1: { pts_ppr: 4, team: "SF" } }]), { p1: { pts_ppr: 4 } },
+    "text fields are left out — a team name is not a quantity to add up");
+});
+
+test("runRefresh scores bets from the weeks it already fetched, never the season aggregate", async () => {
+  const hits = [];
+  globalThis.fetch = async (u) => {
+    hits.push(u.replace(/^.*\/v1\//, ""));
+    const j = /state\/nfl/.test(u) ? { week: 2 }
+      : /stats\/nfl\/regular\/2026\/1$/.test(u) ? { "9": { pts_ppr: 10, rec_yd: 60 } }
+      : /stats\/nfl\/regular\/2026\/2$/.test(u) ? { "9": { pts_ppr: 15, rec_yd: 90 } }
+      : /stats\/nfl\/regular\/2026$/.test(u) ? { "9": { pts_ppr: 999 } }   // the broken one; must be ignored
+      : [];
+    return { ok: true, json: async () => j, text: async () => "" };
+  };
+  const bet = { id: "b1", stats: { rows: [{ key: "9", values: {}, value: 0 }], stat: "pts_ppr",
+    tracks: [{ stat: "pts_ppr" }, { stat: "rec_yd" }] } };
+  const db = fakeDb();
+  await N.runRefresh(db, "m0", true, { config: { ...config, sleeperLeagueId: "L1", scheduleUpdatedAt: N.isoNow() },
+    refresh: {}, bets: [bet], roster: { updatedAt: N.isoNow() }, holder: "m0", mobile: true });
+  const w = db.writes.find((x) => x[1] === "bets/b1");
+  assert.ok(w, "the bet was re-scored");
+  assert.equal(w[2].stats.rows[0].value, 25, "10 + 15 from the two weeks, not the 999 the aggregate claimed");
+  assert.equal(w[2].stats.rows[0].values.rec_yd, 150);
+  assert.equal(w[2].stats.through, "Through week 2");
+  assert.equal(hits.some((h) => /^stats\/nfl\/regular\/2026$/.test(h)), false,
+    "and the season endpoint is never asked - it disagreed with its own weeks");
+});
