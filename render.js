@@ -204,6 +204,10 @@ function glance(){
     if(b.status==="open"&&state.me&&b.createdBy===state.me&&!isLocked(b)) entriesOf(b).forEach(function(e){ if(!e.memberId) mineOpen++; });
   });
   var parts=['<span><b>'+live+"</b> "+(live===1?"bet":"bets")+" running</span>",'<span><b>'+esc(money(pot))+"</b> on the table</span>"];
+  // the season's league dues, all managers together, once an admin has set the amount
+  var season=Sn.shownSeasonOf(state), dues=Sn.settingsFor(state.config,season).dues, tally=Sn.duesTally(state.config,season);
+  if(dues&&tally.of) parts.push('<span data-tip="'+esc(season+" league dues: "+money(dues)+" × "+tally.of+" managers")+'"><b>'+esc(money(dues*tally.of))+"</b> in dues"+
+    (tally.paid<tally.of?' · <b class="warn">'+tally.paid+" of "+tally.of+"</b> paid":"")+"</span>");
   if(state.me){
     var Bg=Ledger.balances(seasonCfg(),state.bets,state.highlow,state.payments&&state.payments.list,Ledger.hlStake(seasonCfg()));
     var net=(Bg.byId[state.me]||{}).net||0;

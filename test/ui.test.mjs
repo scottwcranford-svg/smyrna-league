@@ -535,6 +535,13 @@ test("tabs: Book open by default, the others behind their tabs, badges and the g
     const badges = () => [...document.querySelectorAll("#tabs .tab")].map(t => [t.getAttribute("data-tab"), t.classList.contains("on"), t.querySelector(".n").hidden ? "" : t.querySelector(".n").textContent]);
     const res = { line: document.getElementById("leagueSub").textContent, glance: document.getElementById("glanceTxt").textContent, shown: shown(), badges: badges(),
       me: document.getElementById("meName").textContent, dropHidden: document.getElementById("meDrop").hidden };
+    // dues: nothing until an amount is set; then the league's total, and who's still to pay
+    state.config.bySeason = { "2026": { dues: 200, duesPaid: { a: { at: "x" } } } }; V.render();
+    const dueSpan = [...document.querySelectorAll("#glanceTxt > span")].find(x => /in dues/.test(x.textContent));
+    res.duesPart = dueSpan && [dueSpan.textContent, dueSpan.dataset.tip, getComputedStyle(dueSpan.querySelector("b.warn")).color !== getComputedStyle(dueSpan.querySelector("b")).color];
+    state.config.bySeason["2026"].duesPaid = { a: { at: "x" }, b: { at: "x" }, c: { at: "x" } }; V.render();
+    res.duesAllPaid = [...document.querySelectorAll("#glanceTxt > span")].map(x => x.textContent).find(t => /in dues/.test(t));
+    state.config.bySeason = {}; V.render();
     document.querySelector('#tabs .tab[data-tab="settle"]').click();
     await new Promise(r => setTimeout(r, 30));
     res.afterClick = { shown: shown(), on: badges().filter(b => b[1]).map(b => b[0]), saved: localStorage.getItem("smyrna.tab") };
@@ -543,7 +550,9 @@ test("tabs: Book open by default, the others behind their tabs, badges and the g
     return res;
   });
   assert.equal(out.line, "2026 · 10-Team Keeper SF PPR · side bets", "the league's settings from Sleeper");
-  assert.equal(out.glance, "1 bet running$10 on the tableyou −$25 net · 1 seat waiting on takers");
+  assert.equal(out.glance, "1 bet running$10 on the tableyou −$25 net · 1 seat waiting on takers"); // no dues amount set: nothing about dues
+  assert.deepEqual(out.duesPart, ["$600 in dues · 1 of 3 paid", "2026 league dues: $200 × 3 managers", true], "the league's total, and the unpaid count stands out");
+  assert.equal(out.duesAllPaid, "$600 in dues", "everyone paid: just the total");
   assert.deepEqual(out.shown, ["book"]);
   assert.deepEqual(out.badges, [["book", true, "1"], ["ledger", false, ""], ["badges", false, "6"], ["league", false, "1"], ["rivals", false, "1"], ["settle", false, "2"]], "a seat open, six titles held, a week in, a rivalry you're behind on, two transfers to clear");
   assert.equal(out.me, "Alice"); assert.equal(out.dropHidden, true);
