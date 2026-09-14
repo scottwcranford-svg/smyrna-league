@@ -160,21 +160,72 @@ export function autoResult(b,games,now){
   var fresh=Date.parse(S.updatedAt||"");
   if(isNaN(fresh)||fresh<lastKick+SETTLE_LAG||(now||Date.now())<lastKick+SETTLE_LAG) return null;
   var tracks=(Array.isArray(S.tracks)&&S.tracks.length)?S.tracks:[{ stat:S.stat, lower:S.lower }];
-  var wins={};
-  tracks.forEach(function(t){
+  var wins={}, firstLeaders=null;
+  tracks.forEach(function(t,ti){
     var best=null, leaders=[];
     S.rows.forEach(function(r){
       var v=Number((r.values&&t.stat in r.values)?r.values[t.stat]:r.value)||0;
       var who=r.memberId||owner(ents[r.entry]); if(!who) return;
       if(best===null||(t.lower?v<best:v>best)){ best=v; leaders=[who]; } else if(v===best&&leaders.indexOf(who)<0) leaders.push(who);
     });
+    if(ti===0) firstLeaders=leaders;
     if(leaders.length===1) wins[leaders[0]]=(wins[leaders[0]]||0)+1;
   });
   var top=0, tops=[];
   Object.keys(wins).forEach(function(id){ if(wins[id]>top){ top=wins[id]; tops=[id]; } else if(wins[id]===top) tops.push(id); });
   var period=w?"Week "+w:"Season";
+  // A bet posted with the tiebreaker (every stat bet since it existed): when the stats won
+  // are level, the first stat decides it - if its leader is one of those level.
+  if(tops.length>1&&b.tiebreak&&tracks.length>1&&firstLeaders&&firstLeaders.length===1&&tops.indexOf(firstLeaders[0])>=0)
+    return { winner:firstLeaders[0], note:period+" complete · level on stats, "+String(tracks[0].metric||tracks[0].stat||"the first stat").replace(/ · (combined|best of each side)$/,"")+" decided it" };
   if(tops.length!==1) return { winner:"push", note:period+" complete · tied" };
   return { winner:tops[0], note:period+" complete · "+(S.through||"") };
+}
+
+/* ---- how a bet is scored, in plain words ----
+   A few sentences for every kind of bet, shown on its ticket, in the propose form as it's
+   filled in, and in the Join dialog. It reads the same fields autoResult settles on, so
+   what it says is what happens. */
+function fmtLine(n){ n=Number(n); return isNaN(n)?"":String(n); }
+function statName(t){ return String((t&&(t.metric||t.stat))||"the stat").replace(/ · (combined|best of each side)$/,""); }
+function lower1(s){ return /^[A-Z]{2}/.test(s)?s:s.charAt(0).toLowerCase()+s.slice(1); }   // "PPR points" keeps its capitals
+// A field side: one row per player sharing a seat, or a bet set up as one.
+function fieldSide(b){
+  if(b&&b.match==="field") return true;
+  var seen={}, dup=false;
+  ((b&&b.stats&&b.stats.rows)||[]).forEach(function(r){ var k=r.entry!=null?"e"+r.entry:null; if(k){ if(seen[k]) dup=true; seen[k]=1; } });
+  return dup;
+}
+export function scoringText(b){
+  if(!b) return "";
+  if(b.game){
+    var g=b.game, ln=fmtLine(b.line);
+    if(b.market==="total") return "Both teams' final points are added together. Over "+ln+" wins if the total is higher, Under if it's lower. Exactly "+ln+" is a push.";
+    if(b.market==="spread"&&Number(b.line)>0){
+      var fav=b.fav||g.home, dog=fav===g.home?g.away:g.home;
+      return fav+" has to win by more than "+ln+" to cover; anything else and "+dog+" covers. "+fav+" winning by exactly "+ln+" is a push.";
+    }
+    return "Whoever wins the game takes it. A tie is a push.";
+  }
+  var S=b.stats;
+  if(!S||!S.scope) return "Settled by hand: the result is recorded once it's decided.";
+  var tracks=(Array.isArray(S.tracks)&&S.tracks.length)?S.tracks:[{ stat:S.stat, metric:S.metric, lower:S.lower }];
+  var w=Number(b.week)||0, period=w?"in Week "+w:"over the whole season";
+  var ents=entriesOf(b), field=fieldSide(b);
+  var who=S.scope==="team"?"defense":"player";
+  var side=field?"The field counts only its best "+who+". "
+    :ents.some(function(e){ return (e.picks||[]).length>1; })?"A side's "+who+"s are added together. ":"";
+  var pot=(!field&&(b.joinable!==false||ents.length>2))?"However many join, the one leader takes every stake. ":"";
+  var out;
+  if(tracks.length===1){
+    var t=tracks[0];
+    out=(t.lower?"Fewest ":"Most ")+lower1(statName(t))+" "+period+" wins. "+side+pot+"A tie for the top is a push.";
+  } else {
+    var names=tracks.map(function(x){ return lower1(statName(x))+(x.lower?" (fewest wins)":""); });
+    out="Each stat is its own contest "+period+": "+names.slice(0,-1).join(", ")+" and "+names[names.length-1]+". Whoever wins more of them takes it. "+side+pot+
+      "A stat that ends tied counts for nobody. "+(b.tiebreak?"If the stats won are level, the first one listed ("+lower1(statName(tracks[0]))+") decides it; if that's tied too, it's a push.":"If the stats won are level, it's a push.");
+  }
+  return out+" Settles once every game "+(w?"that week":"through Week "+LAST_WEEK)+" is final.";
 }
 
 /* ---- auto-written names and terms ---- */
@@ -186,7 +237,7 @@ export function autoTerms(scope,tracks,week,entries,members){
   if(names.length>1){
     // several stats: name them plainly; "most"/"fewest" would misread across the list
     var list=names.map(lc); list[0]=names[0];
-    what=list.slice(0,-1).join(", ")+" and "+list[list.length-1]+" (each its own standings)";
+    what=list.slice(0,-1).join(", ")+" and "+list[list.length-1]+" (most stats won takes it)";
   } else what=((tracks[0]&&tracks[0].lower)?"Fewest ":"Most ")+lc(names[0]||"");
   var when=Number(week)?" in Week "+Number(week):" on the season";
   var sides=(entries||[]).map(function(e){

@@ -61,7 +61,11 @@ export function valueFor(key,kind,totals){
   return Math.round(total*10)/10;
 }
 
-export function buildStats(entries,scope,statIds){
+// opts.field: a player-vs-the-field bet. Its field side gets one row per player, and the
+// side counts its best one (the ticket groups them; autoResult takes the leading row).
+// Any other side with several players is one row with their numbers added together.
+export function buildStats(entries,scope,statIds,opts){
+  var field=!!(opts&&opts.field);
   if(!scope||!STATS[scope]) return null;
   var tracks=[];
   STATS[scope].forEach(function(s){ if((statIds||[]).indexOf(s[0])>=0) tracks.push({ stat:s[0], metric:s[1], lower:!!s[2] }); });
@@ -69,6 +73,15 @@ export function buildStats(entries,scope,statIds){
   var rows=[], multi=false;
   entries.forEach(function(e,i){
     var picks=e.picks||[]; if(!picks.length) return;
+    if(field&&picks.length>1){
+      picks.forEach(function(p){
+        var vals={}; tracks.forEach(function(t){ vals[t.stat]=0; });
+        var pr={ key:p.id, label:shortName([p.id,p.name,p.pos,p.team]), memberId:e.memberId||null, entry:i, value:0, values:vals };
+        if(scope==="player") pr.team=p.team;
+        rows.push(pr);
+      });
+      return;
+    }
     if(picks.length>1) multi=true;
     var values={}; tracks.forEach(function(t){ values[t.stat]=0; });
     var row={ key:picks.map(function(p){ return p.id; }).join("+"),
@@ -78,7 +91,8 @@ export function buildStats(entries,scope,statIds){
     rows.push(row);
   });
   if(!rows.length) return null;
-  if(multi) tracks.forEach(function(t){ t.metric+=" · combined"; });
+  if(field) tracks.forEach(function(t){ t.metric+=" · best of each side"; });
+  else if(multi) tracks.forEach(function(t){ t.metric+=" · combined"; });
   // `stat`/`metric`/`lower` mirror the first track so older readers still work.
   return { scope:scope, tracks:tracks, stat:tracks[0].stat, metric:tracks[0].metric, lower:tracks[0].lower,
            rows:rows, through:"Not refreshed yet", source:"Sleeper", updatedAt:null };

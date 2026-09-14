@@ -1015,6 +1015,7 @@ function ticketHtml(b){
     '<p class="terms">'+esc(b.name||b.terms)+"</p>"+
     (b.name?'<p class="bet-desc">'+esc(b.terms)+"</p>":"")+
     (b.game?gamelineHtml(b):"")+
+    '<p class="scoring"><span class="lbl">How it’s scored</span> '+esc(Bets.scoringText(b))+"</p>"+
     '<div class="sides">'+sides+"</div>"+
     strip+
     '<div class="t-foot">'+

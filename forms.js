@@ -27,7 +27,7 @@ const rosterRows=function(){ return Roster.rosterRows(state.roster); };
 const rosterFind=function(id){ return Roster.rosterFind(id,state.roster); };
 const rosterSearch=function(q,scope,opts){ return Roster.rosterSearch(q,scope,state.roster,opts); };
 const autoTerms=function(scope,tracks,week,entries){ return Bets.autoTerms(scope,tracks,week,entries,members()); };
-const buildStats=function(entries){ return Stats.buildStats(entries,state.draftScope,state.draftStats); };
+const buildStats=function(entries){ return Stats.buildStats(entries,state.draftScope,state.draftStats,{ field:state.draftScope==="player"&&document.getElementById("bMatch").value==="field" }); };
 
 // Games still open for a bet in a week: not yet within five minutes of kickoff.
 export function openGames(week){
@@ -69,6 +69,7 @@ export function drawGameBox(){
     amt.placeholder="";
     if(!state.editId) document.getElementById("bHint").textContent="Default stake is "+money(Number(dflt))+".";
   }
+  drawScoring();
   if(!isGame) return;
   var wk=document.getElementById("bWeek"), sel=document.getElementById("bGame");
   // One list, every game still open, grouped by week — no separate week step.
@@ -223,6 +224,7 @@ export function drawEntries(hostId){
     "</div>";
   }).join("");
   drawPickFilters(host.id==="jEntries"?"jPickFilters":"bPickFilters");
+  if(host.id==="bEntries") drawScoring();
 }
 // The Team and Position filters: one pair above the rows, for every search box in the
 // form. Player bets only — a defense is found by name.
@@ -313,6 +315,22 @@ export function addPick(i,id){
 export function matchChanged(){
   if(document.getElementById("bMatch").value==="field"&&state.draft.length<2) state.draft.push({memberId:null,pick:"",picks:[]});
   drawScope(); drawEntries();
+}
+// The propose form's "How it's scored", from the draft as it stands.
+export function drawScoring(){
+  var box=document.getElementById("bScoring"); if(!box) return;
+  var scope=state.draftScope, b;
+  if(scope==="game"){
+    if(!state.draftGame){ box.hidden=true; return; }
+    b={ game:state.draftGame, market:state.draftMarket, line:state.draftLine, fav:state.draftFav||state.draftGame.home };
+  } else {
+    var match=scope==="player"?document.getElementById("bMatch").value:"";
+    var tracks=(STATS[scope]||[]).filter(function(s){ return state.draftStats.indexOf(s[0])>=0; }).map(function(s){ return { stat:s[0], metric:s[1], lower:!!s[2] }; });
+    b={ week:Number(document.getElementById("bWeek").value)||0, stats:{ scope:scope, tracks:tracks }, entries:state.draft, match:match,
+        joinable:match!=="field"&&document.getElementById("bJoin").checked, tiebreak:state.editId?!!(findBet(state.editId)||{}).tiebreak:true };
+  }
+  box.innerHTML='<span class="lbl">How it’s scored</span> '+esc(Bets.scoringText(b));
+  box.hidden=false;
 }
 // A filter changed: redraw the open row's list with whatever is typed in it.
 export function refilter(){
@@ -515,6 +533,8 @@ export function submitBet(){
   if(state.draftScope==="player"){ var mv=document.getElementById("bMatch").value; bet.match=/^(any|lineup|field)$/.test(mv)?mv:"count"; }
   // a field bet is its two sides and nobody else
   if(bet.match==="field") bet.joinable=false;
+  // the first stat breaks an even split of stats won; a bet from before keeps its rule
+  if(statScope) bet.tiebreak=existing?!!existing.tiebreak:true;
   if(isGame&&(bet.market==="total"||bet.market==="spread")) bet.line=parseFloat(state.draftLine);
   if(isGame&&bet.market==="spread") bet.fav=state.draftFav||G.home;
   if(isGame&&bet.market!=="ml"){
@@ -564,6 +584,7 @@ export function openJoinDlg(id){
   state.draftTeam=""; state.draftPos=""; state.suggRow=0;
   document.getElementById("jTitle").textContent="Join · "+(bet.name||bet.terms);
   document.getElementById("jTerms").textContent=bet.terms+"  ·  "+money(bet.amount)+" a side";
+  document.getElementById("jScoring").innerHTML='<span class="lbl">How it’s scored</span> '+esc(Bets.scoringText(bet));
   var ml=Bets.matchLabel(bet);
   document.getElementById("jHint").textContent=state.draftScope
     ? (state.draftScope==="team"?"Pick a defense nobody else has.":(ml?"Pick "+ml.replace(/ each$/,"")+", same as everyone else.":"Pick players nobody else has."))

@@ -647,6 +647,44 @@ test("League dialog: the season's dues amount sits with the league settings; an 
   await p.close();
 });
 
+test("how it's scored: on every ticket, live in the propose form, and in the Join dialog", { skip }, async () => {
+  const { p, errors } = await page();
+  const out = await p.evaluate(async () => {
+    const { state } = await import("./state.js?v=dev"); const V = await import("./render.js?v=dev"); const F = await import("./forms.js?v=dev");
+    const g = { id: "g5", week: 5, away: "NE", home: "SEA", date: "2026-10-11T17:00:00Z" };
+    state.bets = [
+      { id: "t1", status: "active", week: 5, kind: "matchup", amount: 10, name: "NE @ SEA", terms: "t", game: g, market: "total", line: 44.5, entries: [{ memberId: "a", side: "over" }, { memberId: "b", side: "under" }], paid: [] },
+      { id: "s1", status: "open", week: 5, kind: "prop", amount: 10, name: "Yards", terms: "t", joinable: true, tiebreak: true, stats: { scope: "player", tracks: [{ stat: "rec_yd", metric: "Receiving yards" }, { stat: "rec", metric: "Receptions" }], rows: [] },
+        entries: [{ memberId: "b", picks: [{ id: "3", name: "Drake Maye", pos: "QB", team: "NE" }] }], paid: [] } ];
+    V.render();
+    const res = { tickets: ["t1", "s1"].map(id => (document.querySelector(`article.ticket[data-bet="${id}"] .scoring`) || {}).textContent) };
+    res.ticketStyle = getComputedStyle(document.querySelector("article.ticket .scoring")).display !== "none";
+    // the propose form: the wording follows the choices
+    const wk = document.getElementById("bWeek"); wk.innerHTML = '<option value="6">Week 6</option>'; wk.value = "6";
+    document.getElementById("bMatch").innerHTML = '<option value="count"></option><option value="field"></option>';
+    state.editId = null; state.draftScope = "player"; state.draftStats = ["rec_yd"]; state.draft = [{ memberId: "a", pick: "", picks: [] }];
+    F.drawScope(); F.drawEntries(); const box = document.getElementById("bScoring");
+    res.oneStat = box.textContent;
+    document.querySelector('#bStats .chip[data-stat="rec"]').click(); res.twoStats = box.textContent;
+    state.draftScope = "game"; state.draftGame = g; state.draftMarket = "spread"; state.draftLine = "3.5"; state.draftFav = "SEA"; F.drawScope(); F.drawEntries();
+    res.spread = box.textContent;
+    // joining the stat bet
+    // (opening it reads nothing from the server, but the preview guard would stop it)
+    state.me = "a"; state.local = false; F.openJoinDlg("s1"); state.local = true;
+    res.join = document.getElementById("jScoring").textContent; document.getElementById("joinDlg").close();
+    return res;
+  });
+  assert.deepEqual(out.tickets, ["How it’s scored Both teams' final points are added together. Over 44.5 wins if the total is higher, Under if it's lower. Exactly 44.5 is a push.",
+    "How it’s scored Each stat is its own contest in Week 5: receiving yards and receptions. Whoever wins more of them takes it. However many join, the one leader takes every stake. A stat that ends tied counts for nobody. If the stats won are level, the first one listed (receiving yards) decides it; if that's tied too, it's a push. Settles once every game that week is final."]);
+  assert.equal(out.ticketStyle, true);
+  assert.match(out.oneStat, /Most receiving yards in Week 6 wins\./);
+  assert.match(out.twoStats, /Each stat is its own contest in Week 6: receptions and receiving yards\..*the first one listed \(receptions\) decides it/, "adding a stat rewrites it, in the order the ticket lists them");
+  assert.match(out.spread, /SEA has to win by more than 3\.5 to cover; anything else and NE covers\./);
+  assert.match(out.join, /Each stat is its own contest in Week 5/);
+  assert.deepEqual(errors, []);
+  await p.close();
+});
+
 test("notifications: the menu button says where they stand; the nudge shows once and takes 'not now'", { skip }, async () => {
   const { p, errors } = await page();
   const out = await p.evaluate(async () => {

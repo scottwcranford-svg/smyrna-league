@@ -137,3 +137,38 @@ test("matched sides: same number, same lineup, or one player against a field of 
   assert.match(Bets.joinProblem(old(side("QB", "WR")), [p("a", "K")]), /Pick 2 players/);
   assert.equal(Bets.matchLabel(old(side("QB", "WR"))), "", "and the ticket says nothing new about them");
 });
+
+test("scoringText: every kind of bet says how it's scored, in the words autoResult settles by", () => {
+  const g = { id: "g", week: 3, away: "DEN", home: "KC", date: "2026-09-20T17:00:00Z" };
+  assert.equal(Bets.scoringText({ game: g, market: "ml" }), "Whoever wins the game takes it. A tie is a push.");
+  assert.equal(Bets.scoringText({ game: g, market: "total", line: 45.5 }), "Both teams' final points are added together. Over 45.5 wins if the total is higher, Under if it's lower. Exactly 45.5 is a push.");
+  assert.equal(Bets.scoringText({ game: g, market: "spread", line: 3.5, fav: "KC" }), "KC has to win by more than 3.5 to cover; anything else and DEN covers. KC winning by exactly 3.5 is a push.");
+  assert.equal(Bets.scoringText({ game: g, market: "spread", line: 0, fav: "KC" }), "Whoever wins the game takes it. A tie is a push.", "a pick'em reads as straight up");
+  const p = (id, pos) => ({ id, name: id, pos, team: "KC" });
+  const one = { week: 3, joinable: false, stats: { scope: "player", tracks: [{ stat: "rec_yd", metric: "Receiving yards" }] }, entries: [{ memberId: "a", picks: [p("1", "WR")] }, { memberId: "b", picks: [p("2", "WR")] }] };
+  assert.equal(Bets.scoringText(one), "Most receiving yards in Week 3 wins. A tie for the top is a push. Settles once every game that week is final.");
+  assert.match(Bets.scoringText({ ...one, week: 0, joinable: true }), /^Most receiving yards over the whole season wins\. However many join, the one leader takes every stake\. .* Settles once every game through Week 17 is final\.$/);
+  assert.match(Bets.scoringText({ ...one, stats: { scope: "team", tracks: [{ stat: "pts_allow", metric: "Points allowed", lower: true }] } }), /^Fewest points allowed in Week 3 wins\./);
+  assert.match(Bets.scoringText({ ...one, entries: [{ memberId: "a", picks: [p("1", "WR"), p("3", "RB")] }, { memberId: "b", picks: [p("2", "WR"), p("4", "RB")] }] }), /A side's players are added together\./);
+  const field = { ...one, match: "field", entries: [{ memberId: "a", picks: [p("1", "WR")] }, { memberId: "b", picks: ["2", "3", "4", "5"].map(x => p(x, "WR")) }] };
+  assert.match(Bets.scoringText(field), /The field counts only its best player\./); assert.doesNotMatch(Bets.scoringText(field), /added together|However many/);
+  const oldField = { ...one, stats: { scope: "player", tracks: [{ stat: "pts_ppr", metric: "PPR points · best of each side" }], rows: [{ key: "1", entry: 0 }, { key: "2", entry: 1 }, { key: "3", entry: 1 }] } };
+  assert.match(Bets.scoringText(oldField), /^Most PPR points in Week 3 wins\. The field counts only its best player\./, "an older field bet is recognised from its rows");
+  const two = { ...one, stats: { scope: "player", tracks: [{ stat: "rec_yd", metric: "Receiving yards" }, { stat: "fum_lost", metric: "Fumbles lost", lower: true }] } };
+  assert.equal(Bets.scoringText({ ...two, tiebreak: true }), "Each stat is its own contest in Week 3: receiving yards and fumbles lost (fewest wins). Whoever wins more of them takes it. A stat that ends tied counts for nobody. If the stats won are level, the first one listed (receiving yards) decides it; if that's tied too, it's a push. Settles once every game that week is final.");
+  assert.match(Bets.scoringText(two), /If the stats won are level, it's a push\./, "a bet from before the tiebreaker says so");
+  assert.equal(Bets.scoringText({ stats: null, entries: [] }), "Settled by hand: the result is recorded once it's decided.");
+});
+
+test("autoResult: level on stats won — the first stat decides a bet with the tiebreaker, pushes one without", () => {
+  const games = { games: [{ week: 3, status: "final", date: "2026-09-21T00:00:00Z" }] };
+  const now = Date.parse("2026-09-22T12:00:00Z");
+  const bet = (tiebreak, recYd) => ({ status: "active", week: 3, tiebreak, entries: [{ memberId: "a" }, { memberId: "b" }],
+    stats: { scope: "player", updatedAt: "2026-09-22T00:00:00Z", through: "Through week 3", tracks: [{ stat: "rec_yd", metric: "Receiving yards" }, { stat: "rec", metric: "Receptions" }],
+      rows: [{ memberId: "a", entry: 0, values: { rec_yd: recYd[0], rec: 5 } }, { memberId: "b", entry: 1, values: { rec_yd: recYd[1], rec: 8 } }] } });
+  assert.deepEqual(Bets.autoResult(bet(true, [92, 71]), games, now), { winner: "a", note: "Week 3 complete · level on stats, Receiving yards decided it" }, "1–1, yards is first: a");
+  assert.equal(Bets.autoResult(bet(false, [92, 71]), games, now).winner, "push", "an older bet still pushes a split");
+  assert.equal(Bets.autoResult(bet(true, [60, 71]), games, now).winner, "b", "b wins both outright; no tiebreak needed");
+  const tiedFirst = bet(true, [70, 70]); tiedFirst.stats.tracks.push({ stat: "rec_td", metric: "Receiving TDs" }); tiedFirst.stats.rows[0].values.rec_td = 1; tiedFirst.stats.rows[1].values.rec_td = 0;
+  assert.equal(Bets.autoResult(tiedFirst, games, now).winner, "push", "yards tied (nobody), 1–1 on the rest, and the first stat can't break it");
+});

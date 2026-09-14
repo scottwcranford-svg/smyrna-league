@@ -250,6 +250,7 @@ export function bindEvents(hooks){
     var t=ev.target, act=t.getAttribute&&attr(t,"data-act");
     if(act&&CHANGES[act]) return CHANGES[act](t);
     if(t.id==="bMatch") return F.matchChanged();
+    if(t.id==="bJoin"||(t.id==="bWeek"&&state.draftScope!=="game")) F.drawScoring();
     if(t.id==="bWeek"&&state.draftScope==="game"){ state.draftGame=null; state.draftFav=""; state.draft.forEach(function(e){ e.side=""; }); F.drawGameBox(); F.drawEntries(); }
     else if(t.id==="bGame"){
       var gid=t.value, pick=null;
@@ -266,7 +267,7 @@ export function bindEvents(hooks){
     var t=ev.target, act=t.getAttribute&&attr(t,"data-act");
     if(act==="dPick") state.draft[num(t,"data-i")].pick=t.value;
     else if(act==="dSearch") F.drawSugg(num(t,"data-i"),t.value);
-    else if(t.id==="bLine"){ state.draftLine=t.value.trim(); if(state.draftMarket==="total") F.drawEntries(); }
+    else if(t.id==="bLine"){ state.draftLine=t.value.trim(); if(state.draftMarket==="total") F.drawEntries(); F.drawScoring(); }
   });
   // A picker's list opens when its box is focused (with a filter set there is something
   // to show before any typing) and closes on a tap anywhere outside the picker and filters.

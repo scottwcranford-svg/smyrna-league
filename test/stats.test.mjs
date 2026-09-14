@@ -33,3 +33,13 @@ test("projections: trimmed to the roster and the tracked stats, read with valueF
   assert.equal(Stats.projFor(5, proj), P, "parsed once, then cached");
   assert.deepEqual(Stats.trimProjections([1, 2], ["2"]), {}, "a bad payload is an empty set");
 });
+
+test("buildStats: a field side is one row per player (best of); any other multi-player side is combined", () => {
+  const p = id => ({ id, name: "P" + id, pos: "WR", team: "KC" });
+  const entries = [{ memberId: "a", picks: [p("1")] }, { memberId: "b", picks: [p("2"), p("3"), p("4"), p("5")] }];
+  const field = Stats.buildStats(entries, "player", ["rec_yd"], { field: true });
+  assert.deepEqual(field.rows.map(r => [r.key, r.entry, r.memberId]), [["1", 0, "a"], ["2", 1, "b"], ["3", 1, "b"], ["4", 1, "b"], ["5", 1, "b"]]);
+  assert.equal(field.tracks[0].metric, "Receiving yards · best of each side");
+  const combined = Stats.buildStats(entries, "player", ["rec_yd"]);
+  assert.deepEqual(combined.rows.map(r => r.key), ["1", "2+3+4+5"]); assert.equal(combined.tracks[0].metric, "Receiving yards · combined");
+});
