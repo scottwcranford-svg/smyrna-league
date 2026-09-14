@@ -1,18 +1,19 @@
-// Kickoff locks and week math. Every bet locks five minutes before the first game
-// of its week (season bets: the opener); `config.weekStarts` carries the real
-// schedule and the anchor cadence is the fallback. Imports nothing.
+// Kickoff locks and week math. A bet locks five minutes before its game — a game
+// bet's own, a weekly stat bet's picks' first, otherwise the week's first (season
+// bets: the opener); `config.weekStarts` carries the real schedule and the anchor
+// cadence is the fallback. Imports nothing.
 
 
 export const PLAYOFF_START = 15, LAST_WEEK = 17;
 
 export const DEFAULT_KICKOFF="2026-09-10T00:20:00Z";   // the opener: Wed Sep 9 2026, 8:20 PM ET (Seattle)
 const WEEK_ANCHOR="2026-09-11T00:15:00Z";       // Week 1's Thursday, 8:15 PM ET — weeks 2+ lock on that cadence
-export const LOCK_LEAD=5*60*1000;                      // bets lock five minutes before the week's first game
+export const LOCK_LEAD=5*60*1000;                      // bets lock five minutes before kickoff
 
 export function isPlayoff(w){ return Number(w)>=PLAYOFF_START; }
 
 /* ---- kickoff locks ----
-   Every bet locks five minutes before the first game of its week (season bets: the opener).
+   Every bet locks five minutes before a kickoff — see betLock for which one.
    `config.weekStarts` carries the real schedule; the anchor cadence is the fallback. */
 
 function kickoffTime(config){ var t=Date.parse((config&&config.kickoff)||DEFAULT_KICKOFF); return isNaN(t)?Date.parse(DEFAULT_KICKOFF):t; }
@@ -28,14 +29,51 @@ function firstGame(week,config){
 
 export function lockTime(week,config){ return firstGame(week,config)-LOCK_LEAD; }
 
-export function betLock(b,config){
+// A game bet locks on its game. A weekly stat bet locks on the first game any of its
+// picks plays in, so it stays open through the week while nobody on it has started —
+// and nobody joins knowing how a pick already on it did. Without the schedule (or a
+// pick's game in it) it falls back to the week's first game. Season bets: the opener.
+export function betLock(b,config,games){
   if(b&&b.game&&b.game.date){ var t=Date.parse(b.game.date); if(!isNaN(t)) return t-LOCK_LEAD; }
-  return lockTime(b?b.week:0,config);
+  var week=b?Number(b.week)||0:0;
+  if(week&&games){
+    var first=Infinity, found=true, any=false;
+    (Array.isArray(b.entries)?b.entries:[]).forEach(function(e){ (e.picks||[]).forEach(function(p){
+      any=true;
+      var k=kickoffOf(p.team,week,games);
+      if(isNaN(k)) found=false; else if(k<first) first=k;
+    }); });
+    if(any&&found) return first-LOCK_LEAD;
+  }
+  return lockTime(week,config);
 }
 
 export function weekLocked(week,config){ return Date.now()>=lockTime(week,config); }
 
-export function isLocked(b,config){ return (b.status==="open"||b.status==="active")&&Date.now()>=betLock(b,config); }
+export function isLocked(b,config,games){ return (b.status==="open"||b.status==="active")&&Date.now()>=betLock(b,config,games); }
+
+// When a team's game in a week kicks off, or NaN if the schedule doesn't have one.
+function kickoffOf(team,week,games){
+  var w=Number(week)||0, t=NaN;
+  allGames(games).forEach(function(g){ if(Number(g.week)===w&&(g.away===team||g.home===team)) t=Date.parse(g.date||""); });
+  return t;
+}
+// A game that's under way or over, or inside the five minutes before kickoff —
+// the same line a game bet locks on.
+export function gameStarted(g,now){
+  if(!g) return false;
+  if(g.status==="live"||g.status==="final") return true;
+  var t=Date.parse(g.date||"");
+  return !isNaN(t)&&(now||Date.now())>=t-LOCK_LEAD;
+}
+// Teams whose game in a week has started, as a set. Empty for season-long bets and
+// before the schedule has loaded.
+export function teamsStarted(week,games,now){
+  var w=Number(week)||0, out={};
+  if(!w) return out;
+  allGames(games).forEach(function(g){ if(Number(g.week)===w&&gameStarted(g,now)){ out[g.away]=1; out[g.home]=1; } });
+  return out;
+}
 
 export function currentWeek(config,games){
   var now=Date.now(), w=1;

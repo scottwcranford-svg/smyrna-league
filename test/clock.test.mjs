@@ -17,6 +17,33 @@ test("a game bet locks five minutes before that game, not the week", () => {
   assert.equal(Clock.betLock(b, config), Date.parse("2026-09-13T17:00:00Z") - 300e3);
 });
 
+test("a weekly stat bet locks on its picks' first game, not the week's", () => {
+  const games = { games: [
+    { id: "thu", week: 2, away: "BUF", home: "MIA", date: "2026-09-18T00:15:00Z" },
+    { id: "sun", week: 2, away: "CIN", home: "NE", date: "2026-09-20T17:00:00Z" },
+    { id: "mon", week: 2, away: "KC", home: "DEN", date: "2026-09-22T00:15:00Z" } ] };
+  const pick = (team) => ({ id: team, name: team, pos: "WR", team });
+  const bet = (...teams) => ({ week: 2, status: "open", entries: teams.map(t => ({ memberId: "m0", picks: [pick(t)] })) });
+  assert.equal(Clock.betLock(bet("KC"), config, games), Date.parse("2026-09-22T00:15:00Z") - 300e3, "a Monday-night pick holds it open till Monday");
+  assert.equal(Clock.betLock(bet("KC", "CIN"), config, games), Date.parse("2026-09-20T17:00:00Z") - 300e3, "the earliest pick decides");
+  assert.equal(Clock.betLock(bet("KC", "SEA"), config, games), Clock.lockTime(2, config), "a pick not on the schedule falls back to the week");
+  assert.equal(Clock.betLock(bet("KC"), config), Clock.lockTime(2, config), "no schedule: the week");
+  assert.equal(Clock.betLock({ week: 0, status: "open", entries: [{ picks: [pick("KC")] }] }, config, games), Clock.lockTime(0, config), "season long: the opener");
+});
+
+test("teams whose game has started: live, final, or inside five minutes of kickoff", () => {
+  const now = Date.parse("2026-09-20T17:00:00Z");
+  const games = { games: [
+    { id: "a", week: 2, away: "CIN", home: "NE", date: "2026-09-20T17:00:00Z" },
+    { id: "b", week: 2, away: "GB", home: "MIN", date: "2026-09-20T17:04:00Z" },
+    { id: "c", week: 2, away: "KC", home: "DEN", date: "2026-09-22T00:15:00Z" },
+    { id: "d", week: 2, away: "LV", home: "LAC", date: "2026-09-22T00:15:00Z", status: "live" },
+    { id: "e", week: 3, away: "SEA", home: "ARI", date: "2026-09-01T00:00:00Z" } ] };
+  assert.deepEqual(Object.keys(Clock.teamsStarted(2, games, now)).sort(), ["CIN", "GB", "LAC", "LV", "MIN", "NE"]);
+  assert.deepEqual(Clock.teamsStarted(0, games, now), {}, "season long: nobody");
+  assert.deepEqual(Clock.teamsStarted(2, null, now), {}, "no schedule: nobody");
+});
+
 test("isLocked only applies to open/active bets and respects time", () => {
   const past = { week: 1, status: "active", game: { date: "2020-01-01T00:00:00Z" } };
   const settled = { week: 1, status: "settled", game: { date: "2020-01-01T00:00:00Z" } };

@@ -151,6 +151,49 @@ test("admin switch on: any manager on any row; off: row one is you, others open 
   await p.close();
 });
 
+test("mid-week: players whose game has started are left out of every picker and refused on post or join", { skip }, async () => {
+  const { p, errors } = await page();
+  const out = await p.evaluate(async () => {
+    const { state } = await import("./state.js?v=dev"); const F = await import("./forms.js?v=dev");
+    const at = h => new Date(Date.now() + h * 3600e3).toISOString();
+    // week 3 is under way: CIN @ NE kicked off an hour ago, SEA @ KC is tomorrow
+    state.config.weekStarts = { "3": at(-1) };
+    state.games = { games: [{ id: "x", week: 3, away: "CIN", home: "NE", date: at(-1), status: "live" }, { id: "y", week: 3, away: "SEA", home: "KC", date: at(24), status: "pre" }] };
+    const wk = document.getElementById("bWeek"); wk.innerHTML = '<option value="3">Week 3</option>'; wk.value = "3";
+    const names = sel => [...document.querySelectorAll(sel + " button")].map(x => x.textContent.split(/[A-Z]{2,3}/)[0]);
+    state.draftScope = "player"; state.draftStats = ["rec_yd"]; state.draft = [{ memberId: "a", pick: "", picks: [] }]; F.drawEntries();
+    F.drawSugg(0, "ch"); const playerSugg = names("#bEntries #sugg0"); const suggHidden = document.querySelector("#bEntries #sugg0").hidden;
+    F.drawSugg(0, "maye"); const mayeSugg = names("#bEntries #sugg0");
+    state.roster.players.push(["NE", "New England Patriots", "DEF", "NE"]);
+    const defIds = q => { F.drawSugg(0, q); return [...document.querySelectorAll("#bEntries #sugg0 button")].map(x => x.dataset.id); };
+    state.draftScope = "team"; F.drawEntries(); const defSugg = [...defIds("new england"), ...defIds("seattle")];
+    // posting: a started pick is refused, but the week itself is still open for anyone yet to play
+    state.draftScope = "player"; document.getElementById("bName").value = "Mid"; document.getElementById("bAmt").value = "10"; state.editId = null; state.bets = [];
+    state.draft = [{ memberId: "a", pick: "", picks: [{ id: "3", name: "Drake Maye", pos: "QB", team: "NE" }] }]; F.submitBet();
+    const startedSaved = state.bets.length, startedToast = document.getElementById("toast").textContent;
+    state.roster.players.push(["9", "Travis Kelce", "TE", "KC"]);
+    state.draft = [{ memberId: "a", pick: "", picks: [{ id: "9", name: "Travis Kelce", pos: "TE", team: "KC" }] }]; F.submitBet();
+    const later = state.bets[0]; const laterSaved = state.bets.length;
+    // joining that bet: the picker leaves the started players out, and a started pick is refused
+    state.joinId = later.id; state.draftScope = "player"; state.draftStats = ["rec_yd"]; state.draft = [{ memberId: "b", pick: "", picks: [] }];
+    state.me = "b"; F.drawEntries("jEntries"); document.getElementById("joinDlg").showModal();
+    F.drawSugg(0, "ch"); const joinSugg = document.querySelector("#jEntries #sugg0").hidden;
+    state.draft = [{ memberId: "b", pick: "", picks: [{ id: "1", name: "Chase Brown", pos: "RB", team: "CIN" }] }]; F.submitJoin();
+    const joinStartedToast = document.getElementById("toast").textContent, joinedStarted = later.entries.length;
+    document.getElementById("joinDlg").close();
+    return { playerSugg, suggHidden, mayeSugg, defSugg, startedSaved, startedToast, laterSaved, laterStatus: later && later.status, joinSugg, joinStartedToast, joinedStarted };
+  });
+  assert.deepEqual(out.playerSugg, [], "both CIN players are left out, not greyed"); assert.equal(out.suggHidden, true);
+  assert.deepEqual(out.mayeSugg, [], "and NE's Maye");
+  assert.deepEqual(out.defSugg, ["SEA"], "NE's defense is left out; Seattle's, yet to play, still shows");
+  assert.equal(out.startedSaved, 0); assert.match(out.startedToast, /Drake Maye's game has already started/);
+  assert.equal(out.laterSaved, 1, "a pick who plays tomorrow can still be posted after the week's first game"); assert.equal(out.laterStatus, "open");
+  assert.equal(out.joinSugg, true, "the join picker leaves them out too");
+  assert.match(out.joinStartedToast, /Chase Brown's game has already started/); assert.equal(out.joinedStarted, 1);
+  assert.deepEqual(errors, []);
+  await p.close();
+});
+
 test("bye week: off teams are greyed in the picker and refused on post or join", { skip }, async () => {
   const { p, errors } = await page();
   const out = await p.evaluate(async () => {

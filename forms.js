@@ -18,14 +18,14 @@ const STATS=Stats.STATS, LAST_WEEK=Clock.LAST_WEEK, PLAYOFF_START=Clock.PLAYOFF_
 const esc=Fmt.esc, money=Fmt.money, uid=Fmt.uid, clone=Fmt.clone, entriesOf=Fmt.entriesOf, fmtWhen=Fmt.fmtWhen,
       shortName=Fmt.shortName, picksText=Fmt.picksText, statsKey=Stats.statsKey, autoName=Bets.autoName;
 const mName=function(id){ return Id.mName(id,members()); };
-const isLocked=function(b){ return Clock.isLocked(b,seasonCfg()); };
+const isLocked=function(b){ return Clock.isLocked(b,seasonCfg(),state.games); };
 const weekLocked=function(w){ return Clock.weekLocked(w,seasonCfg()); };
 const currentWeek=function(){ return Clock.currentWeek(seasonCfg(),state.games); };
 const allGames=function(){ return Clock.allGames(state.games); };
 const teamName=function(code){ return Roster.teamName(code,state.roster); };
 const rosterRows=function(){ return Roster.rosterRows(state.roster); };
 const rosterFind=function(id){ return Roster.rosterFind(id,state.roster); };
-const rosterSearch=function(q,scope){ return Roster.rosterSearch(q,scope,state.roster); };
+const rosterSearch=function(q,scope,keep){ return Roster.rosterSearch(q,scope,state.roster,keep); };
 const autoTerms=function(scope,tracks,week,entries){ return Bets.autoTerms(scope,tracks,week,entries,members()); };
 const buildStats=function(entries){ return Stats.buildStats(entries,state.draftScope,state.draftStats); };
 
@@ -240,12 +240,20 @@ function byePick(entries,week){
   entries.forEach(function(e){ (e.picks||[]).forEach(function(p){ if(!hit&&Clock.onBye(p.team,playing)) hit=p; }); });
   return hit;
 }
+// The first pick whose game in the week has already kicked off, or null.
+function startedPick(entries,week){
+  var started=Clock.teamsStarted(week,state.games), hit=null;
+  entries.forEach(function(e){ (e.picks||[]).forEach(function(p){ if(!hit&&started[p.team]) hit=p; }); });
+  return hit;
+}
 
 export function drawSugg(i,q){
   var box=document.querySelector("#"+entriesHost()+" #sugg"+i); if(!box) return;
   // A player or defense can be on one side only — hide anything any side already holds.
   var taken={}; state.draft.forEach(function(e){ (e.picks||[]).forEach(function(p){ taken[p.id]=1; }); });
-  var hits=rosterSearch(q,state.draftScope).filter(function(r){ return !taken[r[0]]; });
+  // On a weekly bet, anyone whose game has already started isn't offered at all.
+  var started=Clock.teamsStarted(draftWeek(),state.games);
+  var hits=rosterSearch(q,state.draftScope,function(r){ return !taken[r[0]]&&!started[r[3]]; });
   // On a weekly bet, anyone whose team is off that week is shown but can't be picked.
   var playing=Clock.teamsPlaying(draftWeek(),state.games);
   box.hidden=!hits.length;
@@ -384,7 +392,14 @@ export function submitBet(){
   if(!terms) return toast("Write the terms first");
   if(!(amt>0)) return toast(isGame?"Set the stake — it's yours to name":"Set a stake above zero");
   var wkPick=isGame?G.week:(Number(document.getElementById("bWeek").value)||0);
-  if(!isGame&&weekLocked(wkPick)&&!(state.editId&&state.admin)) return toast(wkPick?"Week "+wkPick+" has kicked off — pick a later week":"The season's underway — season-long bets are locked");
+  // A weekly stat bet can be posted while any of the week's games is still to come —
+  // its picks are held to that below. Without a schedule or picks, or season long, the
+  // week's first game is the line (and that is where such a bet locks).
+  var adminEdit=!!(state.editId&&state.admin);
+  if(!isGame&&!adminEdit){
+    if(wkPick&&allGames().length&&statScope&&rosterRows().length){ if(!openGames(wkPick).length) return toast("Week "+wkPick+"'s games have all kicked off — pick a later week"); }
+    else if(weekLocked(wkPick)) return toast(wkPick?"Week "+wkPick+" has kicked off — pick a later week":"The season's underway — season-long bets are locked");
+  }
   var seen={};
   for(var i=0;i<state.draft.length;i++){
     var id=state.draft[i].memberId;
@@ -418,6 +433,8 @@ export function submitBet(){
     if(dup) return toast(dup+" is on two sides");
     var off=byePick(state.draft,wkPick);
     if(off) return toast(off.name+" is off in week "+wkPick+" — pick someone who's playing");
+    var gone=adminEdit?null:startedPick(state.draft,wkPick);
+    if(gone) return toast(gone.name+"'s game has already started — pick someone who hasn't played");
   }
   var entries=state.draft.map(function(e){
     var out={ memberId:e.memberId||null, pick:(e.pick||"").trim() };
@@ -501,6 +518,7 @@ export function openJoinDlg(id){
 export function submitJoin(){
   var id=state.joinId, bet=findBet(id);
   if(!bet) return;
+  if(isLocked(bet)) return toast("Locked — a pick on it has kicked off");
   var d=state.draft[0]||{}, scope=state.draftScope;
   if(scope&&rosterRows().length){
     if(!(d.picks&&d.picks.length)) return toast(scope==="team"?"Pick a defense":"Pick a player");
@@ -514,6 +532,8 @@ export function submitJoin(){
     if(dup) return toast(dup+" is already taken");
     var off=byePick([d],bet.week);
     if(off) return toast(off.name+" is off in week "+bet.week+" — pick someone who's playing");
+    var gone=startedPick([d],bet.week);
+    if(gone) return toast(gone.name+"'s game has already started — pick someone who hasn't played");
   } else if(!(d.pick||"").trim()) return toast("Say what you're taking");
 
   var entry={ memberId:state.me, pick:(d.pick||"").trim(), takenAt:new Date().toISOString() };

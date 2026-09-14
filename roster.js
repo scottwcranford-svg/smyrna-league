@@ -54,12 +54,15 @@ export function teamName(code,roster){
   return code;
 }
 
-export function rosterSearch(q,scope,roster){
+// Up to eight matches. `keep`, if given, drops rows before they count toward the eight,
+// so a hidden row never pushes a real match off the list.
+export function rosterSearch(q,scope,roster,keep){
   q=String(q||"").trim().toLowerCase(); if(q.length<2) return [];
   var out=[], rows=rosterRows(roster);
   for(var i=0;i<rows.length&&out.length<8;i++){
     var r=rows[i], isDef=r[2]==="DEF";
     if(scope==="team"?!isDef:isDef) continue;
+    if(keep&&!keep(r)) continue;
     var hay=(r[1]+" "+r[3]).toLowerCase();
     if(hay.indexOf(q)>=0) out.push(r);
   }

@@ -15,8 +15,8 @@ import { toast, statsBar } from "./render.js?v=dev";
 const entriesOf=Fmt.entriesOf, openSeats=Fmt.openSeats, clone=Fmt.clone;
 const mName=function(id){ return Id.mName(id,members()); };
 const money=Fmt.money, uid=Fmt.uid;
-const isLocked=function(b){ return Clock.isLocked(b,seasonCfg()); };
-const betLock=function(b){ return Clock.betLock(b,seasonCfg()); };
+const isLocked=function(b){ return Clock.isLocked(b,seasonCfg(),state.games); };
+const betLock=function(b){ return Clock.betLock(b,seasonCfg(),state.games); };
 
 export function guard(){
   if(state.local){ toast(state.connected?"Publish the league first":"Preview only — nothing saves"); return false; }
