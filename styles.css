@@ -794,6 +794,18 @@ button.bal-ln{cursor:pointer} button.bal-ln:hover{color:var(--ink-2)}
 .t-fold{display:none}
 @media(max-width:600px){
   .dues-pot{align-items:flex-start}   /* the pot sits under the treasurer once they wrap */
+  /* the playoff bracket stands up: the champion on top, then the final, the semifinals and round 1 below, each round two games across with an arrow up to the next */
+  .brk-scroll{overflow:visible;padding-bottom:0}
+  .brk{display:flex;flex-direction:column-reverse;min-width:0}
+  .brk-h{margin-bottom:6px}
+  .brk-games{flex-direction:row;gap:8px;min-height:0}
+  .brk-cell{flex:1 1 0;min-width:0}
+  .brk-slot{padding:6px 7px;gap:6px;font-size:12px}
+  .brk-tag{padding:1px 5px;font-size:10px}
+  .brk-col:not(.champ) .brk-game::after,.brk-col.r2 .brk-games::after,.brk-col.r3 .brk-game::before{display:none}
+  .brk-col:not(.champ)::before{content:"↑";display:block;text-align:center;color:var(--ink-3);font-size:15px;line-height:1;margin:7px 0 9px}
+  .brk-col.r1::before{content:"↑  winners advance";font-size:11px;letter-spacing:.04em}
+  .brk-champ{flex-direction:row;justify-content:center;gap:10px;padding:12px}
   .wrap{padding:10px 12px calc(96px + env(safe-area-inset-bottom))}
   /* one-row header: mark, name, settings line, your avatar */
   header.top{flex-wrap:nowrap;gap:9px;padding-bottom:9px}
