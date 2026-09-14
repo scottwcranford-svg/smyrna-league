@@ -383,3 +383,57 @@ test("runRefresh scores bets from the weeks it already fetched, never the season
   assert.equal(hits.some((h) => /^stats\/nfl\/regular\/2026$/.test(h)), false,
     "and the season endpoint is never asked - it disagreed with its own weeks");
 });
+
+test("a weekly bet is scored on its own week; a season bet on the running total", () => {
+  const byWeek = { 1: { p: { pts_ppr: 10 } }, 2: { p: { pts_ppr: 15 } }, 3: { p: { pts_ppr: 4 } } };
+  const toDate = N.sumWeeks([byWeek[1], byWeek[2], byWeek[3]]);
+  assert.deepEqual(N.totalsFor(byWeek, toDate, 2), { p: { pts_ppr: 15 } }, "week 2 means week 2");
+  assert.deepEqual(N.totalsFor(byWeek, toDate, 0), { p: { pts_ppr: 29 } }, "season means everything so far");
+  assert.deepEqual(N.totalsFor(byWeek, toDate, 9), {}, "a week not played yet is nothing, not the season");
+  assert.deepEqual(N.totalsFor(null, toDate, 0), { p: { pts_ppr: 29 } });
+
+  assert.equal(N.throughFor(3, 5), "Week 3", "and a weekly bet does not claim to be the season");
+  assert.equal(N.throughFor(0, 5), "Through week 5");
+  assert.equal(N.throughFor(0, 0), "No games played yet");
+});
+
+test("runRefresh: week 2's bet reads week 2, the season bet reads both weeks", async () => {
+  globalThis.fetch = async (u) => {
+    const j = /state\/nfl/.test(u) ? { week: 2, season: "2026", season_type: "regular" }
+      : /stats\/nfl\/regular\/2026\/1$/.test(u) ? { "9": { pts_ppr: 10 } }
+      : /stats\/nfl\/regular\/2026\/2$/.test(u) ? { "9": { pts_ppr: 15 } }
+      : [];
+    return { ok: true, json: async () => j, text: async () => "" };
+  };
+  const mk = (id, week) => ({ id, week, stats: { rows: [{ key: "9", values: {}, value: 0 }],
+    stat: "pts_ppr", tracks: [{ stat: "pts_ppr" }] } });
+  const db = fakeDb();
+  await N.runRefresh(db, "m0", true, { config: { ...config, sleeperLeagueId: "L1", scheduleUpdatedAt: N.isoNow() },
+    refresh: {}, bets: [mk("wk2", 2), mk("season", 0), mk("wk1", 1)],
+    roster: { updatedAt: N.isoNow() }, holder: "m0", mobile: true });
+  const val = (id) => db.writes.find((x) => x[1] === "bets/" + id)[2].stats;
+  assert.equal(val("wk2").rows[0].value, 15, "week 2's bet is week 2 alone");
+  assert.equal(val("wk2").through, "Week 2");
+  assert.equal(val("wk1").rows[0].value, 10, "and week 1's is week 1, not everything since");
+  assert.equal(val("season").rows[0].value, 25, "the season bet keeps adding up");
+  assert.equal(val("season").through, "Through week 2");
+});
+
+test("once the season is over the totals stop shrinking with the NFL's clock", async () => {
+  const asked = [];
+  globalThis.fetch = async (u) => {
+    asked.push(u);
+    // February: Sleeper's state has rolled to next season, week 1
+    const j = /state\/nfl/.test(u) ? { week: 1, season: "2027", season_type: "pre" }
+      : /stats\/nfl\/regular\/2026\/(\d+)$/.test(u) ? { "9": { pts_ppr: 5 } }
+      : [];
+    return { ok: true, json: async () => j, text: async () => "" };
+  };
+  const db = fakeDb();
+  await N.runRefresh(db, "m0", true, { config: { ...config, season: "2026", sleeperLeagueId: "L1", scheduleUpdatedAt: N.isoNow() },
+    refresh: {}, bets: [{ id: "s", week: 0, stats: { rows: [{ key: "9", values: {}, value: 0 }], stat: "pts_ppr", tracks: [{ stat: "pts_ppr" }] } }],
+    roster: { updatedAt: N.isoNow() }, holder: "m0", mobile: true });
+  const w = db.writes.find((x) => x[1] === "bets/s");
+  assert.equal(w[2].stats.rows[0].value, 90, "all eighteen weeks, not the one the new season is on");
+  assert.equal(asked.filter((u) => /stats\/nfl\/regular\/2026\/\d+$/.test(u)).length, 18);
+});

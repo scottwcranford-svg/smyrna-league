@@ -207,6 +207,22 @@ export function sumWeeks(weeks){
   return out;
 }
 
+// Which numbers a bet is scored on. A weekly bet is that week and nothing else - week 3
+// means week 3, not the season with week 3 somewhere inside it. A season-long bet is the
+// running total to date. Both were reading season-to-date, so every weekly bet has been
+// scored on the wrong figures.
+export function totalsFor(byWeek,season,betWeek){
+  var w=Number(betWeek)||0;
+  return w>0?((byWeek||{})[w]||{}):(season||{});
+}
+
+// What to print under the numbers, so a weekly bet doesn't claim to be the season.
+export function throughFor(betWeek,week){
+  var w=Number(betWeek)||0;
+  if(w>0) return "Week "+w;
+  return week?"Through week "+week:"No games played yet";
+}
+
 // A bet's stats block re-scored from season totals; null if the bet tracks nothing.
 export function restat(S,totals,through,now){
   if(!S||!Array.isArray(S.rows)) return null;
@@ -289,16 +305,17 @@ export function statsTick(db,ctx){
     if(!ok) return;
     // the same weekly feeds, so the four-minute pass and the hourly one never disagree
     var season=seasonOf(ctx.config), upto=Math.min(18,Math.max(1,Clock.currentWeek(ctx.config,ctx.games)));
-    var got=[];
+    var byWeek={};
     var chain=Promise.resolve();
     for(var w=1;w<=upto;w++)(function(w){ chain=chain.then(function(){
-      return sj(SLEEPER+"/v1/stats/nfl/regular/"+season+"/"+w).then(function(d){ if(d&&Object.keys(d).length) got.push(d); }).catch(function(){});
+      return sj(SLEEPER+"/v1/stats/nfl/regular/"+season+"/"+w).then(function(d){ if(d&&Object.keys(d).length) byWeek[w]=d; }).catch(function(){});
     }); })(w);
-    return chain.then(function(){ return sumWeeks(got); }).then(function(totals){
+    return chain.then(function(){
+      var toDate=sumWeeks(Object.keys(byWeek).map(function(k){ return byWeek[k]; }));
       var now=isoNow(), jobs=[];
       (ctx.bets||[]).forEach(function(b){
-        // keep whatever "through week N" the hourly pass worked out; only the numbers move
-        var S=restat(b.stats,totals,(b.stats&&b.stats.through)||"",now);
+        // a weekly bet is its own week; a season bet is the running total
+        var S=restat(b.stats,totalsFor(byWeek,toDate,b.week),(b.stats&&b.stats.through)||"",now);
         if(S) jobs.push(db.doc("bets/"+b.id).update({ stats:S }));
       });
       return Promise.all(jobs);
@@ -334,15 +351,27 @@ export function runRefresh(db,by,forced,ctx){
     var now=isoNow(), season=seasonOf(ctx.config);
     db.doc("league/refresh").update({ requestedAt:now, requestedBy:by||null });
     return sj(SLEEPER+"/v1/state/nfl").catch(function(){ return {}; }).then(function(st){
-      var maxW=Math.min(18,Math.max(1,Number(st.week)||18));
+      // How far to walk. Normally the NFL's own week - there is no point asking for weeks
+      // that have not happened. But that cap is only right while our season is the one
+      // being played: come February the state's week resets to 1, and capping there would
+      // quietly shrink a season-long bet's totals to week 1 and keep them there. A season
+      // that is over, or a season we are not in, is walked in full.
+      // Only an explicit mismatch counts as "the season is done" - a field Sleeper didn't
+      // send is not evidence that it has, and guessing there would walk all eighteen weeks
+      // every hour for no reason.
+      var stSeason=String(st.season||""), stType=String(st.season_type||"");
+      var over=(stSeason&&stSeason!==String(season))||(stType&&stType!=="regular");
+      var maxW=over?18:Math.min(18,Math.max(1,Number(st.week)||18));
       // through: the highest week with stats posted, bounded by the NFL's current week
-      var seq=Promise.resolve(0), weekly=[];
-      for(var w=1;w<=maxW;w++)(function(w){ seq=seq.then(function(last){ if(last<w-1) return last; return sj(SLEEPER+"/v1/stats/nfl/regular/"+season+"/"+w).then(function(d){ if(d&&Object.keys(d).length){ weekly.push(d); return w; } return last; }).catch(function(){ return last; }); }); })(w);
+      var seq=Promise.resolve(0), byWeek={};
+      for(var w=1;w<=maxW;w++)(function(w){ seq=seq.then(function(last){ if(last<w-1) return last; return sj(SLEEPER+"/v1/stats/nfl/regular/"+season+"/"+w).then(function(d){ if(d&&Object.keys(d).length){ byWeek[w]=d; return w; } return last; }).catch(function(){ return last; }); }); })(w);
       return seq.then(function(week){
-        return Promise.resolve(sumWeeks(weekly)).then(function(totals){
-          var through=week?"Through week "+week:"No games played yet", writes=[], n=0;
+        var toDate=sumWeeks(Object.keys(byWeek).map(function(k){ return byWeek[k]; }));
+        return Promise.resolve(toDate).then(function(totals){
+          // the book's own headline: how far the season has been played
+          var through=throughFor(0,week), writes=[], n=0;
           (ctx.bets||[]).forEach(function(b){
-            var S=restat(b.stats,totals,through,now); if(!S) return;
+            var S=restat(b.stats,totalsFor(byWeek,totals,b.week),throughFor(b.week,week),now); if(!S) return;
             writes.push(db.doc("bets/"+b.id).update({ stats:S })); n++;
           });
           // the schedule daily; the roster every six hours so injury designations keep up,
