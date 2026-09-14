@@ -709,7 +709,12 @@ test("dues payouts: set in the League dialog; on Settle Up the treasurer, the pl
     res.winners = Object.assign({}, state.config.bySeason["2026"].payoutWinners);
     // everyone else: names, not selects
     state.admin = false; state.me = "a"; V.render();
-    res.places = [...card().querySelectorAll(".dues-place")].map(r => [r.querySelector(".dues-lab").textContent, (r.querySelector(".dues-winner, .dues-tbd") || {}).lastChild.textContent, r.querySelector("b").textContent, !!r.querySelector("select")]);
+    const who = el => (el.querySelector(".dues-winner, .dues-tbd") || {}).lastChild.textContent;
+    res.podium = [...card().querySelectorAll(".podium .step")].map(s => [s.querySelector(".step-place").textContent, who(s), s.querySelector(".step-block b").textContent, !!s.querySelector("select")]);
+    res.stepHeights = [...card().querySelectorAll(".podium .step-block")].map(x => parseFloat(getComputedStyle(x).height));   // the app is off screen in this test, so the style, not the rect
+    const champ = card().querySelector(".brk-champ");
+    res.champ = [champ.querySelector("b").textContent, who(champ)];
+    res.bracket = [[...card().querySelectorAll(".brk-h")].map(x => x.textContent), [...card().querySelectorAll(".brk-col.r1 .brk-name, .brk-col.r2 .brk-name")].map(x => x.textContent), [...card().querySelectorAll(".brk-tag")].map(x => x.textContent)];
     res.note = card().querySelector(".dues-note").textContent;
     res.table = [...document.querySelectorAll("#settle table.pivot tbody tr")].map(tr => [tr.querySelector("th").textContent, [...tr.querySelectorAll("td")].map(td => td.textContent)]);
     res.you = (document.querySelector("#settle .you-dues") || {}).textContent;
@@ -724,7 +729,10 @@ test("dues payouts: set in the League dialog; on Settle Up the treasurer, the pl
   assert.deepEqual({ treasurer: out.saved.treasurer, payouts: out.saved.payouts }, { treasurer: "c", payouts: { reg1: 300, reg2: 150, reg3: 50, champ: 100 } });
   assert.match(out.cardTop, /Cara.*Treasurer · holds the dues and pays them out.*\$600.*\$200 × 3 · all paid/);
   assert.deepEqual(out.winners, { reg1: "a", champ: "a", reg2: "b" });
-  assert.deepEqual(out.places, [["Regular season · 1st", "Alice", "$300", false], ["Regular season · 2nd", "Bob", "$150", false], ["Regular season · 3rd", "decided at season’s end", "$50", false], ["Playoff champion", "Alice", "$100", false]]);
+  assert.deepEqual(out.podium, [["2nd", "Bob", "$150", false], ["1st", "Alice", "$300", false], ["3rd", "decided at season’s end", "$50", false]], "a podium: 2nd, 1st, 3rd");
+  assert.equal(out.stepHeights[1] > out.stepHeights[0] && out.stepHeights[0] > out.stepHeights[2], true, "1st stands tallest, then 2nd, then 3rd");
+  assert.deepEqual(out.champ, ["$100", "Alice"], "the bracket ends in the champion");
+  assert.deepEqual(out.bracket, [["Round 1 · Week 15", "Semifinals · Week 16", "Final · Week 17", "Champion"], ["Seed 4", "Seed 5", "Seed 3", "Seed 6", "Seed 1", "Winner 4 / 5", "Seed 2", "Winner 3 / 6"], ["$50", "$300", "$150"]], "six seeds, 1 and 2 on a bye, the top three wearing their regular-season money");
   assert.match(out.note, /One manager can win a regular-season place and the playoff pool\..*Cara pays them from the dues/);
   assert.deepEqual(out.table.map(r => r[0]), ["Hi / low", "Weekly bets", "Season bets", "Dues payout", "Total"]);
   assert.deepEqual(out.table[3][1], ["+$400", "+$150", "$0"], "Alice took 1st and the playoffs, Bob 2nd");

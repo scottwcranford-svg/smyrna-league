@@ -787,15 +787,43 @@ function duesCard(){
     (set.treasurer?'<span class="dues-who">'+avatarHtml(set.treasurer,26)+"<span><b>"+esc(mName(set.treasurer))+"</b><small>Treasurer · holds the dues and pays them out</small></span></span>":"")+
     (pot?'<span class="dues-pot"><b class="num">'+esc(money(pot))+'</b><small>'+esc(money(set.dues))+" × "+tally.of+" · "+(tally.paid===tally.of?"all paid":tally.paid+" of "+tally.of+" paid")+"</small></span>":"")+
   "</div>";
-  // Each place: what it pays and who took it. An admin picks the winner once it's decided;
-  // everyone else sees the name, or that it's still to come.
-  if(places.length) h+='<div class="dues-places">'+places.map(function(pl){
-    var w=winnerOf(pl[0]);
-    var who=state.admin
-      ? '<select class="field dues-win" data-act="payWinner" data-place="'+pl[0]+'" aria-label="'+esc(pl[1])+' winner"><option value="">Not decided</option>'+
+  // Who took a place: an admin picks it once it's decided; everyone else sees the name, or
+  // that it's still to come.
+  var whoHtml=function(k,label){
+    var w=winnerOf(k);
+    return state.admin
+      ? '<select class="field dues-win" data-act="payWinner" data-place="'+k+'" aria-label="'+esc(label)+' winner"><option value="">Not decided</option>'+
           league.map(function(m){ return '<option value="'+esc(m.id)+'"'+(m.id===w?" selected":"")+">"+esc(m.name)+"</option>"; }).join("")+"</select>"
       : (w?'<span class="dues-winner">'+avatarHtml(w,20)+esc(mName(w))+"</span>":'<span class="dues-tbd">decided at season’s end</span>');
-    return '<div class="dues-place"><span class="dues-lab">'+esc(pl[1])+"</span>"+who+'<b class="num">'+esc(money(po[pl[0]]))+"</b></div>"; }).join("")+"</div>";
+  };
+  // The places drawn the way the season runs: the regular season's top three on a podium,
+  // and the playoffs as a six-team bracket (seeds 1 and 2 on a bye) ending in the champion.
+  // A picture of where the money goes, not a live bracket.
+  var reg=[["reg1","1st"],["reg2","2nd"],["reg3","3rd"]].filter(function(x){ return po[x[0]]; });
+  if(reg.length){
+    h+='<div class="brk-sec"><span class="lbl">Regular season</span></div><div class="podium">'+
+      [["reg2","2nd"],["reg1","1st"],["reg3","3rd"]].filter(function(x){ return po[x[0]]; }).map(function(x){
+        return '<div class="step '+x[0]+'"><span class="step-who">'+whoHtml(x[0],"Regular season "+x[1])+"</span>"+
+          '<div class="step-block"><span class="step-place">'+x[1]+'</span><b class="num">'+esc(money(po[x[0]]))+"</b></div></div>";
+      }).join("")+"</div>";
+  }
+  if(po.champ){
+    var W=Clock.PLAYOFF_START;
+    var seed=function(n){
+      var tag=n<=3&&po["reg"+n]?'<i class="brk-tag" data-tip="Regular season '+(n===1?"1st":n===2?"2nd":"3rd")+' pays '+esc(money(po["reg"+n]))+'">'+esc(money(po["reg"+n]))+"</i>":"";
+      return '<div class="brk-slot"><span class="brk-seed">'+n+'</span><span class="brk-name">Seed '+n+"</span>"+tag+"</div>";
+    };
+    var tbd=function(txt){ return '<div class="brk-slot tbd"><span class="brk-seed">·</span><span class="brk-name">'+esc(txt)+"</span></div>"; };
+    var game=function(a,b){ return '<div class="brk-cell"><div class="brk-game">'+a+b+"</div></div>"; };
+    h+='<div class="brk-sec"><span class="lbl">Playoffs</span></div><div class="brk-scroll"><div class="brk">'+
+      '<div class="brk-col r1"><div class="brk-h">Round 1 · Week '+W+'</div><div class="brk-games">'+game(seed(4),seed(5))+game(seed(3),seed(6))+"</div></div>"+
+      '<div class="brk-col r2"><div class="brk-h">Semifinals · Week '+(W+1)+'</div><div class="brk-games">'+game(seed(1),tbd("Winner 4 / 5"))+game(seed(2),tbd("Winner 3 / 6"))+"</div></div>"+
+      '<div class="brk-col r3"><div class="brk-h">Final · Week '+(W+2)+'</div><div class="brk-games">'+game(tbd("Semifinal winner"),tbd("Semifinal winner"))+"</div></div>"+
+      '<div class="brk-col champ"><div class="brk-h">Champion</div><div class="brk-games"><div class="brk-cell"><div class="brk-champ">'+
+        '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4h8v5a4 4 0 0 1-8 0z"/><path d="M8 6H5a3 3 0 0 0 3 3M16 6h3a3 3 0 0 1-3 3"/><path d="M12 13v4M9 20h6"/></svg>'+
+        '<b class="num">'+esc(money(po.champ))+"</b>"+whoHtml("champ","Playoff champion")+"</div></div></div></div>"+
+    "</div></div>";
+  }
   var notes=[];
   if(places.length>1) notes.push("One manager can win a regular-season place and the playoff pool.");
   if(places.length) notes.push("Payouts count in the season table’s total, but "+(set.treasurer?mName(set.treasurer)+" pays them":"they’re paid")+" from the dues, so they’re not in the manager-to-manager transfers.");

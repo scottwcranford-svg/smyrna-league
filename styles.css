@@ -627,6 +627,40 @@ ol.rlist li.start{border-color:var(--rule-2)}
 .you-dues{font-size:12.5px;color:var(--ink-2)}
 .dues-place b{color:var(--ink)}
 .dues-note{margin:9px 0 0;font-size:12px;color:var(--ink-3)}
+/* the payouts as a podium and a bracket */
+.brk-sec{margin:14px 0 8px}
+.podium{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;align-items:end;max-width:560px}
+.podium .step{display:flex;flex-direction:column;align-items:center;gap:6px;min-width:0}
+.step-who{min-height:26px;display:flex;align-items:flex-end;max-width:100%}
+.step-block{width:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;border-radius:10px 10px 4px 4px;background:var(--surface);border:1px solid var(--rule)}
+.step-place{font-size:10.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2)}
+.step-block b{font-size:17px;color:var(--ink)}
+.step.reg1 .step-block{height:92px;border-color:var(--gold);background:var(--gold-bg)}
+.step.reg1 .step-place{color:var(--gold)}
+.step.reg2 .step-block{height:70px}
+.step.reg3 .step-block{height:54px}
+.brk-scroll{overflow-x:auto;padding-bottom:4px}
+.brk{display:grid;grid-template-columns:repeat(3,minmax(150px,1fr)) minmax(140px,.9fr);column-gap:28px;min-width:680px}
+.brk-col{display:flex;flex-direction:column}
+.brk-h{font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);margin-bottom:8px}
+.brk-games{flex:1;display:flex;flex-direction:column;position:relative;min-height:190px}
+.brk-cell{flex:1;display:flex;align-items:center;position:relative}
+.brk-game{position:relative;width:100%;background:var(--surface);border:1px solid var(--rule);border-radius:10px}
+.brk-slot{display:flex;align-items:center;gap:7px;padding:6px 9px;font-size:12.5px;color:var(--ink)}
+.brk-slot+.brk-slot{border-top:1px solid var(--rule)}
+.brk-slot.tbd .brk-name{color:var(--ink-3)}
+.brk-seed{flex:none;width:18px;height:18px;border-radius:5px;background:var(--surface-2);color:var(--ink-2);font-size:10.5px;font-weight:800;display:inline-flex;align-items:center;justify-content:center}
+.brk-name{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.brk-tag{font-style:normal;font-size:10.5px;font-weight:800;color:var(--gold);background:var(--gold-bg);padding:1px 6px;border-radius:99px}
+/* the lines: each game reaches right; the semifinals join into the final; the final into the champion */
+.brk-col:not(.champ) .brk-game::after{content:"";position:absolute;left:100%;top:50%;width:14px;border-top:1.5px solid var(--rule-2)}
+.brk-col.r1 .brk-game::after{width:28px}
+.brk-col.r2 .brk-games::after{content:"";position:absolute;right:-14px;top:25%;bottom:25%;border-right:1.5px solid var(--rule-2)}
+.brk-col.r3 .brk-game::before{content:"";position:absolute;right:100%;top:50%;width:14px;border-top:1.5px solid var(--rule-2)}
+.brk-col.r3 .brk-game::after{width:28px}
+.brk-champ{width:100%;display:flex;flex-direction:column;align-items:center;gap:6px;padding:14px 10px;border:1.5px solid var(--gold);background:var(--gold-bg);border-radius:12px;text-align:center}
+.brk-champ svg{width:26px;height:26px;fill:none;stroke:var(--gold);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.brk-champ b{font-size:20px;color:var(--ink)}
 .paid{display:flex;align-items:center;gap:12px;background:var(--surface-3);border:1px solid var(--rule);border-radius:12px;padding:8px 13px;font-size:13px}
 .paid .paid-when{color:var(--ink-3);font-size:12px;flex:none;min-width:130px}
 .paid .paid-txt{flex:1 1 auto;min-width:0;color:var(--ink)}
@@ -759,6 +793,7 @@ ol.rlist li.start{border-color:var(--rule-2)}
 /* ---- phones: the same page in a phone shape. Desktop is untouched above 600px. ---- */
 .t-fold{display:none}
 @media(max-width:600px){
+  .dues-pot{align-items:flex-start}   /* the pot sits under the treasurer once they wrap */
   .wrap{padding:10px 12px calc(96px + env(safe-area-inset-bottom))}
   /* one-row header: mark, name, settings line, your avatar */
   header.top{flex-wrap:nowrap;gap:9px;padding-bottom:9px}
