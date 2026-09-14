@@ -162,7 +162,7 @@ test("mid-week: players whose game has started are left out of every picker and 
     const wk = document.getElementById("bWeek"); wk.innerHTML = '<option value="3">Week 3</option>'; wk.value = "3";
     const names = sel => [...document.querySelectorAll(sel + " button")].map(x => x.textContent.split(/[A-Z]{2,3}/)[0]);
     state.draftScope = "player"; state.draftStats = ["rec_yd"]; state.draft = [{ memberId: "a", pick: "", picks: [] }]; F.drawEntries();
-    F.drawSugg(0, "ch"); const playerSugg = names("#bEntries #sugg0"); const suggHidden = document.querySelector("#bEntries #sugg0").hidden;
+    F.drawSugg(0, "ch"); const playerSugg = names("#bEntries #sugg0"); const suggEmpty = document.querySelector("#bEntries #sugg0 .sugg-empty")?.textContent;
     F.drawSugg(0, "maye"); const mayeSugg = names("#bEntries #sugg0");
     state.roster.players.push(["NE", "New England Patriots", "DEF", "NE"]);
     const defIds = q => { F.drawSugg(0, q); return [...document.querySelectorAll("#bEntries #sugg0 button")].map(x => x.dataset.id); };
@@ -177,19 +177,113 @@ test("mid-week: players whose game has started are left out of every picker and 
     // joining that bet: the picker leaves the started players out, and a started pick is refused
     state.joinId = later.id; state.draftScope = "player"; state.draftStats = ["rec_yd"]; state.draft = [{ memberId: "b", pick: "", picks: [] }];
     state.me = "b"; F.drawEntries("jEntries"); document.getElementById("joinDlg").showModal();
-    F.drawSugg(0, "ch"); const joinSugg = document.querySelector("#jEntries #sugg0").hidden;
+    F.drawSugg(0, "ch"); const joinSugg = document.querySelectorAll("#jEntries #sugg0 button").length === 0;
     state.draft = [{ memberId: "b", pick: "", picks: [{ id: "1", name: "Chase Brown", pos: "RB", team: "CIN" }] }]; F.submitJoin();
     const joinStartedToast = document.getElementById("toast").textContent, joinedStarted = later.entries.length;
     document.getElementById("joinDlg").close();
-    return { playerSugg, suggHidden, mayeSugg, defSugg, startedSaved, startedToast, laterSaved, laterStatus: later && later.status, joinSugg, joinStartedToast, joinedStarted };
+    return { playerSugg, suggEmpty, mayeSugg, defSugg, startedSaved, startedToast, laterSaved, laterStatus: later && later.status, joinSugg, joinStartedToast, joinedStarted };
   });
-  assert.deepEqual(out.playerSugg, [], "both CIN players are left out, not greyed"); assert.equal(out.suggHidden, true);
+  assert.deepEqual(out.playerSugg, [], "both CIN players are left out, not greyed"); assert.equal(out.suggEmpty, "No players match", "and the list says so rather than vanishing");
   assert.deepEqual(out.mayeSugg, [], "and NE's Maye");
   assert.deepEqual(out.defSugg, ["SEA"], "NE's defense is left out; Seattle's, yet to play, still shows");
   assert.equal(out.startedSaved, 0); assert.match(out.startedToast, /Drake Maye's game has already started/);
   assert.equal(out.laterSaved, 1, "a pick who plays tomorrow can still be posted after the week's first game"); assert.equal(out.laterStatus, "open");
   assert.equal(out.joinSugg, true, "the join picker leaves them out too");
   assert.match(out.joinStartedToast, /Chase Brown's game has already started/); assert.equal(out.joinedStarted, 1);
+  assert.deepEqual(errors, []);
+  await p.close();
+});
+
+test("picker filters: team and position narrow the list, the name box matches names, and the list stays open between picks", { skip }, async () => {
+  const { p, errors } = await page();
+  const out = await p.evaluate(async () => {
+    const { state } = await import("./state.js?v=dev"); const F = await import("./forms.js?v=dev");
+    state.roster.players.push(["10", "Patrick Mahomes", "QB", "KC"], ["11", "Gardner Minshew", "QB", "KC"], ["12", "Travis Kelce", "TE", "KC"], ["13", "Denzel Mims", "WR", "PIT"], ["14", "Bo Nix", "QB", "DEN"]);
+    state.proj = { weeks: { "6": JSON.stringify({ "10": { pts_ppr: 24 }, "11": { pts_ppr: 3 }, "12": { pts_ppr: 14 } }) } };
+    const wk = document.getElementById("bWeek"); wk.innerHTML = '<option value="6">Week 6</option>'; wk.value = "6";
+    document.getElementById("bMatch").innerHTML = '<option value="count">c</option>';
+    state.draftScope = "player"; state.draftStats = ["pts_ppr"]; state.draftTeam = ""; state.draftPos = ""; state.draft = [{ memberId: "a", pick: "", picks: [] }];
+    F.drawScope(); F.drawEntries(); document.getElementById("betDlg").showModal();
+    const list = () => [...document.querySelectorAll("#bEntries #sugg0 button")].map(b => b.dataset.id);
+    const sel = (act, v) => { const el = document.querySelector('#bPickFilters [data-act="' + act + '"]'); el.value = v; el.dispatchEvent(new Event("change", { bubbles: true })); };
+    const box = () => document.querySelector('#bEntries [data-act="dSearch"]');
+    const type = v => { const b = box(); b.value = v; b.dispatchEvent(new Event("input", { bubbles: true })); };
+    const res = { filtersShown: getComputedStyle(document.getElementById("bPickFilters")).display !== "none",
+      teamOpts: [...document.querySelectorAll('#bPickFilters [data-act="dTeam"] option')].map(o => o.value),
+      posOpts: [...document.querySelectorAll('#bPickFilters [data-act="dPos"] option')].map(o => o.textContent),
+      placeholder: box().placeholder };
+    box().focus();
+    res.blankNoFilter = document.querySelector("#bEntries #sugg0").hidden;
+    sel("dTeam", "KC"); res.kc = list();
+    sel("dPos", "QB"); res.kcQb = list();
+    type("mah"); res.kcQbMah = list();
+    sel("dTeam", ""); sel("dPos", ""); type("den"); res.den = list();
+    type(""); sel("dTeam", "KC");
+    document.querySelector('#bEntries #sugg0 button[data-id="10"]').click();
+    res.afterPick = { chips: [...document.querySelectorAll("#bEntries .pick-chip")].map(c => c.firstChild.textContent.trim()), open: !document.querySelector("#bEntries #sugg0").hidden, list: list() };
+    document.getElementById("bScopeHint").click(); res.closedOutside = document.querySelector("#bEntries #sugg0").hidden;
+    state.draftScope = "team"; F.drawScope(); F.drawEntries();
+    res.teamScope = { filters: document.getElementById("bPickFilters").hidden, match: document.getElementById("bMatchRow").hidden };
+    document.getElementById("betDlg").close();
+    return res;
+  });
+  assert.equal(out.filtersShown, true); assert.equal(out.placeholder, "Player name…");
+  assert.deepEqual(out.teamOpts, ["", "CIN", "DEN", "KC", "NE", "PIT"]); assert.deepEqual(out.posOpts, ["Any position", "QB", "RB", "WR", "TE", "K"]);
+  assert.equal(out.blankNoFilter, true, "an empty box with no filter shows nothing");
+  assert.deepEqual(out.kc, ["10", "11", "12"], "the Chiefs, by position, the starter first on projection");
+  assert.deepEqual(out.kcQb, ["10", "11"]); assert.deepEqual(out.kcQbMah, ["10"]);
+  assert.deepEqual(out.den, ["13"], "den finds Denzel, not the Broncos");
+  assert.deepEqual(out.afterPick, { chips: ["Patrick Mahomes"], open: true, list: ["11", "12"] }, "picked, and the list stays open on who's left");
+  assert.equal(out.closedOutside, true, "a tap outside closes it");
+  assert.deepEqual(out.teamScope, { filters: true, match: true }, "a defense bet has neither");
+  assert.deepEqual(errors, []);
+  await p.close();
+});
+
+test("sides must match: same lineup is enforced on post and join, a field bet is one against four", { skip }, async () => {
+  const { p, errors } = await page();
+  const out = await p.evaluate(async () => {
+    const { state } = await import("./state.js?v=dev"); const F = await import("./forms.js?v=dev"); const V = await import("./render.js?v=dev");
+    const P = (id, pos) => { state.roster.players.push([id, "P" + id, pos, "KC"]); return { id, name: "P" + id, pos, team: "KC" }; };
+    const qb1 = P("q1", "QB"), wr1 = P("w1", "WR"), qb2 = P("q2", "QB"), rb2 = P("r2", "RB"), wr2 = P("w2", "WR"), f = ["f1", "f2", "f3", "f4"].map(id => P(id, "WR"));
+    const wk = document.getElementById("bWeek"), mSel = document.getElementById("bMatch");
+    const toast = () => document.getElementById("toast").textContent;
+    const post = (match, draft) => {
+      wk.innerHTML = '<option value="6">Week 6</option>'; wk.value = "6";
+      mSel.innerHTML = '<option value="count"></option><option value="lineup"></option><option value="field"></option>'; mSel.value = match;
+      state.draftScope = "player"; state.draftStats = ["pts_ppr"]; state.editId = null; state.draft = draft;
+      document.getElementById("bName").value = ""; document.getElementById("bAmt").value = "10";
+      const before = new Set(state.bets.map(b => b.id)); F.submitBet(); return state.bets.find(b => !before.has(b.id)) || null;
+    };
+    state.bets = [];
+    const res = {};
+    res.lineupBad = post("lineup", [{ memberId: "a", picks: [qb1, wr1] }, { memberId: null, picks: [qb2, rb2] }]); res.lineupBadToast = toast();
+    const good = post("lineup", [{ memberId: "a", picks: [qb1, wr1] }]); res.lineupGood = good && good.match;
+    V.render(); res.label = [...document.querySelectorAll("article.ticket .kind.match")].map(k => k.textContent);
+    // joining it with a WR already picked: only quarterbacks are offered, and a wrong lineup is refused
+    state.me = "b"; state.joinId = good.id; state.draftScope = "player"; state.draftStats = ["pts_ppr"]; state.draftTeam = "KC"; state.draftPos = "";
+    state.draft = [{ memberId: "b", pick: "", picks: [wr2] }]; F.drawEntries("jEntries"); document.getElementById("joinDlg").showModal();
+    F.drawSugg(0, ""); res.joinOffered = [...document.querySelectorAll("#jEntries #sugg0 button")].map(b => b.dataset.id).sort();
+    state.draft = [{ memberId: "b", pick: "", picks: [wr2, rb2] }]; F.submitJoin(); res.joinBadToast = toast(); res.joinBadIn = good.entries.length;
+    document.getElementById("joinDlg").close(); state.me = "a";
+    // a field bet: choosing it adds the second side and hides the join option
+    state.bets = []; wk.innerHTML = '<option value="6">Week 6</option>'; state.draftScope = "player"; state.draft = [{ memberId: "a", picks: [] }];
+    mSel.innerHTML = '<option value="count"></option><option value="field"></option>'; F.drawScope(); F.drawEntries();
+    mSel.value = "field"; mSel.dispatchEvent(new Event("change", { bubbles: true }));
+    res.fieldRows = state.draft.length; res.fieldJoinHidden = document.getElementById("bJoinRow").hidden;
+    res.fieldThree = post("field", [{ memberId: "a", picks: [qb1] }, { memberId: null, picks: f.slice(0, 3) }]); res.fieldThreeToast = toast();
+    const field = post("field", [{ memberId: "a", picks: [qb1] }, { memberId: null, picks: f }]);
+    res.field = field && { match: field.match, joinable: field.joinable };
+    return res;
+  });
+  assert.equal(out.lineupBad, null); assert.match(out.lineupBadToast, /Pick QB \+ WR, same as the other side/);
+  assert.equal(out.lineupGood, "lineup");
+  assert.deepEqual(out.label, ["QB + WR each"], "the ticket says what every side has to be");
+  assert.deepEqual(out.joinOffered, ["q1", "q2"], "with a WR already picked, only quarterbacks are offered");
+  assert.match(out.joinBadToast, /Pick QB \+ WR, same as everyone else/); assert.equal(out.joinBadIn, 1);
+  assert.equal(out.fieldRows, 2, "a field bet gets its second side"); assert.equal(out.fieldJoinHidden, true);
+  assert.equal(out.fieldThree, null); assert.match(out.fieldThreeToast, /one player, and a field of 4/);
+  assert.deepEqual(out.field, { match: "field", joinable: false });
   assert.deepEqual(errors, []);
   await p.close();
 });
@@ -217,11 +311,11 @@ test("bye week: off teams are greyed in the picker and refused on post or join",
     return { w5chase, w5maye, w5def, w0chase, w5saved, w5toast, w0saved, joinChase, pickerLogos };
   });
   assert.deepEqual(out.w5chase.map(r => r[1]), [true, true], "both CIN rows disabled");
-  assert.equal(out.w5chase[0][2], "0.45"); assert.equal(out.w5chase[0][3], true, "bye tag shown");
+  assert.equal(out.w5chase[1][2], "0.45"); assert.equal(out.w5chase[1][3], true, "bye tag shown");
   assert.deepEqual(out.w5maye, [["Drake MayeQB0 rec ydsNE", false, "1", false, [], "0 rec yds"]]);
-  assert.deepEqual(out.w5chase.map(r => r[5]), ["0 rec yds", "61.5 rec yds"], "the picker shows the projection for the selected stat and week");
-  assert.deepEqual(out.w0chase.map(r => r[5]), ["0 rec yds", "1210 rec yds"], "a season-long bet shows the season projection");
-  assert.deepEqual(out.w5chase.map(r => r[4]), [[], ["Q"]], "the picker tags the questionable player");
+  assert.deepEqual(out.w5chase.map(r => r[5]), ["61.5 rec yds", "0 rec yds"], "the picker shows the projection for the selected stat and week, best first");
+  assert.deepEqual(out.w0chase.map(r => r[5]), ["1210 rec yds", "0 rec yds"], "a season-long bet shows the season projection");
+  assert.deepEqual(out.w5chase.map(r => r[4]), [["Q"], []], "the picker tags the questionable player");
   assert.equal(out.pickerLogos, 2, "a logo beside each team code in the picker");
   assert.equal(out.w5def[0][1], true, "KC's defense is off too");
   assert.deepEqual(out.w0chase.map(r => r[1]), [false, false], "season-long filters nobody");

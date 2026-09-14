@@ -25,7 +25,7 @@ const allGames=function(){ return Clock.allGames(state.games); };
 const teamName=function(code){ return Roster.teamName(code,state.roster); };
 const rosterRows=function(){ return Roster.rosterRows(state.roster); };
 const rosterFind=function(id){ return Roster.rosterFind(id,state.roster); };
-const rosterSearch=function(q,scope,keep){ return Roster.rosterSearch(q,scope,state.roster,keep); };
+const rosterSearch=function(q,scope,opts){ return Roster.rosterSearch(q,scope,state.roster,opts); };
 const autoTerms=function(scope,tracks,week,entries){ return Bets.autoTerms(scope,tracks,week,entries,members()); };
 const buildStats=function(entries){ return Stats.buildStats(entries,state.draftScope,state.draftStats); };
 
@@ -134,6 +134,10 @@ export function drawScope(){
   var scope=state.draftScope, box=document.getElementById("bStats"), hint=document.getElementById("bScopeHint");
   document.querySelectorAll("#bScope .chip").forEach(function(c){ c.setAttribute("aria-pressed",String(c.getAttribute("data-scope")===scope)); });
   drawGameBox();
+  // how alike the sides must be: a player bet's question only
+  document.getElementById("bMatchRow").hidden=scope!=="player";
+  // a field bet is its two sides, so nobody can add themselves to it
+  if(scope==="player"&&document.getElementById("bMatch").value==="field") document.getElementById("bJoinRow").hidden=true;
   if(scope==="game"){
     box.hidden=true;
     hint.textContent=allGames().length?"Pick the game, take a side, say who you're betting, set the stake. The other owner gets the other side. Locks five minutes before that game.":"Schedule isn't loaded yet — hit Refresh stats first.";
@@ -205,7 +209,7 @@ export function drawEntries(hostId){
       }).join("");
       pickUi='<div class="picker">'+
         (chips?'<div class="pick-chips">'+chips+"</div>":"")+
-        '<input class="field" data-act="dSearch" data-i="'+i+'" autocomplete="off" placeholder="'+(scope==="team"?"Search a defense…":"Search a player…")+'">'+
+        '<input class="field" data-act="dSearch" data-i="'+i+'" autocomplete="off" placeholder="'+(scope==="team"?"Search a defense…":"Player name…")+'">'+
         '<div class="sugg" id="sugg'+i+'" hidden></div>'+
       "</div>";
     } else {
@@ -218,7 +222,21 @@ export function drawEntries(hostId){
       (i>0&&scope!=="game"?'<button class="btn danger rm" data-act="dRm" data-i="'+i+'">✕</button>':"")+
     "</div>";
   }).join("");
+  drawPickFilters(host.id==="jEntries"?"jPickFilters":"bPickFilters");
 }
+// The Team and Position filters: one pair above the rows, for every search box in the
+// form. Player bets only — a defense is found by name.
+export function drawPickFilters(id){
+  var el=document.getElementById(id); if(!el) return;
+  el.hidden=!(state.draftScope==="player"&&rosterRows().length);
+  if(el.hidden){ el.innerHTML=""; return; }
+  var opt=function(v,label,cur){ return '<option value="'+esc(v)+'"'+(v===cur?" selected":"")+">"+esc(label)+"</option>"; };
+  el.innerHTML='<select class="field" data-act="dTeam" aria-label="Team">'+opt("","Any team",state.draftTeam)+
+      Roster.rosterTeams(state.roster).map(function(t){ return opt(t,teamName(t)===t?t:t+" · "+teamName(t),state.draftTeam); }).join("")+"</select>"+
+    '<select class="field" data-act="dPos" aria-label="Position">'+opt("","Any position",state.draftPos)+
+      Object.keys(Roster.POS_ORDER).map(function(p){ return opt(p,p,state.draftPos); }).join("")+"</select>";
+}
+function filtersOn(){ return state.draftScope==="player"&&!!(state.draftTeam||state.draftPos); }
 function gameSideText(side){
   if(side==="over"||side==="under") return (side==="over"?"Over ":"Under ")+state.draftLine;
   return teamName(side);
@@ -249,14 +267,26 @@ function startedPick(entries,week){
 
 export function drawSugg(i,q){
   var box=document.querySelector("#"+entriesHost()+" #sugg"+i); if(!box) return;
+  state.suggRow=i;
+  q=String(q||"");
+  // nothing typed and no filter set: nothing to show
+  if(!filtersOn()&&q.trim().length<2){ box.hidden=true; box.innerHTML=""; return; }
   // A player or defense can be on one side only — hide anything any side already holds.
   var taken={}; state.draft.forEach(function(e){ (e.picks||[]).forEach(function(p){ taken[p.id]=1; }); });
   // On a weekly bet, anyone whose game has already started isn't offered at all.
   var started=Clock.teamsStarted(draftWeek(),state.games);
-  var hits=rosterSearch(q,state.draftScope,function(r){ return !taken[r[0]]&&!started[r[3]]; });
+  // Joining a bet that needs a lineup: only the positions still to fill.
+  var joining=document.getElementById("joinDlg").open?findBet(state.joinId):null;
+  var need=joining?Bets.positionsNeeded(joining,(state.draft[0]||{}).picks):null;
+  // best projection first, on the first stat the bet tracks
+  var P=Stats.projFor(draftWeek()||0,state.proj), st=(state.draftStats||[])[0];
+  var hits=rosterSearch(q,state.draftScope,{ team:state.draftTeam, pos:state.draftPos,
+    keep:function(r){ return !taken[r[0]]&&!started[r[3]]&&(!need||need[r[2]]>0); },
+    score:P&&st?function(r){ return Stats.valueFor(r[0],st,P); }:null });
   // On a weekly bet, anyone whose team is off that week is shown but can't be picked.
   var playing=Clock.teamsPlaying(draftWeek(),state.games);
-  box.hidden=!hits.length;
+  box.hidden=false;
+  if(!hits.length){ box.innerHTML='<div class="sugg-empty">No players match</div>'; return; }
   box.innerHTML=hits.map(function(r){
     var bye=Clock.onBye(r[3],playing), pt=projText(r[0]);
     return '<button type="button" data-act="dAdd" data-i="'+i+'" data-id="'+esc(r[0])+'"'+(bye?' disabled data-tip="Off this week"':"")+'>'+esc(r[1])+
@@ -274,7 +304,21 @@ export function addPick(i,id){
   e.picks.push({ id:r[0], name:r[1], pos:r[2], team:r[3] });
   e.pick=picksText(e.picks);
   drawEntries();
+  // With a filter set, the list stays open on who's left, ready for the next tap.
+  // Otherwise back to the box for the next name.
+  if(filtersOn()) return drawSugg(i,"");
   var next=document.querySelector("#"+entriesHost()+' [data-act="dSearch"][data-i="'+i+'"]'); if(next) next.focus();
+}
+// The Sides-must-match choice changed. A field bet needs its second side, so one appears.
+export function matchChanged(){
+  if(document.getElementById("bMatch").value==="field"&&state.draft.length<2) state.draft.push({memberId:null,pick:"",picks:[]});
+  drawScope(); drawEntries();
+}
+// A filter changed: redraw the open row's list with whatever is typed in it.
+export function refilter(){
+  drawPickFilters(document.getElementById("joinDlg").open?"jPickFilters":"bPickFilters");
+  var i=state.suggRow||0, inp=document.querySelector("#"+entriesHost()+' [data-act="dSearch"][data-i="'+i+'"]');
+  drawSugg(i,inp?inp.value:"");
 }
 export function dropPick(i,pid){
   var de=state.draft[i];
@@ -329,6 +373,12 @@ export function openBetDlg(editId){
     ? (state.admin&&isLocked(bet)?"Admin update on a locked bet — everyone will see the change. ":"")+"Changing sides or stats resets the standings until the next refresh."
     : "Default stake is "+money(stake)+".";
   state.draftGame=null; state.draftMarket="ml"; state.draftLine=""; state.draftFav="";
+  state.draftTeam=""; state.draftPos=""; state.suggRow=0;
+  // an older bet has no setting; it opens on the rule it has been playing by
+  var mSel=document.getElementById("bMatch");
+  var lvl=bet?Bets.matchLevel(bet):"count", levels=Bets.MATCH_LEVELS.concat(lvl==="any"?[Bets.ANY_LEVEL]:[]);
+  mSel.innerHTML=levels.map(function(m){ return '<option value="'+m[0]+'">'+esc(m[1])+"</option>"; }).join("");
+  mSel.value=lvl;
   if(bet){
     state.draft=entriesOf(bet).map(function(e){
       return { memberId:e.memberId||null, invite:e.invite||null, pick:e.pick||"", picks:clone(e.picks||[]), side:e.side||"" };
@@ -393,11 +443,11 @@ export function submitBet(){
   if(!(amt>0)) return toast(isGame?"Set the stake — it's yours to name":"Set a stake above zero");
   var wkPick=isGame?G.week:(Number(document.getElementById("bWeek").value)||0);
   // A weekly stat bet can be posted while any of the week's games is still to come —
-  // its picks are held to that below. Without a schedule or picks, or season long, the
-  // week's first game is the line (and that is where such a bet locks).
+  // its picks are held to that below. Without that week's schedule or picks, or season
+  // long, the week's first game is the line (and that is where such a bet locks).
   var adminEdit=!!(state.editId&&state.admin);
   if(!isGame&&!adminEdit){
-    if(wkPick&&allGames().length&&statScope&&rosterRows().length){ if(!openGames(wkPick).length) return toast("Week "+wkPick+"'s games have all kicked off — pick a later week"); }
+    if(wkPick&&statScope&&rosterRows().length&&allGames().some(function(g){ return g.week===wkPick; })){ if(!openGames(wkPick).length) return toast("Week "+wkPick+"'s games have all kicked off — pick a later week"); }
     else if(weekLocked(wkPick)) return toast(wkPick?"Week "+wkPick+" has kicked off — pick a later week":"The season's underway — season-long bets are locked");
   }
   var seen={};
@@ -431,6 +481,7 @@ export function submitBet(){
     var held={}, dup=null;
     state.draft.forEach(function(e){ (e.picks||[]).forEach(function(p){ if(held[p.id]) dup=p.name; held[p.id]=1; }); });
     if(dup) return toast(dup+" is on two sides");
+    if(state.draftScope==="player"){ var sp=Bets.sidesProblem(document.getElementById("bMatch").value,state.draft); if(sp) return toast(sp); }
     var off=byePick(state.draft,wkPick);
     if(off) return toast(off.name+" is off in week "+wkPick+" — pick someone who's playing");
     var gone=adminEdit?null:startedPick(state.draft,wkPick);
@@ -461,6 +512,9 @@ export function submitBet(){
   // Pot-style: others can add themselves after posting. Never on a two-team game bet;
   // always on a stat bet with nobody named against you, or nobody ever could.
   bet.joinable=!isGame&&(document.getElementById("bJoin").checked||entries.length<2);
+  if(state.draftScope==="player"){ var mv=document.getElementById("bMatch").value; bet.match=/^(any|lineup|field)$/.test(mv)?mv:"count"; }
+  // a field bet is its two sides and nobody else
+  if(bet.match==="field") bet.joinable=false;
   if(isGame&&(bet.market==="total"||bet.market==="spread")) bet.line=parseFloat(state.draftLine);
   if(isGame&&bet.market==="spread") bet.fav=state.draftFav||G.home;
   if(isGame&&bet.market!=="ml"){
@@ -507,10 +561,12 @@ export function openJoinDlg(id){
   state.draftScope=S.scope||"";
   state.draftStats=(Array.isArray(S.tracks)?S.tracks:[]).map(function(t){ return t.stat; }).filter(Boolean);
   state.draft=[{memberId:state.me,pick:"",picks:[],side:""}];
+  state.draftTeam=""; state.draftPos=""; state.suggRow=0;
   document.getElementById("jTitle").textContent="Join · "+(bet.name||bet.terms);
   document.getElementById("jTerms").textContent=bet.terms+"  ·  "+money(bet.amount)+" a side";
+  var ml=Bets.matchLabel(bet);
   document.getElementById("jHint").textContent=state.draftScope
-    ? (state.draftScope==="team"?"Pick a defense nobody else has.":"Pick a player nobody else has.")
+    ? (state.draftScope==="team"?"Pick a defense nobody else has.":(ml?"Pick "+ml.replace(/ each$/,"")+", same as everyone else.":"Pick players nobody else has."))
     : "Say what you're taking.";
   drawEntries("jEntries");
   document.getElementById("joinDlg").showModal();
@@ -522,11 +578,8 @@ export function submitJoin(){
   var d=state.draft[0]||{}, scope=state.draftScope;
   if(scope&&rosterRows().length){
     if(!(d.picks&&d.picks.length)) return toast(scope==="team"?"Pick a defense":"Pick a player");
-    // A player pot is even-handed: join with as many players as everyone else put up.
-    // Unless it's a player-vs-the-field bet, where the sides are uneven on purpose —
-    // then any number goes.
-    var counts=[]; entriesOf(bet).forEach(function(e){ var n=(e.picks||[]).length; if(n&&counts.indexOf(n)<0) counts.push(n); });
-    if(scope==="player"&&counts.length===1&&d.picks.length!==counts[0]) return toast("Pick "+counts[0]+(counts[0]===1?" player":" players")+", same as everyone else on this bet");
+    // The bet says how alike the sides must be (bets.js, matched sides).
+    if(scope==="player"){ var jp=Bets.joinProblem(bet,d.picks); if(jp) return toast(jp); }
     var held={}; entriesOf(bet).forEach(function(e){ (e.picks||[]).forEach(function(p){ held[p.id]=1; }); });
     var dup=null; d.picks.forEach(function(p){ if(held[p.id]) dup=p.name; });
     if(dup) return toast(dup+" is already taken");

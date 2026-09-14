@@ -1001,6 +1001,7 @@ function ticketHtml(b){
     '<div class="t-meta"><div class="t-meta-l">'+
       '<span class="wk'+(isPlayoff(b.week)?" po":"")+'">'+weekLabel(b.week)+"</span>"+
       '<span class="kind">'+esc(kindLabel(b.kind))+(live.length>2?" · "+live.length+"-way":"")+"</span>"+
+      (Bets.matchLabel(b)?'<span class="kind match" data-tip="Every side has to match">'+esc(Bets.matchLabel(b))+"</span>":"")+
     "</div>"+'<div class="t-meta-r">'+
       ((b.status==="open"||b.status==="active")
         ? (isLocked(b)?'<span class="status locked">Locked</span>'

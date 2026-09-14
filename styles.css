@@ -336,6 +336,11 @@ label.f > span{font-size:11px;font-weight:700;text-transform:uppercase;letter-sp
 .sugg .tag{font-size:10px;font-weight:800;color:var(--ink-3);background:var(--surface-2);padding:1px 6px;border-radius:4px}
 .sugg .team{margin-left:auto;font-size:11px;font-weight:800;color:var(--ink-2)}
 .sugg button:disabled{opacity:.45;cursor:not-allowed}
+/* the picker's Team and Position filters: one pair for the whole form, above the rows */
+.pick-filters{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:9px}
+.pick-filters select{width:100%;min-width:0}
+.match-row{margin-top:12px}
+.sugg .sugg-empty{padding:9px 12px;font-size:13px;color:var(--ink-3)}
 .sugg button:disabled:hover{background:transparent}
 .sugg .tag.bye{color:var(--loss);background:transparent;border:1px solid currentColor}
 /* Player status: Q is a warning, anything firmer (OUT, IR, D…) reads as trouble. */

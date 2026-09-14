@@ -55,6 +55,82 @@ export function canJoin(b){
   return !!b&&!b.game&&b.joinable!==false&&(b.status==="open"||b.status==="active")&&!isFieldBet(b);
 }
 
+/* ---- matched sides ----
+   A player bet says how alike its sides must be, in `b.match`:
+     "count"   every side the same number of players, any positions
+     "lineup"  every side the same number and the same positions (QB + WR vs QB + WR)
+     "field"   one player against a field of exactly FIELD_SIZE, two sides, nobody joins
+     "any"     no rule — not offered any more; it's what an older uneven bet plays by
+   Bets from before the setting have no `match` and keep the old join rule: the same
+   count as everyone else, unless the sides were already uneven. */
+export const FIELD_SIZE=4;
+export const MATCH_LEVELS=[["count","Same number of players"],["lineup","Same number and positions"],["field","One player vs a field of "+FIELD_SIZE]];
+export const ANY_LEVEL=["any","Any lineup"];
+var POS_ORDER={ QB:0, RB:1, WR:2, TE:3, K:4 };
+
+// A side's positions in lineup order: ["QB","WR","WR"].
+export function lineupOf(picks){
+  return (picks||[]).map(function(p){ return String(p.pos||""); })
+    .sort(function(a,b){ var ra=POS_ORDER[a], rb=POS_ORDER[b]; return ((ra==null?5:ra)-(rb==null?5:rb))||a.localeCompare(b); });
+}
+// "QB + 2 WR"
+export function lineupText(picks){
+  var n={}, order=[];
+  lineupOf(picks).forEach(function(p){ if(!n[p]){ n[p]=0; order.push(p); } n[p]++; });
+  return order.map(function(p){ return (n[p]>1?n[p]+" ":"")+p; }).join(" + ");
+}
+function plural(n){ return n+(n===1?" player":" players"); }
+
+// What's wrong with a side against the side it has to match, or "".
+function mismatch(match,picks,ref){
+  if(match==="count"&&picks.length!==ref.length) return "Pick "+plural(ref.length)+", same as the other side";
+  if(match==="lineup"&&lineupOf(picks).join()!==lineupOf(ref).join()) return "Pick "+lineupText(ref)+", same as the other side";
+  return "";
+}
+// Every side the proposer filled in, held to the bet's level; "" when they fit.
+export function sidesProblem(match,entries){
+  var sides=(entries||[]).map(function(e){ return e.picks||[]; }).filter(function(p){ return p.length; });
+  if(match==="field"){
+    var n=sides.map(function(p){ return p.length; }).sort(function(a,b){ return a-b; });
+    return (sides.length===2&&(entries||[]).length===2&&n[0]===1&&n[1]===FIELD_SIZE)?"":"Player vs the field is two sides: one player, and a field of "+FIELD_SIZE;
+  }
+  if(match!=="count"&&match!=="lineup") return "";
+  for(var i=1;i<sides.length;i++){ var m=mismatch(match,sides[i],sides[0]); if(m) return m; }
+  return "";
+}
+// The level a bet actually plays by: its own, or for an older bet the rule it always had.
+export function matchLevel(b){
+  if(b&&(b.match==="any"||b.match==="count"||b.match==="lineup"||b.match==="field")) return b.match;
+  return b&&isFieldBet(b)?"any":"count";
+}
+function refSide(b){ var ref=null; entriesOf(b).forEach(function(e){ if(!ref&&(e.picks||[]).length) ref=e.picks; }); return ref; }
+// A joiner's picks against the bet; "" when they fit.
+export function joinProblem(b,picks){
+  var ref=refSide(b), m=matchLevel(b);
+  if(!ref||m==="field") return "";
+  var msg=mismatch(m,picks||[],ref);
+  return msg?msg.replace("the other side","everyone else on this bet"):"";
+}
+// Positions a joiner still needs on a lineup bet, as counts ({ QB:1, WR:1 }), or null
+// when any position will do.
+export function positionsNeeded(b,picks){
+  var ref=refSide(b);
+  if(!ref||matchLevel(b)!=="lineup") return null;
+  var need={};
+  ref.forEach(function(p){ need[p.pos]=(need[p.pos]||0)+1; });
+  (picks||[]).forEach(function(p){ if(need[p.pos]) need[p.pos]--; });
+  return need;
+}
+// What the ticket says about it: "2 players each", "QB + WR each"; "" for no rule.
+export function matchLabel(b){
+  if(!b||b.game||!b.stats||b.stats.scope!=="player"||!b.match) return "";
+  var ref=refSide(b); if(!ref) return "";
+  if(b.match==="count") return plural(ref.length)+" each";
+  if(b.match==="lineup") return lineupText(ref)+" each";
+  if(b.match==="field") return "1 vs a field of "+FIELD_SIZE;
+  return "";
+}
+
 /* ---- settling without a button ----
    A game bet settles from the final score. A stat bet settles once every game of
    its period is final and the standings were refreshed after the last one ended;

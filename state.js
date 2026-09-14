@@ -34,6 +34,7 @@ export const state = {
   // the propose / join forms' draft
   draftScope:"", draftStats:[], editId:null,
   draftGame:null, draftMarket:"ml", draftLine:"", draftFav:"", joinId:null,
+  draftTeam:"", draftPos:"", suggRow:0,   // the picker's Team and Position filters, and the row whose list is open
   draft:[],
   // sign-in bookkeeping
   typedPw:null, mustChange:false, bookTimer:null, bookError:null

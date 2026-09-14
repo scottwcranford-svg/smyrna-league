@@ -54,17 +54,48 @@ export function teamName(code,roster){
   return code;
 }
 
-// Up to eight matches. `keep`, if given, drops rows before they count toward the eight,
-// so a hidden row never pushes a real match off the list.
-export function rosterSearch(q,scope,roster,keep){
-  q=String(q||"").trim().toLowerCase(); if(q.length<2) return [];
-  var out=[], rows=rosterRows(roster);
-  for(var i=0;i<rows.length&&out.length<8;i++){
-    var r=rows[i], isDef=r[2]==="DEF";
-    if(scope==="team"?!isDef:isDef) continue;
-    if(keep&&!keep(r)) continue;
-    var hay=(r[1]+" "+r[3]).toLowerCase();
-    if(hay.indexOf(q)>=0) out.push(r);
-  }
-  return out;
+/* ---- the picker search ----
+   A player search has three parts: a team, a position and a name. A player shows when
+   he matches every part that is set; the name only ever matches the name, so "den"
+   finds Denzel Mims, never "the Broncos". With a team or position picked the name can
+   be blank and the list is everyone who fits; without, it takes two letters and stops
+   at eight. A defense search (scope "team") is the name box alone, and matches the
+   team code too, so "kc" finds the Chiefs.
+   opts: { team, pos, keep(row) → false hides a row, score(row) → a number, higher first }.
+   Hidden rows never count toward a cap, so they can't push a real match off the list. */
+export const LIST_CAP=8, POS_CAP=40;
+export const POS_ORDER={ QB:0, RB:1, WR:2, TE:3, K:4 };
+var SIDELINED={ OUT:1, IR:1, PUP:1, SUS:1, COV:1, NA:1, DNR:1, INA:1, PS:1 };
+export function posRank(pos){ var p=POS_ORDER[pos]; return p==null?5:p; }
+
+export function rosterSearch(q,scope,roster,opts){
+  opts=opts||{};
+  q=String(q||"").trim().toLowerCase();
+  var def=scope==="team", team=def?"":String(opts.team||""), pos=def?"":String(opts.pos||"");
+  var filtered=!!(team||pos);
+  if(!filtered&&q.length<2) return [];
+  var out=[];
+  rosterRows(roster).forEach(function(r){
+    if(def?r[2]!=="DEF":r[2]==="DEF") return;
+    if(team&&r[3]!==team) return;
+    if(pos&&r[2]!==pos) return;
+    if(q&&(def?(r[1]+" "+r[3]):r[1]).toLowerCase().indexOf(q)<0) return;
+    if(opts.keep&&!opts.keep(r)) return;
+    out.push(r);
+  });
+  // A whole team reads like a depth chart, position by position. Otherwise the best
+  // projection leads. Within either, anyone sidelined (IR, out, practice squad…) sinks,
+  // then it's by name.
+  var score=opts.score||function(){ return 0; }, byPos=!!team&&!pos;
+  out.sort(function(a,b){
+    return (byPos?posRank(a[2])-posRank(b[2]):0)||(score(b)-score(a))||
+      ((SIDELINED[a[4]]?1:0)-(SIDELINED[b[4]]?1:0))||String(a[1]).localeCompare(String(b[1]));
+  });
+  return team?out:out.slice(0,filtered?POS_CAP:LIST_CAP);
+}
+// The teams on the roster, as codes, alphabetical — the Team filter's list.
+export function rosterTeams(roster){
+  var seen={};
+  rosterRows(roster).forEach(function(r){ if(r[2]!=="DEF"&&r[3]) seen[r[3]]=1; });
+  return Object.keys(seen).sort();
 }

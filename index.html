@@ -180,7 +180,9 @@
     </div>
     <div class="filters" id="bStats" hidden></div>
     <div class="hint" id="bScopeHint" style="margin-top:6px"></div>
+    <label class="f match-row" id="bMatchRow" hidden><span>Sides must match</span><select class="field" id="bMatch"></select></label>
     <div class="lbl" id="bWhoLbl" style="margin:17px 0 8px">Who's in, and what they're taking</div>
+    <div class="pick-filters" id="bPickFilters" hidden></div>
     <div class="grid" id="bEntries" style="gap:9px"></div>
     <button class="btn" id="bAddSide" style="margin-top:10px">+ Add another side</button>
     <label class="check" id="bJoinRow"><input type="checkbox" id="bJoin" checked> Anyone can add themselves — pot-style, one pick each</label>
@@ -196,6 +198,7 @@
   <div class="dlg-body">
     <p class="bet-desc" id="jTerms" style="margin:0 0 12px"></p>
     <div class="lbl" style="margin:0 0 8px">Your pick</div>
+    <div class="pick-filters" id="jPickFilters" hidden></div>
     <div class="grid" id="jEntries" style="gap:9px"></div>
     <div class="form-foot">
       <button class="btn pri lg" id="jSave">I'm in</button>

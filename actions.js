@@ -152,6 +152,9 @@ const CHANGES = {
     toast(t.checked?mm.name+" is an admin":mm.name+" is no longer an admin");
   },
   week:function(t){ state.filter.week=t.value; touch(); },
+  // the picker's filters
+  dTeam:function(t){ state.draftTeam=t.value; F.refilter(); },
+  dPos:function(t){ state.draftPos=t.value; F.refilter(); },
   dMem:function(t){
     var i=num(t,"data-i"), d=state.draft[i];
     if(state.admin){ d.memberId=t.value||(i===0?state.me:null); d.invite=null; }   // admin on: seat anyone outright
@@ -236,6 +239,7 @@ export function bindEvents(hooks){
   document.addEventListener("change",function(ev){
     var t=ev.target, act=t.getAttribute&&attr(t,"data-act");
     if(act&&CHANGES[act]) return CHANGES[act](t);
+    if(t.id==="bMatch") return F.matchChanged();
     if(t.id==="bWeek"&&state.draftScope==="game"){ state.draftGame=null; state.draftFav=""; state.draft.forEach(function(e){ e.side=""; }); F.drawGameBox(); F.drawEntries(); }
     else if(t.id==="bGame"){
       var gid=t.value, pick=null;
@@ -253,6 +257,16 @@ export function bindEvents(hooks){
     if(act==="dPick") state.draft[num(t,"data-i")].pick=t.value;
     else if(act==="dSearch") F.drawSugg(num(t,"data-i"),t.value);
     else if(t.id==="bLine"){ state.draftLine=t.value.trim(); if(state.draftMarket==="total") F.drawEntries(); }
+  });
+  // A picker's list opens when its box is focused (with a filter set there is something
+  // to show before any typing) and closes on a tap anywhere outside the picker and filters.
+  document.addEventListener("focusin",function(ev){
+    var t=ev.target;
+    if(t.getAttribute&&attr(t,"data-act")==="dSearch") F.drawSugg(num(t,"data-i"),t.value);
+  });
+  document.addEventListener("click",function(ev){
+    if(ev.target.closest&&ev.target.closest(".picker,.pick-filters")) return;
+    document.querySelectorAll(".sugg").forEach(function(b){ b.hidden=true; });
   });
   document.addEventListener("keydown",function(ev){
     var t=ev.target;

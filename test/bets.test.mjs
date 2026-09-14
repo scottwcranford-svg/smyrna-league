@@ -105,3 +105,35 @@ test("lineOrigin: a bet says whether its number was Vegas's or the proposer's ow
   assert.equal(Bets.lineOrigin({ game: g, market: "ml", lineSrc: "vegas" }), null, "a straight-up bet has no number");
   assert.equal(Bets.lineOrigin(null), null);
 });
+
+test("matched sides: same number, same lineup, or one player against a field of four", () => {
+  const p = (id, pos) => ({ id, name: id, pos, team: "KC" });
+  const side = (...pos) => ({ memberId: "m0", picks: pos.map((x, i) => p(x + i + Math.random(), x)) });
+  assert.equal(Bets.sidesProblem("count", [side("QB", "WR"), side("RB", "TE")]), "", "same count, any positions");
+  assert.match(Bets.sidesProblem("count", [side("QB", "WR"), side("RB")]), /Pick 2 players/);
+  assert.equal(Bets.sidesProblem("lineup", [side("WR", "QB"), side("QB", "WR")]), "", "order doesn't matter");
+  assert.match(Bets.sidesProblem("lineup", [side("QB", "WR"), side("QB", "RB")]), /Pick QB \+ WR/);
+  assert.equal(Bets.sidesProblem("field", [side("QB"), side("WR", "WR", "RB", "TE")]), "", "one against four");
+  assert.equal(Bets.sidesProblem("field", [side("WR", "WR", "RB", "TE"), side("QB")]), "", "either side can be the field");
+  assert.match(Bets.sidesProblem("field", [side("QB"), side("WR", "WR", "RB")]), /field of 4/, "three isn't a field");
+  assert.match(Bets.sidesProblem("field", [side("QB"), side("WR", "WR", "RB", "TE"), side("K")]), /two sides/);
+  assert.equal(Bets.sidesProblem("any", [side("QB"), side("WR", "RB")]), "");
+
+  const bet = (match, ...entries) => ({ match, status: "open", joinable: true, stats: { scope: "player" }, entries });
+  assert.equal(Bets.joinProblem(bet("lineup", side("QB", "WR")), [p("a", "WR"), p("b", "QB")]), "");
+  assert.match(Bets.joinProblem(bet("lineup", side("QB", "WR")), [p("a", "WR"), p("b", "WR")]), /QB \+ WR, same as everyone else/);
+  assert.match(Bets.joinProblem(bet("count", side("QB", "WR")), [p("a", "K")]), /Pick 2 players/);
+  assert.deepEqual(Bets.positionsNeeded(bet("lineup", side("QB", "WR", "WR")), [p("a", "WR")]), { QB: 1, WR: 1 }, "what's left to fill");
+  assert.equal(Bets.positionsNeeded(bet("count", side("QB")), []), null);
+
+  assert.equal(Bets.matchLabel(bet("count", side("QB", "WR"))), "2 players each");
+  assert.equal(Bets.matchLabel(bet("lineup", side("QB", "WR", "WR"))), "QB + 2 WR each");
+  assert.equal(Bets.matchLabel(bet("field", side("QB"), side("WR", "WR", "RB", "TE"))), "1 vs a field of 4");
+
+  // bets from before the setting are left as they were
+  const old = (...entries) => ({ status: "open", joinable: true, stats: { scope: "player" }, entries });
+  assert.equal(Bets.matchLevel(old(side("QB"), side("WR"))), "count", "even sides: the old same-count rule");
+  assert.equal(Bets.matchLevel(old(side("QB"), side("WR", "RB"))), "any", "uneven sides: no rule, as before");
+  assert.match(Bets.joinProblem(old(side("QB", "WR")), [p("a", "K")]), /Pick 2 players/);
+  assert.equal(Bets.matchLabel(old(side("QB", "WR"))), "", "and the ticket says nothing new about them");
+});
