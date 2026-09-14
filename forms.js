@@ -150,9 +150,14 @@ export function drawScope(){
     var valid=STATS[scope].map(function(s){ return s[0]; });
     state.draftStats=state.draftStats.filter(function(k){ return valid.indexOf(k)>=0; });
     if(!state.draftStats.length) state.draftStats=[valid[0]];
-    box.innerHTML=STATS[scope].map(function(s){
-      return '<button type="button" class="chip" data-act="dStat" data-stat="'+esc(s[0])+'" aria-pressed="'+(state.draftStats.indexOf(s[0])>=0)+'">'+esc(s[1])+"</button>";
-    }).join("");
+    var chip=function(s){ return '<button type="button" class="chip" data-act="dStat" data-stat="'+esc(s[0])+'" aria-pressed="'+(state.draftStats.indexOf(s[0])>=0)+'">'+esc(s[1])+"</button>"; };
+    var byKey={}; STATS[scope].forEach(function(s){ byKey[s[0]]=s; });
+    // player stats sit under headings so twenty buttons stay findable; pick from as many groups as you like
+    box.innerHTML=scope==="player"
+      ? Stats.STAT_GROUPS.map(function(g){
+          var chips=g[1].filter(function(k){ return byKey[k]; }).map(function(k){ return chip(byKey[k]); }).join("");
+          return chips?'<div class="stat-grp"><span class="lbl">'+esc(g[0])+'</span><div class="stat-grp-chips">'+chips+"</div></div>":""; }).join("")
+      : STATS[scope].map(chip).join("");
   }
   if(!scope) hint.textContent="Anything goes. Settle it by hand when it's decided.";
   else if(!rosterRows().length) hint.textContent="Roster isn't loaded yet — hit Refresh stats first, or switch to free text.";

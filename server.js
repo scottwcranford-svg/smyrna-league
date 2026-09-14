@@ -77,7 +77,9 @@ async function getText(url) {
   if (!r.ok) throw new Error(`${r.status} ${url}`);
   return r.text();
 }
-const COMPOSITES = { takeaways: ["int", "fum_rec"], td_scored: ["rush_td", "rec_td"], rush_rec_yd: ["rush_yd", "rec_yd"] };
+// keep in step with COMPOSITES in stats.js
+const COMPOSITES = { takeaways: ["int", "fum_rec"], td_scored: ["rush_td", "rec_td"], rush_rec_yd: ["rush_yd", "rec_yd"],
+  total_yd: ["pass_yd", "rush_yd", "rec_yd"], total_td: ["pass_td", "rush_td", "rec_td"], touches: ["rush_att", "rec"], turnovers: ["pass_int", "fum_lost"] };
 const FANTASY_POS = new Set(["QB", "RB", "WR", "TE", "K"]);
 let players = null, playersAt = 0;
 async function loadPlayers() {

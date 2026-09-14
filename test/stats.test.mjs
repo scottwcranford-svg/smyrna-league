@@ -43,3 +43,16 @@ test("buildStats: a field side is one row per player (best of); any other multi-
   const combined = Stats.buildStats(entries, "player", ["rec_yd"]);
   assert.deepEqual(combined.rows.map(r => r.key), ["1", "2+3+4+5"]); assert.equal(combined.tracks[0].metric, "Receiving yards · combined");
 });
+
+test("the new totals add like for like, and every player stat sits under exactly one heading", () => {
+  const totals = { qb: { pass_yd: 334, rush_yd: 23, pass_td: 2, rush_td: 2, rush_att: 6, pass_int: 1, fum_lost: 1 }, rb: { rush_yd: 68, rec_yd: 20, rush_att: 10, rec: 5, rec_td: 1 } };
+  assert.equal(Stats.valueFor("qb", "total_yd", totals), 357, "passing + rushing + receiving yards");
+  assert.equal(Stats.valueFor("qb", "total_td", totals), 4);
+  assert.equal(Stats.valueFor("rb", "touches", totals), 15, "rush attempts + receptions");
+  assert.equal(Stats.valueFor("qb", "turnovers", totals), 2);
+  assert.equal(Stats.valueFor("qb+rb", "total_yd", totals), 445, "a combined pick adds the players up");
+  assert.equal(Stats.STATS.player.find(s => s[0] === "turnovers")[2], true, "fewest turnovers wins");
+  const grouped = Stats.STAT_GROUPS.flatMap(g => g[1]);
+  assert.deepEqual([...grouped].sort(), Stats.STATS.player.map(s => s[0]).sort(), "no stat missing a heading, none under two");
+  assert.deepEqual(grouped, Stats.STATS.player.map(s => s[0]), "and the buttons read in catalog order, so 'the first one listed' means the same thing on the form and the ticket");
+});
