@@ -586,6 +586,12 @@ test("League dialog: dues paid per season — an admin taps to change it, everyo
     // the next season: its own list, everyone unpaid, last year's record kept
     state.config.season = "2027"; state.season = null; state.admin = true; D.drawRoster(); res.next = rows(); res.nextSum = sum();
     res.lastYearKept = Object.keys(state.config.bySeason["2026"].duesPaid).sort();
+    // what goes to Firestore: that one entry as a merge, never the whole league record
+    const B = await import("./book.js?v=dev"); const sent = [];
+    state.local = false; state.db = { doc: path => ({ update: d => { sent.push(["update", path, JSON.parse(JSON.stringify(d))]); return Promise.resolve(); }, set: d => { sent.push(["set", path]); return Promise.resolve(); } }) };
+    B.saveDues("2027", "a", true); B.saveDues("2027", "a", false);
+    state.local = true; state.db = null;
+    res.sent = sent.map(x => x[0] === "update" ? [x[0], x[1], Object.keys(x[2]), Object.keys(x[2].bySeason), Object.keys(x[2].bySeason["2027"].duesPaid), x[2].bySeason["2027"].duesPaid.a === null ? "null" : "paid"] : x);
     return res;
   });
   assert.equal(out.sumBefore, "· 2026 dues 0 of 3 paid");
@@ -598,6 +604,7 @@ test("League dialog: dues paid per season — an admin taps to change it, everyo
   assert.deepEqual(out.next, [["Alice", "BUTTON:Dues unpaid"], ["Bob", ""], ["Cara", "BUTTON:Dues unpaid"], ["Testy", ""]], "2027 is Alice and Cara, both unpaid; Bob didn't play");
   assert.equal(out.nextSum, "· 2027 dues 0 of 2 paid");
   assert.deepEqual(out.lastYearKept, ["b", "c"]);
+  assert.deepEqual(out.sent, [["update", "league/config", ["bySeason"], ["2027"], ["a"], "paid"], ["update", "league/config", ["bySeason"], ["2027"], ["a"], "null"]], "each tap writes only its own entry");
   assert.deepEqual(errors, []);
   await p.close();
 });

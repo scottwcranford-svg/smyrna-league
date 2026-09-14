@@ -107,10 +107,14 @@ function subscribeBook(db){
     if(snap.exists){
       var d=Fmt.clone(snap.data());
       if(d&&Array.isArray(d.members)&&d.members.length){
-        state.config={ leagueName:d.leagueName||"Smyrna League", season:d.season||"",
+        // Everything in the document is kept, with the basics given their defaults. It used to
+        // be rebuilt from a handful of fields, which dropped bySeason (each season's settings
+        // and dues) - and since an admin's save writes state.config back whole, the next save
+        // erased what had been dropped.
+        state.config=Object.assign({},d,{ leagueName:d.leagueName||"Smyrna League", season:d.season||"",
                        stake:Number(d.stake)||25, members:d.members,
                        kickoff:d.kickoff||Clock.DEFAULT_KICKOFF,
-                       weekStarts:(d.weekStarts&&typeof d.weekStarts==="object")?d.weekStarts:null };
+                       weekStarts:(d.weekStarts&&typeof d.weekStarts==="object")?d.weekStarts:null });
         state.config.adminEmails=Array.isArray(d.adminEmails)?d.adminEmails:(d.adminEmail?[d.adminEmail]:[]);
         if(state.local){
           state.local=false;

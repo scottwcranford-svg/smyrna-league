@@ -56,6 +56,18 @@ export function saveConfig(){
     state.db.doc("league/config").set(state.config).catch(function(e){ toast(dbMsg(e)); });
 }
 
+// One manager's dues for one season. Written as a merge of that single entry, never the
+// whole config: several taps in a row would otherwise race each other's echoes and the
+// later ones would be lost.
+export function saveDues(season,memberId,paid){
+  Sn.setDues(state.config,season,memberId,paid,state.me);
+  touch();
+  if(!state.db||state.local) return;
+  var entry={}; entry[memberId]=state.config.bySeason[String(season)].duesPaid[memberId];
+  var per={}; per[String(season)]={ duesPaid:entry };
+  state.db.doc("league/config").update({ bySeason:per }).catch(function(e){ toast(dbMsg(e)); });
+}
+
 // A bet still waiting on a seat when its lock hits is cancelled — nobody should be
 // able to jump in after kickoff. Whichever open page notices first writes it; the
 // write is a merge and idempotent, so two pages noticing at once is harmless.

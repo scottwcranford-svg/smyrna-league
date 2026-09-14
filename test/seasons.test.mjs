@@ -110,6 +110,7 @@ test("league dues: kept per season, unpaid until marked, test accounts owe nothi
   assert.equal(config.bySeason["2027"].leagueId, "L27", "the season's other settings are untouched");
   S.setDues(config, "2027", "c", true, "b"); S.setDues(config, "2027", "c", false, "b");
   assert.deepEqual(S.duesTally(config, "2027"), { paid: 0, of: 2 }, "and can be unmarked");
+  assert.equal(config.bySeason["2027"].duesPaid.c, null, "unpaid is kept as null, so it can be merged");
   assert.equal(S.duesPaid(config, "2026", "b"), true, "without touching last year");
   assert.equal(S.settingsFor(config, "2026").stake, undefined, "a dues record doesn't invent settings for the season");
 });

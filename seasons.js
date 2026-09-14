@@ -85,14 +85,14 @@ export function duesPaid(config,season,memberId){
   var per=config&&config.bySeason&&config.bySeason[String(season)];
   return !!(per&&per.duesPaid&&per.duesPaid[memberId]);
 }
-// Mark a manager paid or unpaid for a season, in place. Returns the config.
+// Mark a manager paid or unpaid for a season, in place. Unpaid is written as null rather
+// than removed, so the same change can go to Firestore as a merge. Returns the config.
 export function setDues(config,season,memberId,paid,by,at){
   var s=String(season);
   config.bySeason=config.bySeason||{};
   var per=config.bySeason[s]=Object.assign({},config.bySeason[s]||{});
   var list=Object.assign({},per.duesPaid||{});
-  if(paid) list[memberId]={ at:at||new Date().toISOString(), by:by||null };
-  else delete list[memberId];
+  list[memberId]=paid?{ at:at||new Date().toISOString(), by:by||null }:null;
   per.duesPaid=list;
   return config;
 }

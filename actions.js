@@ -93,8 +93,7 @@ export const ACTIONS = {
     if(!state.admin) return toast("Only the admin can do that");
     var dm=member(id); if(!dm) return;
     var season=shownSeason(), paid=!Sn.duesPaid(state.config,season,id);
-    Sn.setDues(state.config,season,id,paid,state.me);
-    B.saveConfig(); D.drawRoster(); touch();
+    B.saveDues(season,id,paid); D.drawRoster();
     toast(dm.name+(paid?" has paid ":" hasn't paid ")+season+" dues");
   },
   pwDefault:function(t,id){
