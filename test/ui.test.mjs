@@ -468,7 +468,7 @@ test("Scores: a week board with projections, paired matchups, and the season poo
   await p.close();
 });
 
-test("Settle Up opens with the season table: managers across, hi/low, weekly, season and total down", { skip }, async () => {
+test("Settle Up: a balance card per manager with hi/low, weekly, season and what's been paid, then the transfers", { skip }, async () => {
   const { p, errors } = await page();
   const out = await p.evaluate(async () => {
     const { state } = await import("./state.js?v=dev"); const V = await import("./render.js?v=dev");
@@ -478,21 +478,17 @@ test("Settle Up opens with the season table: managers across, hi/low, weekly, se
     ];
     state.highlow = { weeks: { "1": { high: [{ id: "b", name: "Bob", pts: 140 }], low: [{ id: "c", name: "Cara", pts: 90 }] } } };
     V.render();
-    const t = document.querySelector("#settle table.pivot");
-    return { heads: [...t.querySelectorAll("thead th")].slice(1).map(h => [h.querySelector(".pv-head span:not(.avatar)").textContent, h.classList.contains("me")]),
-      rows: [...t.querySelectorAll("tbody tr")].map(r => [r.querySelector("th").textContent, ...[...r.querySelectorAll("td")].map(d => d.textContent + ":" + d.className.replace("num ", "").replace(" total", ""))]),
-      scrolls: getComputedStyle(document.querySelector("#settle .pivot-wrap")).overflowX,
+    return { table: !!document.querySelector("#settle table"),
       you: document.querySelector("#settle .you-line").textContent,
       balances: [...document.querySelectorAll("#settle .bal")].map(b => [b.querySelector(".bal-name").textContent, b.querySelector("b").textContent, b.classList.contains("me")]),
+      lines: [...document.querySelectorAll("#settle .bal")].map(b => [...b.querySelectorAll(".bal-ln")].map(x => x.textContent + (x.querySelector("span") ? ":" + x.querySelector("span").className : ""))),
       transfers: [...document.querySelectorAll("#settle .debt")].map(d => [d.querySelector(".debt-txt").textContent.replace(/^[A-Z]{2}/, "").replace(/→[A-Z]{2}/, "→"), d.querySelector(".debt-amt").textContent]) };
   });
-  assert.deepEqual(out.heads, [["Alice", true], ["Bob", false], ["Cara", false]], "a column per manager, yours marked");
-  assert.deepEqual(out.rows, [
-    ["Hi / low", "$0:flat", "+$5:pos", "−$5:neg"],
-    ["Weekly bets", "−$10:neg", "$0:flat", "+$10:pos"],
-    ["Season bets", "+$25:pos", "−$25:neg", "$0:flat"],
-    ["Total", "+$15:pos", "−$20:neg", "+$5:pos"]], "net all season, paid or not");
-  assert.equal(out.scrolls, "auto", "wide tables scroll inside the section");
+  assert.equal(out.table, false, "no season table: the cards carry it");
+  assert.deepEqual(out.lines, [
+    ["hi/low +$5:pos", "weekly $0:flat", "season −$25:neg", "paid $25"],
+    ["hi/low −$5:neg", "weekly +$10:pos", "season $0:flat"],
+    ["hi/low $0:flat", "weekly −$10:neg", "season +$25:pos", "received $25"]], "each card: what its number is made of, and what's already changed hands");
   assert.match(out.you, /You.re down \$10/, "Alice: +25 on the season bet, already paid by Bob, −10 on the weekly one");
   assert.deepEqual(out.balances, [["Bob", "+$5", false], ["Cara", "+$5", false], ["Alice", "−$10", true]], "balances, biggest first: the paid season bet already netted, week-1 high and low folded in");
   assert.deepEqual(out.transfers, [["Alice→Bob", "$5"], ["Alice→Cara", "$5"]], "two transfers clear it");
@@ -504,7 +500,7 @@ test("Settle Up opens with the season table: managers across, hi/low, weekly, se
   assert.equal(afterPay.transfers, 1); assert.match(afterPay.you, /You.re down \$5/); assert.match(afterPay.head, /To clear it · 1 payment/);
   assert.deepEqual(afterPay.log.map(l => l.replace(/ · marked by \w+/, "")), ["Alice → Bob $5", "Bob → Alice · from a bet marked paid $25"], "the new payment, then the old per-bet flag as a payment");
   // drill through: Alice's Total cell lists her three lines; the bet line jumps to its ticket
-  await p.$eval('#settle td[data-act="drill"][data-m="a"][data-row="total"]', el => el.click());   // through the real click wiring
+  await p.$eval('#settle .bal b[data-act="drill"][data-m="a"][data-row="total"]', el => el.click());   // the card's number, through the real click wiring
   await p.waitForFunction(() => document.getElementById("drillDlg").open, { timeout: 5000 });
   const drill = await p.evaluate(() => ({
     title: document.getElementById("drillTitle").textContent.replace(/^AL\s*/, ""),
@@ -730,11 +726,11 @@ test("dues payouts: set in the League dialog; on Settle Up the treasurer, the pl
     res.champ = [champ.querySelector("b").textContent, who(champ)];
     res.bracket = [[...card().querySelectorAll(".brk-h")].map(x => x.textContent), [...card().querySelectorAll(".brk-col.r1 .brk-name, .brk-col.r2 .brk-name")].map(x => x.textContent), [...card().querySelectorAll(".brk-tag")].map(x => x.textContent)];
     res.note = card().querySelector(".dues-note").textContent;
-    res.table = [...document.querySelectorAll("#settle table.pivot tbody tr")].map(tr => [tr.querySelector("th").textContent, [...tr.querySelectorAll("td")].map(td => td.textContent)]);
+    res.cards = Object.fromEntries([...document.querySelectorAll("#settle .bal")].map(b => [b.dataset.m, [b.querySelector("b").textContent, (b.querySelector(".bal-ln.dues") || {}).textContent || ""]]));
     res.you = (document.querySelector("#settle .you-dues") || {}).textContent;
     res.transfers = [...document.querySelectorAll("#settle .debt")].length;
     // the drill-through behind Alice's dues cell
-    document.querySelector('#settle td[data-m="a"][data-row="dues"]').click();
+    document.querySelector('#settle .bal-ln[data-m="a"][data-row="dues"]').click();
     res.drill = [...document.querySelectorAll("#drillList .drill")].map(d => d.querySelector("b").textContent + " | " + d.querySelector("small").textContent + " | " + d.querySelector(".num").textContent);
     document.getElementById("drillDlg").close();
     return res;
@@ -747,10 +743,8 @@ test("dues payouts: set in the League dialog; on Settle Up the treasurer, the pl
   assert.equal(out.stepHeights[1] > out.stepHeights[0] && out.stepHeights[0] > out.stepHeights[2], true, "1st stands tallest, then 2nd, then 3rd");
   assert.deepEqual(out.champ, ["$100", "Alice"], "the bracket ends in the champion");
   assert.deepEqual(out.bracket, [["Round 1 · Week 15", "Semifinals · Week 16", "Final · Week 17", "Champion"], ["Seed 4", "Seed 5", "Seed 3", "Seed 6", "Seed 1", "Winner 4 / 5", "Seed 2", "Winner 3 / 6"], ["$50", "$300", "$150"]], "six seeds, 1 and 2 on a bye, the top three wearing their regular-season money");
-  assert.match(out.note, /One manager can win a regular-season place and the playoff pool\..*Cara pays them from the dues/);
-  assert.deepEqual(out.table.map(r => r[0]), ["Hi / low", "Weekly bets", "Season bets", "Dues payout", "Total"]);
-  assert.deepEqual(out.table[3][1], ["+$400", "+$150", "$0"], "Alice took 1st and the playoffs, Bob 2nd");
-  assert.deepEqual(out.table[4][1], ["+$400", "+$150", "$0"], "and it's in the total");
+  assert.match(out.note, /One manager can win a regular-season place and the playoff pool\..*balance card, but Cara pays it from the dues/);
+  assert.deepEqual(out.cards, { a: ["$0", "dues +$400"], b: ["$0", "dues +$150"], c: ["$0", ""] }, "the dues each won sit on the card, outside the number the managers settle between them");
   assert.match(out.you, /plus \$400 in dues payouts, from Cara/);
   assert.equal(out.transfers, 0, "dues aren't a manager-to-manager transfer");
   assert.deepEqual(out.drill, ["League dues · Regular season · 1st | paid by Cara | +$300", "League dues · Playoff champion | paid by Cara | +$100"]);
@@ -853,8 +847,8 @@ test("phone: tabs sit in a bar at the bottom, Propose floats, tickets fold and o
     seat.click(); await wait();
     res.seatOpen = cs(document.querySelector(".board .seat .seat-picks")).display;
     document.querySelector('#subTabs [data-tab="settle"]').click(); await wait();
-    const pv = document.querySelector(".pivot");
-    res.pivot = { byManager: pv.classList.contains("by-manager"), rows: [...pv.querySelectorAll("tbody th span:last-child")].map(t => t.textContent.trim()), cells: pv.querySelectorAll('td[data-act="drill"]').length, fits: pv.getBoundingClientRect().width <= innerWidth };
+    const cards = [...document.querySelectorAll("#settle .bal")];
+    res.cards = { count: cards.length, oneColumn: new Set(cards.map(c => Math.round(c.getBoundingClientRect().left))).size === 1, fits: cards.every(c => c.getBoundingClientRect().right <= innerWidth), pieces: document.querySelectorAll('#settle .bal-ln[data-act="drill"]').length, scrollsSideways: document.documentElement.scrollWidth > innerWidth };
     document.getElementById("newBetBtn").click(); await new Promise(r => setTimeout(r, 60));
     const dlg = document.getElementById("betDlg"); res.dialog = { w: Math.round(dlg.getBoundingClientRect().width), sticky: cs(dlg.querySelector(".form-foot")).position };
     dlg.close();
@@ -868,7 +862,7 @@ test("phone: tabs sit in a bar at the bottom, Propose floats, tickets fold and o
   assert.equal(out.doneOpen, true, "a tap anywhere on a folded ticket opens it");
   assert.deepEqual(out.seat, { grid: "grid", propHidden: "none", picks: "none" }, "ledger rows hide empty proposed/cancelled and the bet names");
   assert.equal(out.seatOpen, "block");
-  assert.deepEqual(out.pivot, { byManager: true, rows: ["Alice", "Bob", "Cara"], cells: 12, fits: true }, "Settle Up's table runs by manager on a phone");
+  assert.deepEqual(out.cards, { count: 3, oneColumn: true, fits: true, pieces: 9, scrollsSideways: false }, "Settle Up on a phone: a card a row, each piece tappable, nothing off the side");
   assert.deepEqual(out.dialog, { w: 390, sticky: "sticky" }, "dialogs fill the screen with the buttons pinned");
   assert.deepEqual(errors, []);
   await p.close();
@@ -881,9 +875,9 @@ test("desktop is untouched: no folding, tabs in the panel, the season table with
     const cs = (el) => getComputedStyle(el);
     document.querySelector('#tabs .tab[data-tab="money"]').click(); await new Promise(r => setTimeout(r, 30));
     return { fold: !!document.querySelector("article.ticket.fold"), foldBtn: cs(document.querySelector(".t-fold")).display, tabs: cs(document.getElementById("tabs")).position, fab: cs(document.getElementById("newBetBtn")).position,
-      pivot: document.querySelector(".pivot").classList.contains("by-manager"), refresh: document.getElementById("refreshBtn").textContent };
+      cards: document.querySelectorAll("#settle .bal .bal-lines").length > 0, refresh: document.getElementById("refreshBtn").textContent };
   });
-  assert.deepEqual(out, { fold: false, foldBtn: "none", tabs: "static", fab: "static", pivot: false, refresh: "Refresh stats" });
+  assert.deepEqual(out, { fold: false, foldBtn: "none", tabs: "static", fab: "static", cards: true, refresh: "Refresh stats" });
   assert.deepEqual(errors, []);
   await p.close();
 });
@@ -1358,18 +1352,18 @@ test("tooltips are the app's own, not the browser's, and none are left native", 
   const natives = await p.evaluate(() => [...document.querySelectorAll("[title]")].map(e => e.tagName + ":" + e.getAttribute("title")));
   assert.deepEqual(natives, [], "every title= became data-tip; a stray one would draw the OS box again");
 
-  await p.hover('#settle td[data-act="drill"][data-m="b"][data-row="total"]');
+  await p.hover('#settle .bal b[data-act="drill"][data-m="b"][data-row="total"]');
   await p.waitForFunction(() => { const t = document.getElementById("tip"); return t && t.classList.contains("show"); }, { timeout: 4000 });
   const tip = await p.evaluate(() => {
     const t = document.getElementById("tip"), cs = getComputedStyle(t), r = t.getBoundingClientRect();
-    const cell = document.querySelector('#settle td[data-act="drill"][data-m="b"][data-row="total"]').getBoundingClientRect();
+    const cell = document.querySelector('#settle .bal b[data-act="drill"][data-m="b"][data-row="total"]').getBoundingClientRect();
     const root = getComputedStyle(document.documentElement);
     const paint = (v) => { const d = document.createElement("i"); d.style.color = root.getPropertyValue(v).trim();
       document.body.appendChild(d); const c = getComputedStyle(d).color; d.remove(); return c; };
     return { text: t.textContent, bg: cs.backgroundColor, color: cs.color, ink: paint("--ink"), page: paint("--bg"),
       above: r.bottom <= cell.top + 1, centred: Math.abs((r.left + r.width / 2) - (cell.left + cell.width / 2)) < 2,
       onScreen: r.top >= 0 && r.left >= 0 && r.right <= innerWidth && r.bottom <= innerHeight,
-      notClipped: r.top < document.querySelector("#settle .pivot-wrap").getBoundingClientRect().top + 400 };
+      notClipped: r.bottom <= document.querySelector('#settle .bal b[data-m="b"]').getBoundingClientRect().top + 1 };
   });
   assert.equal(tip.text, "What’s behind this");
   assert.equal(tip.bg, tip.ink, "the app's ink, the same inversion the toast uses — not a system box");
@@ -1377,7 +1371,7 @@ test("tooltips are the app's own, not the browser's, and none are left native", 
   assert.equal(tip.above, true, "it sits above what it describes");
   assert.equal(tip.centred, true, "and points at the middle of it");
   assert.equal(tip.onScreen, true, "never off the edge of the viewport");
-  // it must survive the scrolling wrapper the season table lives in
+  // and isn't cut off by the card it sits on
   assert.equal(tip.notClipped, true);
   // and go away when the pointer leaves
   await p.hover("#settle .you-line");
@@ -1399,9 +1393,10 @@ test("the season seam: the book holds every season, the app shows one", { skip }
       { id: "w1", status: "settled", week: 2, amount: 10, winner: "c", entries: [{ memberId: "a", pick: "x" }, { memberId: "c", pick: "y" }], paid: [] },
       { id: "n1", season: "2027", status: "settled", week: 1, amount: 50, winner: "b", entries: [{ memberId: "a", pick: "x" }, { memberId: "b", pick: "y" }], paid: [] },
     ]);
-    const totals = () => { V.render(); return [...document.querySelectorAll("#settle table.pivot tbody tr")]
-      .filter(r => r.querySelector("th").textContent === "Total")
-      .map(r => [...r.querySelectorAll("td")].map(d => d.textContent))[0]; };
+    // each manager's balance, in roster order; undefined when there's nobody to show
+    const totals = () => { V.render(); const cards = [...document.querySelectorAll("#settle .bal")];
+      if (!cards.length) return undefined;
+      return state.config.members.map(m => cards.find(c => c.dataset.m === m.id)).filter(Boolean).map(c => c.querySelector("b").textContent); };
     const shownDefault = St.shownSeason();
     const held = state.allBets.length, showing2026 = state.bets.length;
     const t2026 = totals();
@@ -1428,7 +1423,7 @@ test("the season seam: the book holds every season, the app shows one", { skip }
   assert.deepEqual(out.t2026, ["+$15", "−$25", "+$10"], "2026 totals, with 2027 nowhere in them");
   assert.equal(out.strangers.members, 0, "a season nobody has joined shows nobody");
   assert.equal(out.strangers.rows, undefined, "so there is no board to draw");
-  assert.deepEqual(out.t2027, ["−$50", "+$50"], "and once two of them join, 2027 on its own - Cara didn't, so she has no column");
+  assert.deepEqual(out.t2027, ["−$50", "+$50"], "and once two of them join, 2027 on its own - Cara didn't, so she has no card");
   assert.deepEqual(out.afterSave, { all: 4, shown: 2 },
     "a 2027 bet saved while looking at 2026 joins the book without appearing on screen");
   assert.deepEqual(out.afterDrop, { all: 3, shown: 2 }, "and deleting it removes it from the book, not just the view");

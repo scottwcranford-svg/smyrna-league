@@ -550,41 +550,6 @@ export function showBet(id){
   return true;
 }
 
-// The season in one table: a column per manager, a row per pool, net all season, paid or not.
-function seasonTable(L){
-  var HL=Ledger.hlTally(state.highlow,members(),Ledger.hlStake(seasonCfg()));
-  var cols=realMembers().filter(function(m){ return !m.test; });
-  if(!cols.length) return "";
-  if(phone()) return seasonTableByManager(L,HL,cols);
-  // league dues payouts, paid by the treasurer: a row of their own, and in the total
-  var DP=Sn.duesPayouts(state.config,Sn.shownSeasonOf(state)), dues=DP.places.length>0;
-  var val=function(m,row){ var p=L.pnl[m.id]||{}, h=HL.byId[m.id]||{}, d=DP.byId[m.id]||0;
-    return row==="hl"?(h.net||0):row==="weekly"?(p.weekly||0):row==="season"?(p.season||0):row==="dues"?d:(h.net||0)+(p.weekly||0)+(p.season||0)+d; };
-  var cell=function(v,total,m,row){ v=Math.round(v*100)/100;
-    return '<td class="num '+(v>0?"pos":v<0?"neg":"flat")+(total?" total":"")+'" data-act="drill" data-m="'+esc(m.id)+'" data-row="'+row+'" data-tip="What\u2019s behind this" tabindex="0">'+signed(v)+"</td>"; };
-  var rows=[["hl","Hi / low"],["weekly","Weekly bets"],["season","Season bets"]].concat(dues?[["dues","Dues payout"]]:[]).concat([["total","Total"]]);
-  return '<div class="pivot-wrap"><table class="pivot"><thead><tr><th></th>'+cols.map(function(m){
-      return '<th'+(m.id===state.me?' class="me"':"")+'><span class="pv-head">'+avatarHtml(m.id,22)+'<span>'+esc(m.name)+"</span></span></th>"; }).join("")+"</tr></thead><tbody>"+
-    rows.map(function(r){ var total=r[0]==="total";
-      return "<tr"+(total?' class="total"':"")+"><th>"+esc(r[1])+"</th>"+cols.map(function(m){ return cell(val(m,r[0]),total,m,r[0]); }).join("")+"</tr>"; }).join("")+
-    "</tbody></table></div>";
-}
-
-// The same table on a phone: a row per manager, the four pools across, so all ten fit.
-function seasonTableByManager(L,HL,cols){
-  // A phone has room for four numbers across; the Dues column joins once a place has a winner
-  // (until then it is all zeros), and the columns tighten to make room. It is in Total either way.
-  var DP=Sn.duesPayouts(state.config,Sn.shownSeasonOf(state)), dues=DP.decided;
-  var val=function(m,row){ var p=L.pnl[m.id]||{}, h=HL.byId[m.id]||{}, d=DP.byId[m.id]||0;
-    return row==="hl"?(h.net||0):row==="weekly"?(p.weekly||0):row==="season"?(p.season||0):row==="dues"?d:(h.net||0)+(p.weekly||0)+(p.season||0)+d; };
-  var pools=["hl","weekly","season"].concat(dues?["dues"]:[]).concat(["total"]);
-  var cell=function(m,row){ var v=Math.round(val(m,row)*100)/100;
-    return '<td class="num '+(v>0?"pos":v<0?"neg":"flat")+(row==="total"?" total":"")+'" data-act="drill" data-m="'+esc(m.id)+'" data-row="'+row+'" tabindex="0">'+signed(v)+"</td>"; };
-  return '<div class="pivot-wrap"><table class="pivot by-manager'+(dues?" five":"")+'"><thead><tr><th>Manager</th><th class="num">Hi/lo</th><th class="num">Weekly</th><th class="num">Season</th>'+(dues?'<th class="num">Dues</th>':"")+'<th class="num">Total</th></tr></thead><tbody>'+
-    cols.map(function(m){ return "<tr"+(m.id===state.me?' class="me"':"")+"><th>"+avatarHtml(m.id,20)+'<span>'+esc(m.name)+"</span></th>"+pools.map(function(r){ return cell(m,r); }).join("")+"</tr>"; }).join("")+
-    "</tbody></table></div>";
-}
-
 /* ---- badges: live titles ----
    rules.badges() works out who holds what from the book; league/badges remembers who
    held it before, which is what lets a card say "took it from JPorch". */
@@ -743,13 +708,15 @@ function rivalsView(){
   host.innerHTML=h;
 }
 
-// Settle Up: the season table, everyone's balance as it stands, the transfers that would
-// clear them, and the payments made so far. Nothing is paid bet by bet.
+// Settle Up: everyone's balance as it stands, card by card with what's behind it, the
+// transfers that would clear them, and the payments made so far. Nothing is paid bet by bet.
 function settle(){
   var L=computeLedger(), host=document.getElementById("settle");
   var B=Ledger.balances(seasonCfg(),state.bets,state.highlow,state.payments&&state.payments.list,Ledger.hlStake(seasonCfg()));
   var cols=realMembers().filter(function(m){ return !m.test; });
-  var h=seasonTable(L);
+  var HL=Ledger.hlTally(state.highlow,members(),Ledger.hlStake(seasonCfg()));
+  var DP=Sn.duesPayouts(state.config,Sn.shownSeasonOf(state));
+  var h="";
 
   // you, first
   if(state.me&&B.byId[state.me]){
@@ -760,12 +727,24 @@ function settle(){
         return d?'<span class="you-dues">plus <b class="pos">'+esc(money(d))+"</b> in dues payouts"+(DPm.treasurer?", from "+esc(mName(DPm.treasurer)):"")+"</span>":""; })()+"</div>";
   }
 
-  // everyone's balance, biggest first
-  var rows=cols.map(function(m){ return { m:m, b:B.byId[m.id]||{ bets:0, hl:0, net:0 } }; }).sort(function(a,b){ return (b.b.net-a.b.net)||a.m.name.localeCompare(b.m.name); });
-  h+='<div class="bal-head"><span class="lbl">Balances · if the season ended now</span><span class="note">Settled bets and hi / low, minus anything already paid.</span></div>'+
-    '<div class="balances">'+rows.map(function(r){ var n=r.b.net;
-      return '<div class="bal'+(r.m.id===state.me?" me":"")+'">'+avatarHtml(r.m.id,26)+'<span class="bal-name">'+esc(r.m.name)+"</span>"+
-        '<b class="'+(n>0?"pos":n<0?"neg":"flat")+'">'+esc(signed(n))+"</b><small>bets "+esc(signed(r.b.bets))+" · hi/low "+esc(signed(r.b.hl))+"</small></div>"; }).join("")+"</div>";
+  // everyone's balance, biggest first. The big number is what they're owed or owe other
+  // managers once payments so far are counted; under it, what it's made of, each piece
+  // opening the bets or weeks behind it. Dues payouts come from the treasurer, so they
+  // sit on the card but not in that number.
+  var cls=function(v){ return v>0?"pos":v<0?"neg":"flat"; };
+  var rows=cols.map(function(m){ return { m:m, b:B.byId[m.id]||{ bets:0, hl:0, net:0, paidOut:0, paidIn:0 } }; }).sort(function(a,b){ return (b.b.net-a.b.net)||a.m.name.localeCompare(b.m.name); });
+  h+='<div class="bal-head"><span class="lbl">Balances · if the season ended now</span><span class="note">Hi / low and settled bets, minus anything already paid. Tap a number for what’s behind it.</span></div>'+
+    '<div class="balances">'+rows.map(function(r){
+      var m=r.m, n=r.b.net, p=L.pnl[m.id]||{}, hl=(HL.byId[m.id]||{}).net||0, d=DP.byId[m.id]||0;
+      var piece=function(row,label,v){ v=Math.round(v*100)/100;
+        return '<button type="button" class="bal-ln" data-act="drill" data-m="'+esc(m.id)+'" data-row="'+row+'" data-tip="What’s behind this">'+esc(label)+' <span class="'+cls(v)+'">'+esc(signed(v))+"</span></button>"; };
+      var lines=piece("hl","hi/low",hl)+piece("weekly","weekly",p.weekly||0)+piece("season","season",p.season||0)+
+        (d?piece("dues","dues",d).replace('class="bal-ln"','class="bal-ln dues"'):"")+
+        (r.b.paidOut?'<span class="bal-ln moved">paid '+esc(money(r.b.paidOut))+"</span>":"")+
+        (r.b.paidIn?'<span class="bal-ln moved">received '+esc(money(r.b.paidIn))+"</span>":"");
+      return '<div class="bal'+(m.id===state.me?" me":"")+'" data-m="'+esc(m.id)+'">'+avatarHtml(m.id,26)+'<span class="bal-name">'+esc(m.name)+"</span>"+
+        '<b class="'+cls(n)+'" data-act="drill" data-m="'+esc(m.id)+'" data-row="total" data-tip="What’s behind this" tabindex="0">'+esc(signed(n))+"</b>"+
+        '<div class="bal-lines">'+lines+"</div></div>"; }).join("")+"</div>";
 
   // what would clear it
   var T=B.transfers;
@@ -844,7 +823,7 @@ function duesCard(){
   }
   var notes=[];
   if(places.length>1) notes.push("One manager can win a regular-season place and the playoff pool.");
-  if(places.length) notes.push("Payouts count in the season table’s total, but "+(set.treasurer?mName(set.treasurer)+" pays them":"they’re paid")+" from the dues, so they’re not in the manager-to-manager transfers.");
+  if(places.length) notes.push("Each winner’s payout shows on their balance card, but "+(set.treasurer?mName(set.treasurer)+" pays it":"it’s paid")+" from the dues, so it’s not in the manager-to-manager transfers.");
   if(pot&&places.length&&Math.round(out*100)!==Math.round(pot*100)) notes.push("Payouts come to "+money(out)+" of the "+money(pot)+" pot.");
   if(notes.length) h+='<p class="dues-note">'+esc(notes.join(" "))+"</p>";
   return h+"</div>";

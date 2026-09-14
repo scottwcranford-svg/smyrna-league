@@ -526,24 +526,8 @@ ol.rlist li.start{border-color:var(--rule-2)}
 .hl-side.high i{color:var(--win)} .hl-side.low i{color:var(--loss)}
 @media (max-width:640px){ .hl-row{grid-template-columns:auto 1fr} .hl-row .hl-side.low{grid-column:2} }
 
-/* ---- the season table in Settle Up: managers across, pools down ---- */
-.pivot-wrap{overflow-x:auto;margin-bottom:10px;background:var(--surface);border:1px solid var(--rule);border-radius:14px}
-.pivot{border-collapse:collapse;width:100%;min-width:640px;font-size:13px}
-.pivot th,.pivot td{padding:8px 10px;border-bottom:1px solid var(--rule);white-space:nowrap}
-.pivot thead th{font-size:11px;font-weight:800;letter-spacing:.04em;color:var(--ink-2);text-align:left;vertical-align:bottom}
-.pivot thead th.me{color:var(--accent)}
-.pivot thead th.me .pv-head{box-shadow:0 0 0 1px var(--accent);border-radius:99px}
-.pivot .pv-head{display:inline-flex;align-items:center;gap:6px;padding:2px 8px 2px 2px;max-width:150px}
-.pivot .pv-head span{overflow:hidden;text-overflow:ellipsis}
-.pivot tbody th{text-align:left;font-weight:700;color:var(--ink-2);font-size:12px;letter-spacing:.04em;text-transform:uppercase;position:sticky;left:0;background:var(--surface)}
-.pivot td.num{text-align:right;font-variant-numeric:tabular-nums;font-weight:700}
-.pivot td.pos{color:var(--win)} .pivot td.neg{color:var(--loss)} .pivot td.flat{color:var(--ink-3)}
-.pivot tr.total th,.pivot tr.total td{border-bottom:0;border-top:1px solid var(--rule-2);font-weight:800;font-size:14px}
-.pivot tr.total th{color:var(--ink)}
 
-/* ---- drill-through from the season table ---- */
-.pivot td[data-act="drill"]{cursor:pointer}
-.pivot td[data-act="drill"]:hover,.pivot td[data-act="drill"]:focus-visible{background:var(--surface-2);outline:none}
+/* ---- drill-through from a balance card ---- */
 #drillTitle{display:flex;align-items:center;gap:8px}
 #drillTitle .drill-row{font-weight:600;color:var(--ink-3)}
 .drill{display:flex;align-items:center;gap:11px;padding:10px 12px;border:1px solid var(--rule);border-radius:12px;background:var(--surface);margin-bottom:7px}
@@ -582,9 +566,8 @@ ol.rlist li.start{border-color:var(--rule-2)}
 .panel{background:var(--surface);border:1px solid var(--rule);border-radius:22px;padding:18px 18px 22px;margin-top:18px}
 .panel section{margin-top:22px}
 .panel .sec-head{margin-bottom:11px}
-.panel .ticket,.panel .seat,.panel .hl-row,.panel .hl-stand,.panel .debt,.panel .pivot-wrap,.panel .empty,.panel .glance,.panel .drill{background:var(--surface-3)}
+.panel .ticket,.panel .seat,.panel .hl-row,.panel .hl-stand,.panel .debt,.panel .empty,.panel .glance,.panel .drill{background:var(--surface-3)}
 .panel .gameline,.panel .btn:not(.gold):not(.pri):not(.danger){background:var(--surface-2)}
-.panel .pivot tbody th{background:var(--surface-3)}
 .tabs{display:flex;gap:10px;overflow-x:auto;padding-bottom:2px}
 .tab{flex:none;background:var(--accent-bg);color:var(--accent);border:1px solid transparent;border-radius:12px;padding:12px 18px;font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;cursor:pointer;display:inline-flex;align-items:center;gap:9px;font-family:"Poppins","Inter",system-ui,sans-serif}
 .tab svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
@@ -605,12 +588,17 @@ ol.rlist li.start{border-color:var(--rule-2)}
 .bal-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:14px 0 9px}
 .bal-head .note{font-size:12px;color:var(--ink-3)}
 .balances{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px}
-.bal{display:grid;grid-template-columns:auto 1fr auto;grid-template-areas:"av name net" "av sub net";column-gap:8px;align-items:center;background:var(--surface-3);border:1px solid var(--rule);border-radius:12px;padding:8px 11px}
+.bal{display:grid;grid-template-columns:auto 1fr auto;grid-template-areas:"av name net" "lines lines lines";column-gap:8px;row-gap:6px;align-items:center;background:var(--surface-3);border:1px solid var(--rule);border-radius:12px;padding:9px 11px}
 .bal.me{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
 .bal .avatar{grid-area:av}
 .bal .bal-name{grid-area:name;font-weight:700;font-size:12.5px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.bal small{grid-area:sub;font-size:10.5px;color:var(--ink-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
-.bal b{grid-area:net;font-size:15px;font-weight:800;font-variant-numeric:tabular-nums;padding-left:6px}
+.bal b{grid-area:net;font-size:15px;font-weight:800;font-variant-numeric:tabular-nums;padding-left:6px;cursor:pointer}
+.bal-lines{grid-area:lines;display:flex;flex-wrap:wrap;gap:4px}
+.bal-ln{font:inherit;font-size:11px;color:var(--ink-3);background:var(--surface-2);border:0;border-radius:6px;padding:2px 7px;white-space:nowrap}
+button.bal-ln{cursor:pointer} button.bal-ln:hover{color:var(--ink-2)}
+.bal-ln span{font-weight:700;font-variant-numeric:tabular-nums} .bal-ln .pos{color:var(--win)} .bal-ln .neg{color:var(--loss)} .bal-ln .flat{color:var(--ink-2)}
+.bal-ln.dues{background:var(--gold-bg);color:var(--gold)} .bal-ln.dues span{color:var(--gold)}
+.bal-ln.moved{background:transparent;border:1px dashed var(--rule-2)}
 .bal b.pos{color:var(--win)} .bal b.neg{color:var(--loss)} .bal b.flat{color:var(--ink-3)}
 .paylog{display:flex;flex-direction:column;gap:6px}
 /* Settle Up: the league dues pot, its treasurer and payouts */
@@ -879,17 +867,7 @@ ol.rlist li.start{border-color:var(--rule-2)}
   .hl-standings{grid-template-columns:1fr;gap:6px}
   .hl-row{grid-template-columns:auto 1fr;row-gap:6px}
   .hl-side.low{grid-column:2}
-  /* Settle Up: the table by manager, balances and payments as rows */
-  .pivot{min-width:0;font-size:12.5px}
-  .pivot th,.pivot td{padding:8px 7px}
-  .pivot.by-manager thead th.num{text-align:right}
-  .pivot.by-manager tbody th{text-transform:none;letter-spacing:0;font-size:12.5px;color:var(--ink);display:flex;align-items:center;gap:6px;border-bottom:0}
-  .pivot.by-manager tbody th span{overflow:hidden;text-overflow:ellipsis}
-  .pivot.by-manager tr.me td,.pivot.by-manager tr.me th{background:var(--accent-bg)}
-  .pivot.by-manager td.total{font-weight:800;color:var(--ink)}
-  .pivot.by-manager.five th,.pivot.by-manager.five td{padding:8px 3px;font-size:11px}
-  .pivot.by-manager.five tbody th .avatar{display:none}
-  .pivot.by-manager.five tbody th span{max-width:74px}
+  /* Settle Up: balances and payments as rows */
   .balances{grid-template-columns:1fr;gap:6px}
   .debt{padding:9px 11px;gap:8px}
   .debt-txt{font-size:13px}
