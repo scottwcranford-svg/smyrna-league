@@ -486,9 +486,9 @@ test("Settle Up: a balance card per manager with hi/low, weekly, season and what
   });
   assert.equal(out.table, false, "no season table: the cards carry it");
   assert.deepEqual(out.lines, [
-    ["hi/low +$5:pos", "weekly $0:flat", "season −$25:neg", "paid $25"],
-    ["hi/low −$5:neg", "weekly +$10:pos", "season $0:flat"],
-    ["hi/low $0:flat", "weekly −$10:neg", "season +$25:pos", "received $25"]], "each card: what its number is made of, and what's already changed hands");
+    ["hi/low +$5:pos", "side bets −$25:neg", "paid $25"],
+    ["hi/low −$5:neg", "side bets +$10:pos"],
+    ["hi/low $0:flat", "side bets +$15:pos", "received $25"]], "each card: what its number is made of, and what's already changed hands");
   assert.match(out.you, /You.re down \$10/, "Alice: +25 on the season bet, already paid by Bob, −10 on the weekly one");
   assert.deepEqual(out.balances, [["Bob", "+$5", false], ["Cara", "+$5", false], ["Alice", "−$10", true]], "balances, biggest first: the paid season bet already netted, week-1 high and low folded in");
   assert.deepEqual(out.transfers, [["Alice→Bob", "$5"], ["Alice→Cara", "$5"]], "two transfers clear it");
@@ -862,7 +862,7 @@ test("phone: tabs sit in a bar at the bottom, Propose floats, tickets fold and o
   assert.equal(out.doneOpen, true, "a tap anywhere on a folded ticket opens it");
   assert.deepEqual(out.seat, { grid: "grid", propHidden: "none", picks: "none" }, "ledger rows hide empty proposed/cancelled and the bet names");
   assert.equal(out.seatOpen, "block");
-  assert.deepEqual(out.cards, { count: 3, oneColumn: true, fits: true, pieces: 9, scrollsSideways: false }, "Settle Up on a phone: a card a row, each piece tappable, nothing off the side");
+  assert.deepEqual(out.cards, { count: 3, oneColumn: true, fits: true, pieces: 6, scrollsSideways: false }, "Settle Up on a phone: a card a row, each piece tappable, nothing off the side");
   assert.deepEqual(out.dialog, { w: 390, sticky: "sticky" }, "dialogs fill the screen with the buttons pinned");
   assert.deepEqual(errors, []);
   await p.close();

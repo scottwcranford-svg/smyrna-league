@@ -117,7 +117,7 @@ export function openDrill(memberId,row){
     // first, in place order: 1st, 2nd, 3rd, playoffs
     rows=DP.places.filter(function(pl){ return pl.winner===memberId; }).map(function(pl){ return { kind:"dues", week:0, label:"League dues · "+pl.label, note:DP.treasurer?"paid by "+mName(DP.treasurer):"paid from the dues", amount:pl.amount }; }).concat(rows);
   }
-  var title={ hl:"Hi / low", weekly:"Weekly bets", season:"Season bets", dues:"Dues payouts", total:"Everything" }[row]||row;
+  var title={ hl:"Hi / low", weekly:"Weekly bets", season:"Season bets", bets:"Side bets", dues:"Dues payouts", total:"Everything" }[row]||row;
   var net=rows.reduce(function(s,r){ return s+r.amount; },0);
   document.getElementById("drillTitle").innerHTML=avatarHtml(m.id,24)+" "+esc(m.name)+' <span class="drill-row">· '+esc(title)+"</span>";
   document.getElementById("drillList").innerHTML=rows.length?rows.map(function(r){

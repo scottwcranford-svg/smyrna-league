@@ -738,7 +738,8 @@ function settle(){
       var m=r.m, n=r.b.net, p=L.pnl[m.id]||{}, hl=(HL.byId[m.id]||{}).net||0, d=DP.byId[m.id]||0;
       var piece=function(row,label,v){ v=Math.round(v*100)/100;
         return '<button type="button" class="bal-ln" data-act="drill" data-m="'+esc(m.id)+'" data-row="'+row+'" data-tip="What’s behind this">'+esc(label)+' <span class="'+cls(v)+'">'+esc(signed(v))+"</span></button>"; };
-      var lines=piece("hl","hi/low",hl)+piece("weekly","weekly",p.weekly||0)+piece("season","season",p.season||0)+
+      // three pieces: hi/low, side bets (weekly and season together; tapping lists both), dues
+      var lines=piece("hl","hi/low",hl)+piece("bets","side bets",(p.weekly||0)+(p.season||0))+
         // once the season has payouts, every card shows its dues piece: $0 until a place is won, then gold
         (DP.places.length?(d?piece("dues","dues",d).replace('class="bal-ln"','class="bal-ln dues"'):piece("dues","dues",0)):"")+
         (r.b.paidOut?'<span class="bal-ln moved">paid '+esc(money(r.b.paidOut))+"</span>":"")+

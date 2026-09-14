@@ -121,3 +121,13 @@ test("footprintText reads as a sentence, however many kinds there are", () => {
   assert.equal(Ledger.footprintText({ bets: 0, payments: 0, weeks: 1 }), "1 hi/low week");
   assert.equal(Ledger.footprintText({ bets: 0, payments: 0, weeks: 0 }), "");
 });
+
+test("drillRows: the side bets row lists weekly and season bets together, no hi/low", () => {
+  const members = [{ id: "a", name: "A" }, { id: "b", name: "B" }];
+  const bets = [
+    { id: "s", status: "settled", week: 0, amount: 25, winner: "a", entries: [{ memberId: "a" }, { memberId: "b" }] },
+    { id: "w", status: "settled", week: 2, amount: 10, winner: "b", entries: [{ memberId: "a" }, { memberId: "b" }] }];
+  const highlow = { weeks: { "1": { high: [{ id: "a", pts: 150 }], low: [{ id: "b", pts: 80 }] } } };
+  const rows = Ledger.drillRows("a", "bets", bets, highlow, 10, members);
+  assert.deepEqual(rows.map(r => [r.kind, r.id, r.amount]), [["bet", "w", -10], ["bet", "s", 25]]);
+});
