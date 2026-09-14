@@ -540,11 +540,13 @@ function seasonTable(L){
   var cols=realMembers().filter(function(m){ return !m.test; });
   if(!cols.length) return "";
   if(phone()) return seasonTableByManager(L,HL,cols);
-  var val=function(m,row){ var p=L.pnl[m.id]||{}, h=HL.byId[m.id]||{};
-    return row==="hl"?(h.net||0):row==="weekly"?(p.weekly||0):row==="season"?(p.season||0):(h.net||0)+(p.weekly||0)+(p.season||0); };
+  // league dues payouts, paid by the treasurer: a row of their own, and in the total
+  var DP=Sn.duesPayouts(state.config,Sn.shownSeasonOf(state)), dues=DP.places.length>0;
+  var val=function(m,row){ var p=L.pnl[m.id]||{}, h=HL.byId[m.id]||{}, d=DP.byId[m.id]||0;
+    return row==="hl"?(h.net||0):row==="weekly"?(p.weekly||0):row==="season"?(p.season||0):row==="dues"?d:(h.net||0)+(p.weekly||0)+(p.season||0)+d; };
   var cell=function(v,total,m,row){ v=Math.round(v*100)/100;
     return '<td class="num '+(v>0?"pos":v<0?"neg":"flat")+(total?" total":"")+'" data-act="drill" data-m="'+esc(m.id)+'" data-row="'+row+'" data-tip="What\u2019s behind this" tabindex="0">'+signed(v)+"</td>"; };
-  var rows=[["hl","Hi / low"],["weekly","Weekly bets"],["season","Season bets"],["total","Total"]];
+  var rows=[["hl","Hi / low"],["weekly","Weekly bets"],["season","Season bets"]].concat(dues?[["dues","Dues payout"]]:[]).concat([["total","Total"]]);
   return '<div class="pivot-wrap"><table class="pivot"><thead><tr><th></th>'+cols.map(function(m){
       return '<th'+(m.id===state.me?' class="me"':"")+'><span class="pv-head">'+avatarHtml(m.id,22)+'<span>'+esc(m.name)+"</span></span></th>"; }).join("")+"</tr></thead><tbody>"+
     rows.map(function(r){ var total=r[0]==="total";
@@ -554,12 +556,14 @@ function seasonTable(L){
 
 // The same table on a phone: a row per manager, the four pools across, so all ten fit.
 function seasonTableByManager(L,HL,cols){
-  var val=function(m,row){ var p=L.pnl[m.id]||{}, h=HL.byId[m.id]||{};
-    return row==="hl"?(h.net||0):row==="weekly"?(p.weekly||0):row==="season"?(p.season||0):(h.net||0)+(p.weekly||0)+(p.season||0); };
+  var DP=Sn.duesPayouts(state.config,Sn.shownSeasonOf(state)), dues=DP.places.length>0;
+  var val=function(m,row){ var p=L.pnl[m.id]||{}, h=HL.byId[m.id]||{}, d=DP.byId[m.id]||0;
+    return row==="hl"?(h.net||0):row==="weekly"?(p.weekly||0):row==="season"?(p.season||0):row==="dues"?d:(h.net||0)+(p.weekly||0)+(p.season||0)+d; };
+  var pools=["hl","weekly","season"].concat(dues?["dues"]:[]).concat(["total"]);
   var cell=function(m,row){ var v=Math.round(val(m,row)*100)/100;
     return '<td class="num '+(v>0?"pos":v<0?"neg":"flat")+(row==="total"?" total":"")+'" data-act="drill" data-m="'+esc(m.id)+'" data-row="'+row+'" tabindex="0">'+signed(v)+"</td>"; };
-  return '<div class="pivot-wrap"><table class="pivot by-manager"><thead><tr><th>Manager</th><th class="num">Hi/lo</th><th class="num">Weekly</th><th class="num">Season</th><th class="num">Total</th></tr></thead><tbody>'+
-    cols.map(function(m){ return "<tr"+(m.id===state.me?' class="me"':"")+"><th>"+avatarHtml(m.id,20)+'<span>'+esc(m.name)+"</span></th>"+["hl","weekly","season","total"].map(function(r){ return cell(m,r); }).join("")+"</tr>"; }).join("")+
+  return '<div class="pivot-wrap"><table class="pivot by-manager"><thead><tr><th>Manager</th><th class="num">Hi/lo</th><th class="num">Weekly</th><th class="num">Season</th>'+(dues?'<th class="num">Dues</th>':"")+'<th class="num">Total</th></tr></thead><tbody>'+
+    cols.map(function(m){ return "<tr"+(m.id===state.me?' class="me"':"")+"><th>"+avatarHtml(m.id,20)+'<span>'+esc(m.name)+"</span></th>"+pools.map(function(r){ return cell(m,r); }).join("")+"</tr>"; }).join("")+
     "</tbody></table></div>";
 }
 
@@ -733,7 +737,9 @@ function settle(){
   if(state.me&&B.byId[state.me]){
     var me=B.byId[state.me], n=me.net;
     h+='<div class="you-line"><b class="'+(n>0?"pos":n<0?"neg":"flat")+'">'+(n>0?"You\u2019re up "+money(n):n<0?"You\u2019re down "+money(-n):"You\u2019re square")+"</b>"+
-      '<span>bets '+esc(signed(me.bets))+" · hi / low "+esc(signed(me.hl))+(me.paidOut||me.paidIn?" · paid "+esc(money(me.paidOut))+", received "+esc(money(me.paidIn)):"")+"</span></div>";
+      '<span>bets '+esc(signed(me.bets))+" · hi / low "+esc(signed(me.hl))+(me.paidOut||me.paidIn?" · paid "+esc(money(me.paidOut))+", received "+esc(money(me.paidIn)):"")+"</span>"+
+      (function(){ var DPm=Sn.duesPayouts(state.config,Sn.shownSeasonOf(state)), d=DPm.byId[state.me];
+        return d?'<span class="you-dues">plus <b class="pos">'+esc(money(d))+"</b> in dues payouts"+(DPm.treasurer?", from "+esc(mName(DPm.treasurer)):"")+"</span>":""; })()+"</div>";
   }
 
   // everyone's balance, biggest first
@@ -752,6 +758,8 @@ function settle(){
       '<div class="debt-amt num">'+esc(money(d.amount))+"</div>"+
       (state.me?'<button class="btn" data-act="pay" data-from="'+esc(d.from)+'" data-to="'+esc(d.to)+'" data-amount="'+d.amount+'">Mark paid</button>':"")+"</div>"; }).join("")+"</div>";
 
+  h+=duesCard();
+
   // paid so far
   var paid=B.payments.filter(function(p){ return !p.voided; }).sort(function(a,b){ return String(b.at||"").localeCompare(String(a.at||"")); });
   if(paid.length) h+='<div class="bal-head" style="margin-top:16px"><span class="lbl">Paid so far · '+paid.length+"</span></div>"+'<div class="paylog">'+paid.map(function(p){
@@ -760,6 +768,40 @@ function settle(){
       '<b class="num">'+esc(money(p.amount))+"</b>"+
       (state.admin&&!p.legacy?'<button class="btn" data-act="unpay" data-id="'+esc(p.id)+'" data-tip="Admin: undo this payment">Undo</button>':"")+"</div>"; }).join("")+"</div>";
   host.innerHTML=h;
+}
+
+// League dues on Settle Up: a pot of its own, apart from the side bets above. Who holds it
+// and pays it out, what each place gets, and how much is in. Nothing until an admin has
+// set an amount or the payouts in the League dialog.
+function duesCard(){
+  var season=Sn.shownSeasonOf(state), set=Sn.settingsFor(state.config,season), tally=Sn.duesTally(state.config,season);
+  var po=set.payouts||{}, places=Sn.PAYOUT_PLACES.filter(function(pl){ return po[pl[0]]; }), DP=Sn.duesPayouts(state.config,season);
+  var winnerOf=function(k){ var hit=DP.places.filter(function(x){ return x.place===k; })[0]; return hit?hit.winner:null; };
+  var league=realMembers().filter(function(m){ return !m.test; });
+  if(!set.dues&&!places.length) return "";
+  var pot=set.dues?set.dues*tally.of:0, out=places.reduce(function(s,pl){ return s+po[pl[0]]; },0);
+  var h='<div class="bal-head" style="margin-top:22px"><span class="lbl">'+esc(season)+" league dues</span>"+
+    '<span class="note">Separate from the side bets above.'+(set.treasurer?" Paid out by the treasurer at the end of the season.":"")+"</span></div>";
+  h+='<div class="dues-card">';
+  h+='<div class="dues-top">'+
+    (set.treasurer?'<span class="dues-who">'+avatarHtml(set.treasurer,26)+"<span><b>"+esc(mName(set.treasurer))+"</b><small>Treasurer · holds the dues and pays them out</small></span></span>":"")+
+    (pot?'<span class="dues-pot"><b class="num">'+esc(money(pot))+'</b><small>'+esc(money(set.dues))+" × "+tally.of+" · "+(tally.paid===tally.of?"all paid":tally.paid+" of "+tally.of+" paid")+"</small></span>":"")+
+  "</div>";
+  // Each place: what it pays and who took it. An admin picks the winner once it's decided;
+  // everyone else sees the name, or that it's still to come.
+  if(places.length) h+='<div class="dues-places">'+places.map(function(pl){
+    var w=winnerOf(pl[0]);
+    var who=state.admin
+      ? '<select class="field dues-win" data-act="payWinner" data-place="'+pl[0]+'" aria-label="'+esc(pl[1])+' winner"><option value="">Not decided</option>'+
+          league.map(function(m){ return '<option value="'+esc(m.id)+'"'+(m.id===w?" selected":"")+">"+esc(m.name)+"</option>"; }).join("")+"</select>"
+      : (w?'<span class="dues-winner">'+avatarHtml(w,20)+esc(mName(w))+"</span>":'<span class="dues-tbd">decided at season’s end</span>');
+    return '<div class="dues-place"><span class="dues-lab">'+esc(pl[1])+"</span>"+who+'<b class="num">'+esc(money(po[pl[0]]))+"</b></div>"; }).join("")+"</div>";
+  var notes=[];
+  if(places.length>1) notes.push("One manager can win a regular-season place and the playoff pool.");
+  if(places.length) notes.push("Payouts count in the season table’s total, but "+(set.treasurer?mName(set.treasurer)+" pays them":"they’re paid")+" from the dues, so they’re not in the manager-to-manager transfers.");
+  if(pot&&places.length&&Math.round(out*100)!==Math.round(pot*100)) notes.push("Payouts come to "+money(out)+" of the "+money(pot)+" pot.");
+  if(notes.length) h+='<p class="dues-note">'+esc(notes.join(" "))+"</p>";
+  return h+"</div>";
 }
 
 function filters(){

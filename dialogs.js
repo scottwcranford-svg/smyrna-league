@@ -89,6 +89,15 @@ export function openRoster(){
   document.getElementById("rDuesLbl").textContent=shownSeason()+" league dues";
   document.getElementById("rDuesAmt").value=dues?String(dues):"";
   ["rName","rStake","rKickoff","rDuesAmt"].forEach(function(id){ document.getElementById(id).disabled=!adm; });
+  // who holds the dues and what each place is paid, for the season on screen
+  var set=Sn.settingsFor(state.config,shownSeason()), po=set.payouts||{};
+  document.getElementById("rPayLbl").textContent=shownSeason()+" dues payouts";
+  document.getElementById("rPayouts").innerHTML=
+    '<label class="f"><span>Treasurer · pays them out</span><select class="field" id="rTreasurer"'+(adm?"":" disabled")+'><option value="">Nobody set</option>'+
+      realMembers().filter(function(m){ return !m.test; }).map(function(m){ return '<option value="'+esc(m.id)+'"'+(m.id===set.treasurer?" selected":"")+">"+esc(m.name)+"</option>"; }).join("")+"</select></label>"+
+    Sn.PAYOUT_PLACES.map(function(pl){
+      return '<label class="f"><span>'+esc(pl[1])+'</span><span class="money-in"><span class="sig">$</span><input class="field num" data-payout="'+pl[0]+'" inputmode="decimal" value="'+(po[pl[0]]?esc(String(po[pl[0]])):"")+'"'+(adm?"":" disabled")+"></span></label>";
+    }).join("");
   document.getElementById("rSeason").disabled=true;   // shown, never typed into - see Start a season
   document.getElementById("rAddRow").hidden=!adm;
   document.getElementById("rAdd").hidden=!adm;
@@ -102,8 +111,13 @@ export function openRoster(){
 // Drill-through from the season table: the bets or hi / low weeks behind one cell.
 export function openDrill(memberId,row){
   var m=member(memberId); if(!m) return;
-  var rows=Ledger.drillRows(memberId,row,state.bets,state.highlow,Ledger.hlStake(seasonCfg()),members());
-  var title={ hl:"Hi / low", weekly:"Weekly bets", season:"Season bets", total:"Everything" }[row]||row;
+  var rows=row==="dues"?[]:Ledger.drillRows(memberId,row,state.bets,state.highlow,Ledger.hlStake(seasonCfg()),members());
+  if(row==="dues"||row==="total"){
+    var DP=Sn.duesPayouts(state.config,shownSeason());
+    // first, in place order: 1st, 2nd, 3rd, playoffs
+    rows=DP.places.filter(function(pl){ return pl.winner===memberId; }).map(function(pl){ return { kind:"dues", week:0, label:"League dues · "+pl.label, note:DP.treasurer?"paid by "+mName(DP.treasurer):"paid from the dues", amount:pl.amount }; }).concat(rows);
+  }
+  var title={ hl:"Hi / low", weekly:"Weekly bets", season:"Season bets", dues:"Dues payouts", total:"Everything" }[row]||row;
   var net=rows.reduce(function(s,r){ return s+r.amount; },0);
   document.getElementById("drillTitle").innerHTML=avatarHtml(m.id,24)+" "+esc(m.name)+' <span class="drill-row">· '+esc(title)+"</span>";
   document.getElementById("drillList").innerHTML=rows.length?rows.map(function(r){

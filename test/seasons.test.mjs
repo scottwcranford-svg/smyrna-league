@@ -125,3 +125,25 @@ test("league dues amount: per season, cleared by blank or zero", () => {
   S.setDuesAmount(config, "2026", ""); assert.equal("dues" in config.bySeason["2026"], false);
   S.setDuesAmount(config, "2027", 150.456); assert.equal(config.bySeason["2027"].dues, 150.46); assert.equal(config.bySeason["2027"].leagueId, "L27");
 });
+
+test("dues payouts: the treasurer, what each place pays, who won it, per season", () => {
+  const config = { season: "2026", members: [{ id: "a" }, { id: "b" }, { id: "c" }], bySeason: { "2025": { payouts: { reg1: 500 } } } };
+  S.setPayouts(config, "2026", "c", { reg1: "800", reg2: "400", reg3: "200", champ: "600" });
+  assert.deepEqual(config.bySeason["2026"], { treasurer: "c", payouts: { reg1: 800, reg2: 400, reg3: 200, champ: 600 } });
+  assert.equal(S.settingsFor(config, "2026").treasurer, "c");
+  let D = S.duesPayouts(config, "2026");
+  assert.deepEqual(D.places.map(p => [p.place, p.amount, p.winner]), [["reg1", 800, null], ["reg2", 400, null], ["reg3", 200, null], ["champ", 600, null]]);
+  assert.equal(D.decided, false); assert.deepEqual(D.byId, {});
+  S.setPayoutWinner(config, "2026", "reg1", "a"); S.setPayoutWinner(config, "2026", "champ", "a"); S.setPayoutWinner(config, "2026", "reg2", "b");
+  D = S.duesPayouts(config, "2026");
+  assert.deepEqual(D.byId, { a: 1400, b: 400 }, "one manager can take a regular-season place and the playoffs");
+  S.setPayoutWinner(config, "2026", "reg2", null);
+  assert.deepEqual(S.duesPayouts(config, "2026").byId, { a: 1400 }, "and a place can be cleared");
+  S.setPayouts(config, "2026", "c", { reg1: "900", reg2: "", reg3: "200", champ: "600" });
+  D = S.duesPayouts(config, "2026");
+  assert.deepEqual(D.places.map(p => p.place), ["reg1", "reg3", "champ"], "a blank place is dropped");
+  assert.deepEqual(D.byId, { a: 1500 }, "a changed amount follows through to the winner; the winners are kept");
+  assert.deepEqual(S.duesPayouts(config, "2025").places.map(p => [p.place, p.amount]), [["reg1", 500]], "another season keeps its own");
+  S.setPayouts(config, "2026", "", {});
+  assert.equal("treasurer" in config.bySeason["2026"], false); assert.equal("payouts" in config.bySeason["2026"], false);
+});

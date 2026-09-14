@@ -685,6 +685,57 @@ test("how it's scored: on every ticket, live in the propose form, and in the Joi
   await p.close();
 });
 
+test("dues payouts: set in the League dialog; on Settle Up the treasurer, the places and their winners, and a Dues row in the season table", { skip }, async () => {
+  const { p, errors } = await page();
+  const out = await p.evaluate(async () => {
+    const { state } = await import("./state.js?v=dev"); const D = await import("./dialogs.js?v=dev"); const V = await import("./render.js?v=dev");
+    state.config.members = [{ id: "a", name: "Alice" }, { id: "b", name: "Bob" }, { id: "c", name: "Cara" }];
+    state.config.bySeason = { "2026": { dues: 200, duesPaid: { a: { at: "x" }, b: { at: "x" }, c: { at: "x" } } } };
+    const res = {};
+    // the League dialog: an admin sets the treasurer and the four places
+    state.admin = true; D.openRoster();
+    res.fields = [...document.querySelectorAll("#rPayouts label > span:first-child")].map(s => s.textContent);
+    document.getElementById("rTreasurer").value = "c";
+    const set = (k, v) => { document.querySelector('#rPayouts [data-payout="' + k + '"]').value = v; };
+    set("reg1", "300"); set("reg2", "150"); set("reg3", "50"); set("champ", "100");
+    document.getElementById("rSave").click();
+    res.saved = state.config.bySeason["2026"];
+    // Settle Up, as an admin: pick winners
+    state.tab = "settle"; V.render();
+    const card = () => document.querySelector("#settle .dues-card");
+    res.cardTop = card().querySelector(".dues-top").textContent;
+    const pick = (place, id) => { const s = card().querySelector('select[data-place="' + place + '"]'); s.value = id; s.dispatchEvent(new Event("change", { bubbles: true })); };
+    state.local = false; pick("reg1", "a"); pick("champ", "a"); pick("reg2", "b"); state.local = true;   // past the preview guard; there is no db to write to
+    res.winners = Object.assign({}, state.config.bySeason["2026"].payoutWinners);
+    // everyone else: names, not selects
+    state.admin = false; state.me = "a"; V.render();
+    res.places = [...card().querySelectorAll(".dues-place")].map(r => [r.querySelector(".dues-lab").textContent, (r.querySelector(".dues-winner, .dues-tbd") || {}).lastChild.textContent, r.querySelector("b").textContent, !!r.querySelector("select")]);
+    res.note = card().querySelector(".dues-note").textContent;
+    res.table = [...document.querySelectorAll("#settle table.pivot tbody tr")].map(tr => [tr.querySelector("th").textContent, [...tr.querySelectorAll("td")].map(td => td.textContent)]);
+    res.you = (document.querySelector("#settle .you-dues") || {}).textContent;
+    res.transfers = [...document.querySelectorAll("#settle .debt")].length;
+    // the drill-through behind Alice's dues cell
+    document.querySelector('#settle td[data-m="a"][data-row="dues"]').click();
+    res.drill = [...document.querySelectorAll("#drillList .drill")].map(d => d.querySelector("b").textContent + " | " + d.querySelector("small").textContent + " | " + d.querySelector(".num").textContent);
+    document.getElementById("drillDlg").close();
+    return res;
+  });
+  assert.deepEqual(out.fields, ["Treasurer · pays them out", "Regular season · 1st", "Regular season · 2nd", "Regular season · 3rd", "Playoff champion"]);
+  assert.deepEqual({ treasurer: out.saved.treasurer, payouts: out.saved.payouts }, { treasurer: "c", payouts: { reg1: 300, reg2: 150, reg3: 50, champ: 100 } });
+  assert.match(out.cardTop, /Cara.*Treasurer · holds the dues and pays them out.*\$600.*\$200 × 3 · all paid/);
+  assert.deepEqual(out.winners, { reg1: "a", champ: "a", reg2: "b" });
+  assert.deepEqual(out.places, [["Regular season · 1st", "Alice", "$300", false], ["Regular season · 2nd", "Bob", "$150", false], ["Regular season · 3rd", "decided at season’s end", "$50", false], ["Playoff champion", "Alice", "$100", false]]);
+  assert.match(out.note, /One manager can win a regular-season place and the playoff pool\..*Cara pays them from the dues/);
+  assert.deepEqual(out.table.map(r => r[0]), ["Hi / low", "Weekly bets", "Season bets", "Dues payout", "Total"]);
+  assert.deepEqual(out.table[3][1], ["+$400", "+$150", "$0"], "Alice took 1st and the playoffs, Bob 2nd");
+  assert.deepEqual(out.table[4][1], ["+$400", "+$150", "$0"], "and it's in the total");
+  assert.match(out.you, /plus \$400 in dues payouts, from Cara/);
+  assert.equal(out.transfers, 0, "dues aren't a manager-to-manager transfer");
+  assert.deepEqual(out.drill, ["League dues · Regular season · 1st | paid by Cara | +$300", "League dues · Playoff champion | paid by Cara | +$100"]);
+  assert.deepEqual(errors, []);
+  await p.close();
+});
+
 test("notifications: the menu button says where they stand; the nudge shows once and takes 'not now'", { skip }, async () => {
   const { p, errors } = await page();
   const out = await p.evaluate(async () => {

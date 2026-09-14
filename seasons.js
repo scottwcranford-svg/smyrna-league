@@ -73,7 +73,9 @@ export function settingsFor(config,season){
     stake:per.stake!=null?per.stake:(config&&config.stake),
     kickoff:per.kickoff||(config&&config.kickoff),
     weekStarts:per.weekStarts||(config&&config.weekStarts)||null,
-    dues:per.dues!=null?Number(per.dues):null   // league dues per manager; seasons before it have none
+    dues:per.dues!=null?Number(per.dues):null,   // league dues per manager; seasons before it have none
+    treasurer:per.treasurer||null,               // the manager who holds the dues and pays them out
+    payouts:per.payouts||null                    // { reg1, reg2, reg3, champ }: what each place is paid
   };
 }
 
@@ -93,6 +95,46 @@ export function setDuesAmount(config,season,amount){
   var per=config.bySeason[s]=Object.assign({},config.bySeason[s]||{});
   if(n>0) per.dues=n; else delete per.dues;
   return config;
+}
+// Where the dues go at the end of a season. The places are fixed; the amounts are the
+// season's own, and one manager can take a regular-season place and the playoffs both.
+export const PAYOUT_PLACES=[["reg1","Regular season · 1st"],["reg2","Regular season · 2nd"],["reg3","Regular season · 3rd"],["champ","Playoff champion"]];
+// Set who holds the dues and what each place pays, in place. A blank amount leaves the
+// place out; no treasurer clears it. Returns the config.
+export function setPayouts(config,season,treasurer,amounts){
+  var s=String(season);
+  config.bySeason=config.bySeason||{};
+  var per=config.bySeason[s]=Object.assign({},config.bySeason[s]||{});
+  if(treasurer) per.treasurer=String(treasurer); else delete per.treasurer;
+  var out={}, any=false;
+  PAYOUT_PLACES.forEach(function(pl){
+    var n=Math.round((Number(amounts&&amounts[pl[0]])||0)*100)/100;
+    if(n>0){ out[pl[0]]=n; any=true; }
+  });
+  if(any) per.payouts=out; else delete per.payouts;
+  return config;
+}
+// Who won each paid place, set by an admin once it's decided:
+// bySeason[season].payoutWinners = { reg1: memberId, ... }. Null clears a place.
+export function setPayoutWinner(config,season,place,memberId){
+  var s=String(season);
+  config.bySeason=config.bySeason||{};
+  var per=config.bySeason[s]=Object.assign({},config.bySeason[s]||{});
+  per.payoutWinners=Object.assign({},per.payoutWinners||{});
+  per.payoutWinners[place]=memberId||null;
+  return config;
+}
+// The season's dues payouts as they stand: every paid place with its winner (or null), and
+// what each manager is owed by the treasurer. A manager can hold several places.
+export function duesPayouts(config,season){
+  var per=(config&&config.bySeason&&config.bySeason[String(season)])||{};
+  var po=per.payouts||{}, won=per.payoutWinners||{}, byId={}, any=false;
+  var places=PAYOUT_PLACES.filter(function(pl){ return po[pl[0]]; }).map(function(pl){
+    var who=won[pl[0]]||null;
+    if(who){ byId[who]=Math.round(((byId[who]||0)+Number(po[pl[0]]))*100)/100; any=true; }
+    return { place:pl[0], label:pl[1], amount:Number(po[pl[0]]), winner:who };
+  });
+  return { places:places, byId:byId, decided:any, treasurer:per.treasurer||null };
 }
 // Mark a manager paid or unpaid for a season, in place. Unpaid is written as null rather
 // than removed, so the same change can go to Firestore as a merge. Returns the config.

@@ -160,6 +160,7 @@ const CHANGES = {
     toast(t.checked?mm.name+" is an admin":mm.name+" is no longer an admin");
   },
   week:function(t){ state.filter.week=t.value; touch(); },
+  payWinner:function(t){ B.savePayoutWinner(shownSeason(),attr(t,"data-place"),t.value||null); },
   // the picker's filters
   dTeam:function(t){ state.draftTeam=t.value; F.refilter(); },
   dPos:function(t){ state.draftPos=t.value; F.refilter(); },
@@ -227,6 +228,8 @@ function saveLeague(){
   if(!isNaN(ko)) state.config.kickoff=ko.toISOString();
   // the dues amount is the shown season's; blank clears it
   Sn.setDuesAmount(state.config,shownSeason(),document.getElementById("rDuesAmt").value);
+  var amounts={}; document.querySelectorAll("#rPayouts [data-payout]").forEach(function(i){ amounts[i.getAttribute("data-payout")]=i.value; });
+  Sn.setPayouts(state.config,shownSeason(),document.getElementById("rTreasurer").value,amounts);
   B.saveConfig();
   document.getElementById("rosterDlg").close();
   toast("League saved");

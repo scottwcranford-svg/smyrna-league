@@ -68,6 +68,20 @@ export function saveDues(season,memberId,paid){
   state.db.doc("league/config").update({ bySeason:per }).catch(function(e){ toast(dbMsg(e)); });
 }
 
+// Who won one paid place. Same narrow merge as saveDues, so it can't clobber anything else.
+export function savePayoutWinner(season,place,memberId){
+  if(!guard()) return;
+  if(!state.admin) return toast("Only the admin can do that");
+  Sn.setPayoutWinner(state.config,season,place,memberId);
+  touch();
+  if(state.db&&!state.local){
+    var won={}; won[place]=memberId||null;
+    var per={}; per[String(season)]={ payoutWinners:won };
+    state.db.doc("league/config").update({ bySeason:per }).catch(function(e){ toast(dbMsg(e)); });
+  }
+  toast(memberId?mName(memberId)+" takes "+(Sn.PAYOUT_PLACES.filter(function(pl){ return pl[0]===place; })[0]||[,""])[1]:"Place cleared");
+}
+
 // A bet still waiting on a seat when its lock hits is cancelled — nobody should be
 // able to jump in after kickoff. Whichever open page notices first writes it; the
 // write is a merge and idempotent, so two pages noticing at once is harmless.
