@@ -156,7 +156,11 @@ let browser; const errors = [], checks = {};
 
   // change-password dialog opens and closes
   // the Ledger tab shows the board and hides the book; a reload remembers it
-  await page.click('#tabs .tab[data-tab="ledger"]');
+  // the Ledger lives under Money now, as a sub-tab
+  await page.click('#tabs .tab[data-tab="money"]');
+  await page.waitForSelector('#subTabs [data-tab="ledger"]');
+  await page.click('#subTabs [data-tab="ledger"]');
+  await page.waitForFunction(() => getComputedStyle(document.getElementById("board")).display !== "none");
   checks.ledgerTab = await page.evaluate(() => ({ board: getComputedStyle(document.getElementById("board")).display !== "none", book: getComputedStyle(document.querySelector('section[data-panel="book"]')).display === "none", saved: localStorage.getItem("smyrna.tab") }));
   await page.click('#tabs .tab[data-tab="book"]');
   await page.click("#meBtn"); await page.waitForFunction(() => !document.getElementById("meDrop").hidden);

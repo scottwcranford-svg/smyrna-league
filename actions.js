@@ -10,7 +10,7 @@ import * as Sn from "./seasons.js?v=dev";
 import * as N from "./sleeper.js?v=dev";
 import * as A from "./auth.js?v=dev";
 import { state, members, touch, shownSeason, setSeason } from "./state.js?v=dev";
-import { toast, showBet } from "./render.js?v=dev";
+import { toast, showBet, TAB_GROUPS } from "./render.js?v=dev";
 import * as B from "./book.js?v=dev";
 import * as F from "./forms.js?v=dev";
 import * as D from "./dialogs.js?v=dev";
@@ -106,6 +106,12 @@ export const ACTIONS = {
   },
   // which panel is open; remembered per device
   tab:function(t){
+    var g=attr(t,"data-tab")||"book";
+    state.tab=TAB_GROUPS[g]?((state.lastSub&&state.lastSub[g])||TAB_GROUPS[g][0]):g;
+    try{ localStorage.setItem("smyrna.tab",state.tab); }catch(e){}
+    touch();
+  },
+  subTab:function(t){
     state.tab=attr(t,"data-tab")||"book";
     try{ localStorage.setItem("smyrna.tab",state.tab); }catch(e){}
     touch();

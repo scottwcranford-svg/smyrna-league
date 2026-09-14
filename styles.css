@@ -415,6 +415,9 @@ h1,h2,h3,.terms,.login-brand h1{font-family:"Poppins","Inter",system-ui,sans-ser
 .seg button:hover{background:var(--surface-3);color:var(--ink)}
 .seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
 .seg button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.sub-tabs{margin:14px 0 2px}
+.sub-tabs .n{font-style:normal;font-size:10.5px;min-width:16px;margin-left:6px;padding:0 5px;border-radius:99px;background:var(--loss);color:#fff;display:inline-block;text-align:center}
+.sub-tabs button[aria-pressed="true"] .n{background:rgba(0,0,0,.18);color:inherit}
 
 .dmgrs{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px}
 .dmgr{background:var(--surface-3);border:1px solid var(--rule);border-radius:14px;padding:10px 12px;min-width:0}
@@ -808,7 +811,7 @@ ol.rlist li.start{border-color:var(--rule-2)}
   /* the panel hugs the edges; the tabs leave it for a bar at the bottom of the screen */
   .panel{padding:10px 10px 14px;border-radius:16px;margin-top:10px}
   .panel section{margin-top:0}
-  .tabs{position:fixed;left:0;right:0;bottom:0;z-index:8;display:grid;grid-template-columns:repeat(6,1fr);gap:0;overflow:visible;padding:6px 6px calc(8px + env(safe-area-inset-bottom));background:var(--surface);border-top:1px solid var(--rule);box-shadow:0 -10px 30px -12px rgba(0,0,0,.5)}
+  .tabs{position:fixed;left:0;right:0;bottom:0;z-index:8;display:grid;grid-template-columns:repeat(4,1fr);gap:0;overflow:visible;padding:6px 6px calc(8px + env(safe-area-inset-bottom));background:var(--surface);border-top:1px solid var(--rule);box-shadow:0 -10px 30px -12px rgba(0,0,0,.5)}
   .tab{flex-direction:column;gap:3px;padding:6px 1px 4px;font-size:8.5px;letter-spacing:0;background:none;color:var(--ink-3);border-radius:10px;position:relative;white-space:nowrap}
   .tab svg{width:19px;height:19px;stroke-width:1.7}
   .tab span{overflow:hidden;text-overflow:ellipsis;max-width:100%}
@@ -884,6 +887,9 @@ ol.rlist li.start{border-color:var(--rule-2)}
   .pivot.by-manager tbody th span{overflow:hidden;text-overflow:ellipsis}
   .pivot.by-manager tr.me td,.pivot.by-manager tr.me th{background:var(--accent-bg)}
   .pivot.by-manager td.total{font-weight:800;color:var(--ink)}
+  .pivot.by-manager.five th,.pivot.by-manager.five td{padding:8px 3px;font-size:11px}
+  .pivot.by-manager.five tbody th .avatar{display:none}
+  .pivot.by-manager.five tbody th span{max-width:74px}
   .balances{grid-template-columns:1fr;gap:6px}
   .debt{padding:9px 11px;gap:8px}
   .debt-txt{font-size:13px}

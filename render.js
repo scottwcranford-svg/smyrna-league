@@ -176,6 +176,12 @@ function head(){
   pb.setAttribute("data-push",ps); pb.textContent=Nf.label(ps);
 }
 
+// The top tabs and the screens under them. A tab holding several gets a sub-tab row, the
+// way League switches Scores, Draft and Roster. state.tab is always the screen itself.
+export const TAB_GROUPS={ book:["book"], money:["settle","ledger"], rivals:["rivals","badges"], league:["league"] };
+const SUB_LABEL={ settle:"Settle up", ledger:"Ledger", rivals:"Head to head", badges:"Badges" };
+export function groupOf(panel){ for(var g in TAB_GROUPS){ if(TAB_GROUPS[g].indexOf(panel)>=0) return g; } return "book"; }
+
 // The tab row: which panel is open, and a badge where something needs a look.
 function tabs(){
   var L=computeLedger(), HL=Ledger.hlTally(state.highlow,members(),Ledger.hlStake(seasonCfg()));
@@ -189,9 +195,19 @@ function tabs(){
   var mineBadges=0;
   if(state.me) badgeList().forEach(function(b){ if((b.holders||[]).indexOf(state.me)>=0) mineBadges++; });
   var badge={ book:seats, ledger:0, badges:mineBadges, league:HL.weeks.length, rivals:owed, settle:Bal.transfers.length };
-  Object.keys(badge).forEach(function(k){ var n=document.getElementById("tabN-"+k); if(!n) return; n.hidden=!badge[k]; n.textContent=badge[k]; });
-  var cur=state.tab||"book";
-  document.querySelectorAll("#tabs .tab").forEach(function(t){ var on=t.getAttribute("data-tab")===cur; t.classList.toggle("on",on); t.setAttribute("aria-selected",String(on)); });
+  // a top tab carries the sum of its screens' counts, so nothing under it goes unseen
+  Object.keys(TAB_GROUPS).forEach(function(g){
+    var sum=TAB_GROUPS[g].reduce(function(s,p){ return s+(badge[p]||0); },0);
+    var n=document.getElementById("tabN-"+g); if(n){ n.hidden=!sum; n.textContent=sum; }
+  });
+  var cur=state.tab||"book"; if(!document.querySelector('section[data-panel="'+cur+'"]')) cur=state.tab="book";
+  var group=groupOf(cur);
+  state.lastSub=state.lastSub||{}; state.lastSub[group]=cur;   // a tab reopens on the screen you left it on
+  document.querySelectorAll("#tabs .tab").forEach(function(t){ var on=t.getAttribute("data-tab")===group; t.classList.toggle("on",on); t.setAttribute("aria-selected",String(on)); });
+  var subs=TAB_GROUPS[group], row=document.getElementById("subTabs");
+  row.hidden=subs.length<2;
+  row.innerHTML=subs.length<2?"":subs.map(function(p){
+    return '<button type="button" data-act="subTab" data-tab="'+p+'" aria-pressed="'+(p===cur)+'">'+esc(SUB_LABEL[p]||p)+(badge[p]?'<i class="n">'+badge[p]+"</i>":"")+"</button>"; }).join("");
   document.querySelectorAll("section[data-panel]").forEach(function(s){ s.hidden=s.getAttribute("data-panel")!==cur; });
 }
 
@@ -556,13 +572,15 @@ function seasonTable(L){
 
 // The same table on a phone: a row per manager, the four pools across, so all ten fit.
 function seasonTableByManager(L,HL,cols){
-  var DP=Sn.duesPayouts(state.config,Sn.shownSeasonOf(state)), dues=DP.places.length>0;
+  // A phone has room for four numbers across; the Dues column joins once a place has a winner
+  // (until then it is all zeros), and the columns tighten to make room. It is in Total either way.
+  var DP=Sn.duesPayouts(state.config,Sn.shownSeasonOf(state)), dues=DP.decided;
   var val=function(m,row){ var p=L.pnl[m.id]||{}, h=HL.byId[m.id]||{}, d=DP.byId[m.id]||0;
     return row==="hl"?(h.net||0):row==="weekly"?(p.weekly||0):row==="season"?(p.season||0):row==="dues"?d:(h.net||0)+(p.weekly||0)+(p.season||0)+d; };
   var pools=["hl","weekly","season"].concat(dues?["dues"]:[]).concat(["total"]);
   var cell=function(m,row){ var v=Math.round(val(m,row)*100)/100;
     return '<td class="num '+(v>0?"pos":v<0?"neg":"flat")+(row==="total"?" total":"")+'" data-act="drill" data-m="'+esc(m.id)+'" data-row="'+row+'" tabindex="0">'+signed(v)+"</td>"; };
-  return '<div class="pivot-wrap"><table class="pivot by-manager"><thead><tr><th>Manager</th><th class="num">Hi/lo</th><th class="num">Weekly</th><th class="num">Season</th>'+(dues?'<th class="num">Dues</th>':"")+'<th class="num">Total</th></tr></thead><tbody>'+
+  return '<div class="pivot-wrap"><table class="pivot by-manager'+(dues?" five":"")+'"><thead><tr><th>Manager</th><th class="num">Hi/lo</th><th class="num">Weekly</th><th class="num">Season</th>'+(dues?'<th class="num">Dues</th>':"")+'<th class="num">Total</th></tr></thead><tbody>'+
     cols.map(function(m){ return "<tr"+(m.id===state.me?' class="me"':"")+"><th>"+avatarHtml(m.id,20)+'<span>'+esc(m.name)+"</span></th>"+pools.map(function(r){ return cell(m,r); }).join("")+"</tr>"; }).join("")+
     "</tbody></table></div>";
 }
