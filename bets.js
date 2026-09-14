@@ -213,7 +213,7 @@ export function scoringText(b){
   var tracks=(Array.isArray(S.tracks)&&S.tracks.length)?S.tracks:[{ stat:S.stat, metric:S.metric, lower:S.lower }];
   var w=Number(b.week)||0, period=w?"in Week "+w:"over the whole season";
   var ents=entriesOf(b), field=fieldSide(b);
-  var who=S.scope==="team"?"defense":"player";
+  var who=S.scope==="team"?"defense":S.scope==="offense"?"team":"player";
   var side=field?"The field counts only its best "+who+". "
     :ents.some(function(e){ return (e.picks||[]).length>1; })?"A side's "+who+"s are added together. ":"";
   // only where more can still come in, or already have

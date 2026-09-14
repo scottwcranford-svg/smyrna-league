@@ -207,6 +207,82 @@ export function sumWeeks(weeks){
   return out;
 }
 
+/* ---- team offense ----
+   Sleeper has no team offense rows (a team's key in the weekly feed is its defense), so a
+   week's offense is worked out, and every piece was checked against ESPN's box scores for
+   all 28 teams of week 1 2026:
+     points       the game's own score, from /scores (the opponent's pts_allow leaves out
+                  defensive and return TDs - wrong for three teams)
+     total yards  the opponent defense's yds_allow
+     passing      every player on the team that week: pass_yd minus pass_sack_yds (net)
+     rushing      every player: rush_yd
+     turnovers    every player, returners included: pass_int + fum_lost (the opponent's
+                  takeaways missed two teams)
+   "On the team that week" needs the feed that tags each row with its team, since a player
+   traded in week 9 must not carry his first eight weeks along. It is heavy (~200KB a week),
+   so a finished week is worked out once and kept in league/offense, and nothing is fetched
+   unless a bet on the book is an offense bet. */
+export const OFFENSE_ROWS="/stats/nfl/{season}/{week}?season_type=regular&position[]=QB&position[]=RB&position[]=WR&position[]=TE&position[]=FB&position[]=K&position[]=P"+
+  "&position[]=DB&position[]=CB&position[]=S&position[]=SS&position[]=FS&position[]=LB&position[]=DL&position[]=DE&position[]=DT";
+
+// One week: { KC: { off_pts, off_yd, off_pass_yd, off_rush_yd, off_to } } for every team whose
+// game has started, plus whether every game that week is over.
+export function offenseWeek(games,defense,rows){
+  var out={}, all=true, any=false;
+  (games||[]).forEach(function(g){
+    if(g.status!=="final") all=false;
+    if(g.status==="pre"||g.awayScore==null||g.homeScore==null) return;
+    any=true;
+    [[g.away,g.home,g.awayScore],[g.home,g.away,g.homeScore]].forEach(function(t){
+      var def=(defense||{})[t[1]]||{};
+      out[t[0]]={ off_pts:Number(t[2])||0, off_yd:Number(def.yds_allow)||0, off_pass_yd:0, off_rush_yd:0, off_to:0 };
+    });
+  });
+  (rows||[]).forEach(function(r){
+    var o=r&&out[r.team]; if(!o) return;
+    var s=r.stats||{};
+    o.off_pass_yd+=(Number(s.pass_yd)||0)-(Number(s.pass_sack_yds)||0);
+    o.off_rush_yd+=Number(s.rush_yd)||0;
+    o.off_to+=(Number(s.pass_int)||0)+(Number(s.fum_lost)||0);
+  });
+  Object.keys(out).forEach(function(k){ var o=out[k]; o.off_pass_yd=Math.round(o.off_pass_yd); o.off_rush_yd=Math.round(o.off_rush_yd); });
+  return { teams:out, final:any&&all };
+}
+// The weekly feeds with each team's offense laid onto its row, so valueFor("KC","off_pts")
+// and sumWeeks work on it like any other stat. The feeds themselves are not changed.
+export function withOffense(byWeek,offByWeek){
+  var out={};
+  Object.keys(byWeek||{}).forEach(function(w){
+    var d=byWeek[w], off=(offByWeek||{})[w];
+    if(!off||!off.teams){ out[w]=d; return; }
+    var merged=Object.assign({},d);
+    Object.keys(off.teams).forEach(function(t){ merged[t]=Object.assign({},d[t]||{},off.teams[t]); });
+    out[w]=merged;
+  });
+  return out;
+}
+export function needsOffense(bets){ return (bets||[]).some(function(b){ return b&&b.stats&&b.stats.scope==="offense"&&(b.status==="open"||b.status==="active"); }); }
+// Every week in byWeek worked out, from league/offense where a week is already final there,
+// else from the feeds. Writes back what changed. Resolves to { week: { teams, final } }.
+export function offenseFor(db,season,byWeek){
+  var ref=db.doc("league/offense");
+  return ref.get().then(function(snap){ return snap.exists?(snap.data()||{}):{}; }).catch(function(){ return {}; }).then(function(doc){
+    var mine=((doc.bySeason||{})[String(season)])||{}, got={}, changed=false;
+    var weeks=Object.keys(byWeek||{});
+    return Promise.all(weeks.map(function(w){
+      if(mine[w]&&mine[w].final){ got[w]=mine[w]; return null; }
+      return Promise.all([gamesFor([Number(w)],season), sj(SLEEPER+OFFENSE_ROWS.replace("{season}",season).replace("{week}",w)).catch(function(){ return []; })])
+        .then(function(r){ got[w]=offenseWeek(r[0],byWeek[w],r[1]); changed=true; }).catch(function(){});
+    })).then(function(){
+      if(changed){
+        var per={}; per[String(season)]=Object.assign({},mine,got);
+        ref.set({ updatedAt:isoNow(), bySeason:Object.assign({},doc.bySeason||{},per) }).catch(function(){});
+      }
+      return got;
+    });
+  });
+}
+
 // Which numbers a bet is scored on. A weekly bet is that week and nothing else - week 3
 // means week 3, not the season with week 3 somewhere inside it. A season-long bet is the
 // running total to date. Both were reading season-to-date, so every weekly bet has been
@@ -311,6 +387,8 @@ export function statsTick(db,ctx){
       return sj(SLEEPER+"/v1/stats/nfl/regular/"+season+"/"+w).then(function(d){ if(d&&Object.keys(d).length) byWeek[w]=d; }).catch(function(){});
     }); })(w);
     return chain.then(function(){
+      return needsOffense(ctx.bets)?offenseFor(db,season,byWeek).then(function(off){ byWeek=withOffense(byWeek,off); }):null;
+    }).then(function(){
       var toDate=sumWeeks(Object.keys(byWeek).map(function(k){ return byWeek[k]; }));
       var now=isoNow(), jobs=[];
       (ctx.bets||[]).forEach(function(b){
@@ -366,6 +444,8 @@ export function runRefresh(db,by,forced,ctx){
       var seq=Promise.resolve(0), byWeek={};
       for(var w=1;w<=maxW;w++)(function(w){ seq=seq.then(function(last){ if(last<w-1) return last; return sj(SLEEPER+"/v1/stats/nfl/regular/"+season+"/"+w).then(function(d){ if(d&&Object.keys(d).length){ byWeek[w]=d; return w; } return last; }).catch(function(){ return last; }); }); })(w);
       return seq.then(function(week){
+        return (needsOffense(ctx.bets)?offenseFor(db,season,byWeek).then(function(off){ byWeek=withOffense(byWeek,off); }):Promise.resolve()).then(function(){ return week; });
+      }).then(function(week){
         var toDate=sumWeeks(Object.keys(byWeek).map(function(k){ return byWeek[k]; }));
         return Promise.resolve(toDate).then(function(totals){
           // the book's own headline: how far the season has been played

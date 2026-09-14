@@ -71,7 +71,7 @@ export function posRank(pos){ var p=POS_ORDER[pos]; return p==null?5:p; }
 export function rosterSearch(q,scope,roster,opts){
   opts=opts||{};
   q=String(q||"").trim().toLowerCase();
-  var def=scope==="team", team=def?"":String(opts.team||""), pos=def?"":String(opts.pos||"");
+  var def=scope==="team"||scope==="offense", team=def?"":String(opts.team||""), pos=def?"":String(opts.pos||"");   // an offense pick is a team too
   var filtered=!!(team||pos);
   if(!filtered&&q.length<2) return [];
   var out=[];

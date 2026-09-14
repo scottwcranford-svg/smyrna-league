@@ -784,6 +784,37 @@ test("a balance card's drill-in: settled lines and their net, then what's still 
   await p.close();
 });
 
+test("offense stat: a fourth scope, teams in the search, one team a side, and a scoring line about the team", { skip }, async () => {
+  const { p, errors } = await page();
+  const out = await p.evaluate(async () => {
+    const { state } = await import("./state.js?v=dev"); const F = await import("./forms.js?v=dev"); const V = await import("./render.js?v=dev");
+    const res = { scopes: [...document.querySelectorAll("#bScope .chip")].map(c => c.dataset.scope + ":" + c.textContent) };
+    const wk = document.getElementById("bWeek"); wk.innerHTML = '<option value="6">Week 6</option>'; wk.value = "6";
+    document.getElementById("bMatch").innerHTML = '<option value="count"></option>';
+    state.editId = null; state.draftScope = "offense"; state.draftStats = []; state.draft = [{ memberId: "a", pick: "", picks: [] }];
+    F.drawScope(); F.drawEntries();
+    res.stats = [...document.querySelectorAll("#bStats .chip")].map(c => c.textContent);
+    res.placeholder = document.querySelector('#bEntries [data-act="dSearch"]').placeholder;
+    res.filters = document.getElementById("bPickFilters").hidden;
+    F.drawSugg(0, "sea"); res.sugg = [...document.querySelectorAll("#bEntries #sugg0 button")].map(b => b.dataset.id);
+    F.addPick(0, "SEA"); F.addPick(0, "KC"); res.oneASide = state.draft[0].picks.map(x => x.id);
+    document.getElementById("bName").value = ""; document.getElementById("bAmt").value = "10";
+    F.submitBet(); const bet = state.bets[0];
+    res.saved = bet && { scope: bet.stats.scope, tracks: bet.stats.tracks.map(t => t.stat), rows: bet.stats.rows.map(r => r.key), hasMatch: "match" in bet };
+    V.render(); res.scoring = (document.querySelector("article.ticket .scoring") || {}).textContent;
+    return res;
+  });
+  assert.deepEqual(out.scopes, ["player:Player stat", "offense:Offense stat", "team:Defense stat", "game:A game"]);
+  assert.deepEqual(out.stats, ["Points scored", "Total yards", "Passing yards", "Rushing yards", "Turnovers"]);
+  assert.equal(out.placeholder, "Search a team…"); assert.equal(out.filters, true, "no player filters on a team bet");
+  assert.deepEqual(out.sugg, ["SEA"], "teams, found by name or code");
+  assert.deepEqual(out.oneASide, ["KC"], "one team a side: a second pick replaces the first");
+  assert.deepEqual(out.saved, { scope: "offense", tracks: ["off_pts"], rows: ["KC"], hasMatch: false }, "sides-must-match is a player bet's question");
+  assert.match(out.scoring, /Most points scored in Week 6 wins\./);
+  assert.deepEqual(errors, []);
+  await p.close();
+});
+
 test("notifications: the menu button says where they stand; the nudge shows once and takes 'not now'", { skip }, async () => {
   const { p, errors } = await page();
   const out = await p.evaluate(async () => {

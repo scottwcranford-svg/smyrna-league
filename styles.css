@@ -836,7 +836,8 @@ button.bal-ln{cursor:pointer} button.bal-ln:hover{color:var(--ink-2)}
   .filters .chip,.filters select{flex:none}
   /* The propose form's two controls are choices, not a filter strip: don't fade their
      edge, and let all the stats wrap into view rather than hide off to the right. */
-  #bScope{-webkit-mask-image:none;mask-image:none}
+  #bScope{-webkit-mask-image:none;mask-image:none;display:grid;grid-template-columns:1fr 1fr;width:100%}   /* four kinds of bet: two by two, all on screen */
+  #bScope .chip{text-align:center}
   #bStats{flex-wrap:wrap;overflow:visible;-webkit-mask-image:none;mask-image:none}
   /* tickets: tighter, and they fold */
   .tickets{gap:8px}

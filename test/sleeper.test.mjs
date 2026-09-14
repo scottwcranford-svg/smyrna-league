@@ -437,3 +437,51 @@ test("once the season is over the totals stop shrinking with the NFL's clock", a
   assert.equal(w[2].stats.rows[0].value, 90, "all eighteen weeks, not the one the new season is on");
   assert.equal(asked.filter((u) => /stats\/nfl\/regular\/2026\/\d+$/.test(u)).length, 18);
 });
+
+test("offenseWeek: a team's offense from its game score, the opponent's yards allowed, and its own players' rows", () => {
+  // CIN 33 @ TB 27, week 1 2026, checked against ESPN: CIN 351 yds, 245 net passing, 106 rushing, 1 turnover
+  const games = [{ id: "g", week: 1, away: "CIN", home: "TB", status: "final", awayScore: 33, homeScore: 27 },
+                 { id: "h", week: 1, away: "KC", home: "DEN", status: "pre" }];
+  const defense = { TB: { yds_allow: 351 }, CIN: { yds_allow: 282 } };
+  const rows = [
+    { team: "CIN", stats: { pass_yd: 254, pass_sack_yds: 9, pass_int: 1 } },
+    { team: "CIN", stats: { rush_yd: 80 } }, { team: "CIN", stats: { rush_yd: 26, fum_lost: 0 } },
+    { team: "TB", stats: { pass_yd: 216, pass_sack_yds: 23, rush_yd: 20 } }, { team: "TB", stats: { rush_yd: 69, fum_lost: 4 } },
+    { team: "KC", stats: { rush_yd: 99 } } ];
+  const w = N.offenseWeek(games, defense, rows);
+  assert.deepEqual(w.teams.CIN, { off_pts: 33, off_yd: 351, off_pass_yd: 245, off_rush_yd: 106, off_to: 1 });
+  assert.deepEqual(w.teams.TB, { off_pts: 27, off_yd: 282, off_pass_yd: 193, off_rush_yd: 89, off_to: 4 });
+  assert.equal("KC" in w.teams, false, "a game that hasn't started has no offense yet");
+  assert.equal(w.final, false, "and the week isn't final while it's still to play");
+  assert.equal(N.offenseWeek([games[0]], defense, rows).final, true);
+});
+
+test("withOffense + restat: an offense bet is scored on the week, and a season bet on the running total", () => {
+  const byWeek = { 1: { CIN: { yds_allow: 282, sack: 4 }, "1234": { pass_yd: 254 } }, 2: { CIN: { sack: 1 } } };
+  const off = { 1: { teams: { CIN: { off_pts: 33, off_yd: 351 } }, final: true }, 2: { teams: { CIN: { off_pts: 17, off_yd: 300 } }, final: false } };
+  const merged = N.withOffense(byWeek, off);
+  assert.deepEqual(merged[1].CIN, { yds_allow: 282, sack: 4, off_pts: 33, off_yd: 351 }, "the defense fields stay; the offense lays on top");
+  assert.equal(byWeek[1].CIN.off_pts, undefined, "the feeds themselves aren't changed");
+  const S = { scope: "offense", stat: "off_pts", tracks: [{ stat: "off_pts" }, { stat: "off_yd" }], rows: [{ key: "CIN", entry: 0 }] };
+  const season = N.sumWeeks([merged[1], merged[2]]);
+  assert.deepEqual(N.restat(S, N.totalsFor(merged, season, 1), "Week 1", "t").rows[0].values, { off_pts: 33, off_yd: 351 });
+  assert.deepEqual(N.restat(S, N.totalsFor(merged, season, 0), "Through week 2", "t").rows[0].values, { off_pts: 50, off_yd: 651 });
+});
+
+test("offenseFor: a final week comes from the book; an unfinished one from the feeds, and is written back", async () => {
+  const writes = [], stored = { bySeason: { "2026": { 1: { final: true, teams: { CIN: { off_pts: 33 } } } } } };
+  const db = { doc: (p) => ({ get: async () => ({ exists: true, data: () => stored }), set: async (d) => { writes.push([p, d]); } }) };
+  const urls = [];
+  globalThis.fetch = async (u) => { urls.push(u); return { ok: true, json: async () => (/scores/.test(u)
+    ? [{ game_id: "x", week: 2, status: "in_game", metadata: { date_time: "2026-09-20T17:00:00+00:00", away_team: "CIN", home_team: "HOU", away_score: 7, home_score: 3, is_in_progress: true } }]
+    : [{ team: "CIN", stats: { rush_yd: 40 } }]) }; };
+  const got = await N.offenseFor(db, "2026", { 1: {}, 2: { HOU: { yds_allow: 120 } } });
+  assert.deepEqual(got[1], stored.bySeason["2026"][1], "week 1 is final in the book: no fetch for it");
+  assert.equal(urls.some((u) => /\/1(\?|$)/.test(u)), false);
+  assert.deepEqual(got[2].teams.CIN, { off_pts: 7, off_yd: 120, off_pass_yd: 0, off_rush_yd: 40, off_to: 0 });
+  assert.equal(got[2].final, false);
+  assert.equal(writes.length, 1); assert.equal(writes[0][0], "league/offense");
+  assert.deepEqual(Object.keys(writes[0][1].bySeason["2026"]).sort(), ["1", "2"], "week 1 kept, week 2 added");
+  assert.equal(N.needsOffense([{ status: "active", stats: { scope: "offense" } }]), true);
+  assert.equal(N.needsOffense([{ status: "settled", stats: { scope: "offense" } }, { status: "active", stats: { scope: "player" } }]), false, "nothing is fetched unless a live or open bet needs it");
+});

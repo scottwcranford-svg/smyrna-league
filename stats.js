@@ -14,6 +14,10 @@ export const STATS = {
     ["total_yd","Total yards"],["total_td","Total TDs"],["rush_rec_yd","Rushing + receiving yards"],["td_scored","Rushing + receiving TDs"],
     ["touches","Touches"],["turnovers","Turnovers",true],["fum_lost","Fumbles lost",true]
   ],
+  // a team's offense, worked out per week in sleeper.js (offenseWeek) and stored on the team's row
+  offense:[
+    ["off_pts","Points scored"],["off_yd","Total yards"],["off_pass_yd","Passing yards"],["off_rush_yd","Rushing yards"],["off_to","Turnovers",true]
+  ],
   team:[
     ["takeaways","Takeaways · INT + fumble recoveries"],["int","Interceptions"],["ff","Forced fumbles"],
     ["sack","Sacks"],["def_td","Defensive TDs"],["pts_allow","Points allowed",true],
@@ -32,7 +36,7 @@ const COMPOSITES = { takeaways:["int","fum_rec"], td_scored:["rush_td","rec_td"]
    Sleeper's weekly projections, trimmed to the roster and to the stats the app tracks,
    ride in league/proj as { weeks: { "5": "<json>" } }. A projection is read with the
    same valueFor as the actuals, so it is always the bet's own stat. */
-export const STAT_SHORT={ pts_ppr:"pts", pts_half_ppr:"pts", pts_std:"pts", rec_tgt:"tgt", total_yd:"total yds", total_td:"TD", touches:"touches", turnovers:"TO", pass_yd:"pass yds", pass_td:"pass TD", pass_int:"INT", rush_yd:"rush yds", rush_td:"rush TD",
+export const STAT_SHORT={ off_pts:"pts", off_yd:"yds", off_pass_yd:"pass yds", off_rush_yd:"rush yds", off_to:"TO", pts_ppr:"pts", pts_half_ppr:"pts", pts_std:"pts", rec_tgt:"tgt", total_yd:"total yds", total_td:"TD", touches:"touches", turnovers:"TO", pass_yd:"pass yds", pass_td:"pass TD", pass_int:"INT", rush_yd:"rush yds", rush_td:"rush TD",
   rec:"rec", rec_yd:"rec yds", rec_td:"rec TD", rush_rec_yd:"scrimmage yds", td_scored:"TD", fum_lost:"fum", takeaways:"takeaways", int:"INT", ff:"FF", sack:"sacks",
   def_td:"TD", pts_allow:"pts allowed", yds_allow:"yds allowed" };
 function projKeys(){
