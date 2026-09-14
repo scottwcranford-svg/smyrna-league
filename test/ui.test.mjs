@@ -731,7 +731,7 @@ test("dues payouts: set in the League dialog; on Settle Up the treasurer, the pl
     res.transfers = [...document.querySelectorAll("#settle .debt")].length;
     // the drill-through behind Alice's dues cell
     document.querySelector('#settle .bal-ln[data-m="a"][data-row="dues"]').click();
-    res.drill = [...document.querySelectorAll("#drillList .drill")].map(d => d.querySelector("b").textContent + " | " + d.querySelector("small").textContent + " | " + d.querySelector(".num").textContent);
+    res.drill = [...document.querySelectorAll("#drillList .drill:not(.pending)")].map(d => d.querySelector("b").textContent + " | " + d.querySelector("small").textContent + " | " + d.querySelector(".num").textContent);   // what was won; what is still to come sits below
     document.getElementById("drillDlg").close();
     return res;
   });
@@ -748,6 +748,38 @@ test("dues payouts: set in the League dialog; on Settle Up the treasurer, the pl
   assert.match(out.you, /plus \$400 in dues payouts, from Cara/);
   assert.equal(out.transfers, 0, "dues aren't a manager-to-manager transfer");
   assert.deepEqual(out.drill, ["League dues · Regular season · 1st | paid by Cara | +$300", "League dues · Playoff champion | paid by Cara | +$100"]);
+  assert.deepEqual(errors, []);
+  await p.close();
+});
+
+test("a balance card's drill-in: settled lines and their net, then what's still in play — live and open bets, dues paid in, places not decided", { skip }, async () => {
+  const { p, errors } = await page();
+  const out = await p.evaluate(async () => {
+    const { state } = await import("./state.js?v=dev"); const D = await import("./dialogs.js?v=dev");
+    state.config.bySeason = { "2026": { dues: 200, duesPaid: { a: { at: "x" } }, treasurer: "c", payouts: { reg1: 800, champ: 600 }, payoutWinners: { champ: "b" } } };
+    state.bets = [
+      { id: "s1", status: "settled", week: 0, amount: 25, winner: "a", name: "Season win", entries: [{ memberId: "a" }, { memberId: "b" }], paid: [] },
+      { id: "l1", status: "active", week: 3, amount: 10, name: "Live pot", entries: [{ memberId: "a" }, { memberId: "b" }, { memberId: "c" }], paid: [] },
+      { id: "o1", status: "open", week: 4, amount: 5, name: "Open one", entries: [{ memberId: "a" }, { memberId: null }], paid: [] },
+      { id: "x1", status: "active", week: 3, amount: 50, name: "Not hers", entries: [{ memberId: "b" }, { memberId: "c" }], paid: [] } ];
+    const read = () => ({ settled: [...document.querySelectorAll("#drillList .drill:not(.pending)")].map(d => d.querySelector(".drill-txt b").textContent + " " + d.querySelector("b.num").textContent),
+      net: (document.querySelector("#drillList .drill-net b") || {}).textContent, empty: (document.querySelector("#drillList .empty") || {}).textContent,
+      sec: (document.querySelector("#drillList .drill-sec") || {}).textContent,
+      secs: [...document.querySelectorAll("#drillList .drill-sec")].map(s => s.textContent),
+      pending: [...document.querySelectorAll("#drillList .drill.pending")].map(d => [d.querySelector(".drill-txt b").textContent, d.querySelector("small").textContent, d.querySelector("b.num").textContent, d.dataset.id || ""]) });
+    const res = {};
+    D.openDrill("a", "bets"); res.bets = read(); document.getElementById("drillDlg").close();
+    D.openDrill("a", "dues"); res.dues = read(); document.getElementById("drillDlg").close();
+    D.openDrill("c", "hl"); res.hl = read(); document.getElementById("drillDlg").close();
+    return res;
+  });
+  assert.deepEqual(out.bets.settled, ["Season win +$25"]); assert.equal(out.bets.net, "+$25");
+  assert.equal(out.bets.sec, "In play · not counted yet");
+  assert.deepEqual(out.bets.pending, [["Live pot", "live · wins $20", "$10 at stake", "l1"], ["Open one", "waiting on takers", "$5 at stake", "o1"]], "her live and open bets, not anyone else's; each opens its ticket");
+  assert.equal(out.dues.empty, "No payouts won yet.");
+  assert.deepEqual(out.dues.secs, ["Paid in", "In play · not counted yet"]);
+  assert.deepEqual(out.dues.pending, [["2026 league dues", "paid in · to Cara", "$200", ""], ["League dues · Regular season · 1st", "decided at season’s end", "$800", ""]], "what she paid in on its own, then the place still open; the champion is decided, so it's not pending");
+  assert.equal(out.hl.sec, undefined, "hi / low has nothing in play"); assert.equal(out.hl.empty, "Nothing here yet.");
   assert.deepEqual(errors, []);
   await p.close();
 });

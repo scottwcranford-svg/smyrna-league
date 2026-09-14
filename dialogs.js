@@ -108,7 +108,31 @@ export function openRoster(){
   drawRoster();
   document.getElementById("rosterDlg").showModal();
 }
-// Drill-through from the season table: the bets or hi / low weeks behind one cell.
+// What's still in play behind a piece of a balance card, not counted in its number yet:
+// bets that haven't settled, and the dues - what they paid in, and places not yet decided.
+function pendingRows(memberId,row){
+  var out=[];
+  if(row==="bets"||row==="weekly"||row==="season"||row==="total"){
+    state.bets.forEach(function(b){
+      if(b.status!=="active"&&b.status!=="open") return;
+      var ents=entriesOf(b); if(!ents.some(function(e){ return e.memberId===memberId; })) return;
+      var weekly=Number(b.week)>0;
+      if(row==="weekly"&&!weekly) return; if(row==="season"&&weekly) return;
+      var others=ents.filter(function(e){ return e.memberId&&e.memberId!==memberId; }).length;
+      out.push({ kind:"bet", id:b.id, week:Number(b.week)||0, label:b.name||b.terms||"",
+        note:(b.status==="open"?"waiting on takers":"live")+(others>1?" · wins "+money(b.amount*others):""), text:money(b.amount)+" at stake" });
+    });
+  }
+  if(row==="dues"||row==="total"){
+    var season=shownSeason(), set=Sn.settingsFor(state.config,season), DP=Sn.duesPayouts(state.config,season), mm=member(memberId);
+    if(set.dues&&mm&&!mm.test&&Sn.inSeason(mm,season))
+      out.push({ kind:"dues", paidIn:true, week:0, label:season+" league dues", note:(Sn.duesPaid(state.config,season,memberId)?"paid in":"not paid yet")+(DP.treasurer?" · to "+mName(DP.treasurer):""), text:money(set.dues) });
+    DP.places.forEach(function(pl){ if(!pl.winner) out.push({ kind:"place", week:0, label:"League dues · "+pl.label, note:"decided at season’s end", text:money(pl.amount) }); });
+  }
+  return out;
+}
+// Drill-through from a balance card: the bets or hi / low weeks behind one piece, then
+// anything still in play.
 export function openDrill(memberId,row){
   var m=member(memberId); if(!m) return;
   var rows=row==="dues"?[]:Ledger.drillRows(memberId,row,state.bets,state.highlow,Ledger.hlStake(seasonCfg()),members());
@@ -120,14 +144,21 @@ export function openDrill(memberId,row){
   var title={ hl:"Hi / low", weekly:"Weekly bets", season:"Season bets", bets:"Side bets", dues:"Dues payouts", total:"Everything" }[row]||row;
   var net=rows.reduce(function(s,r){ return s+r.amount; },0);
   document.getElementById("drillTitle").innerHTML=avatarHtml(m.id,24)+" "+esc(m.name)+' <span class="drill-row">· '+esc(title)+"</span>";
-  document.getElementById("drillList").innerHTML=rows.length?rows.map(function(r){
-    var v=Math.round(r.amount*100)/100, cls=v>0?"pos":v<0?"neg":"flat";
-    return '<div class="drill"'+(r.kind==="bet"?' data-act="goBet" data-id="'+esc(r.id)+'" role="button" tabindex="0"':"")+'>'+
+  var line=function(r,amountHtml,extra){
+    return '<div class="drill'+(extra||"")+'"'+(r.kind==="bet"?' data-act="goBet" data-id="'+esc(r.id)+'" role="button" tabindex="0"':"")+'>'+
       '<span class="wk">'+esc(Fmt.weekLabel(r.week))+"</span>"+
-      '<span class="drill-txt"><b>'+esc(r.label)+"</b><small>"+esc(r.note)+"</small></span>"+
-      '<b class="num '+cls+'">'+Fmt.signed(v)+"</b></div>";
-  }).join("")+'<div class="drill-net">Net <b class="'+(net>0?"pos":net<0?"neg":"flat")+'">'+Fmt.signed(Math.round(net*100)/100)+"</b></div>"
-  :'<div class="empty">Nothing here yet.</div>';
+      '<span class="drill-txt"><b>'+esc(r.label)+"</b><small>"+esc(r.note)+"</small></span>"+amountHtml+"</div>"; };
+  var pend=pendingRows(memberId,row), paidIn=pend.filter(function(r){ return r.paidIn; });
+  pend=pend.filter(function(r){ return !r.paidIn; });
+  document.getElementById("drillList").innerHTML=
+    (rows.length?rows.map(function(r){
+      var v=Math.round(r.amount*100)/100, cls=v>0?"pos":v<0?"neg":"flat";
+      return line(r,'<b class="num '+cls+'">'+Fmt.signed(v)+"</b>");
+    }).join("")+'<div class="drill-net">Net <b class="'+(net>0?"pos":net<0?"neg":"flat")+'">'+Fmt.signed(Math.round(net*100)/100)+"</b></div>"
+    :'<div class="empty">'+(row==="dues"?"No payouts won yet.":pend.length?"Nothing settled yet.":"Nothing here yet.")+"</div>")+
+    // the dues they put in: done, not in play, so a line of its own
+    (paidIn.length?'<div class="drill-sec">Paid in</div>'+paidIn.map(function(r){ return line(r,'<b class="num pend">'+esc(r.text)+"</b>"," pending"); }).join(""):"")+
+    (pend.length?'<div class="drill-sec">In play · not counted yet</div>'+pend.map(function(r){ return line(r,'<b class="num pend">'+esc(r.text)+"</b>"," pending"); }).join(""):"");
   document.getElementById("drillDlg").showModal();
 }
 // When a manager last opened the app, from league/seen.
