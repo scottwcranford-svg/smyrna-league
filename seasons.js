@@ -72,7 +72,8 @@ export function settingsFor(config,season){
     leagueId:per.leagueId||(config&&config.sleeperLeagueId)||"",
     stake:per.stake!=null?per.stake:(config&&config.stake),
     kickoff:per.kickoff||(config&&config.kickoff),
-    weekStarts:per.weekStarts||(config&&config.weekStarts)||null
+    weekStarts:per.weekStarts||(config&&config.weekStarts)||null,
+    dues:per.dues!=null?Number(per.dues):null   // league dues per manager; seasons before it have none
   };
 }
 
@@ -84,6 +85,14 @@ export function settingsFor(config,season){
 export function duesPaid(config,season,memberId){
   var per=config&&config.bySeason&&config.bySeason[String(season)];
   return !!(per&&per.duesPaid&&per.duesPaid[memberId]);
+}
+// Set a season's dues amount in place; zero or blank clears it. Returns the config.
+export function setDuesAmount(config,season,amount){
+  var s=String(season), n=Math.round((Number(amount)||0)*100)/100;
+  config.bySeason=config.bySeason||{};
+  var per=config.bySeason[s]=Object.assign({},config.bySeason[s]||{});
+  if(n>0) per.dues=n; else delete per.dues;
+  return config;
 }
 // Mark a manager paid or unpaid for a season, in place. Unpaid is written as null rather
 // than removed, so the same change can go to Firestore as a merge. Returns the config.

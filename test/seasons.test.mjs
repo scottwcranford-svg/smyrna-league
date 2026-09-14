@@ -114,3 +114,14 @@ test("league dues: kept per season, unpaid until marked, test accounts owe nothi
   assert.equal(S.duesPaid(config, "2026", "b"), true, "without touching last year");
   assert.equal(S.settingsFor(config, "2026").stake, undefined, "a dues record doesn't invent settings for the season");
 });
+
+test("league dues amount: per season, cleared by blank or zero", () => {
+  const config = { season: "2026", stake: 25, bySeason: { "2027": { leagueId: "L27" } } };
+  assert.equal(S.settingsFor(config, "2026").dues, null, "none set");
+  S.setDuesAmount(config, "2026", "200");
+  assert.equal(S.settingsFor(config, "2026").dues, 200);
+  assert.equal(S.settingsFor(config, "2027").dues, null, "no carrying over");
+  assert.equal(S.settingsFor(config, "2026").stake, 25, "the season's stake still falls back as before");
+  S.setDuesAmount(config, "2026", ""); assert.equal("dues" in config.bySeason["2026"], false);
+  S.setDuesAmount(config, "2027", 150.456); assert.equal(config.bySeason["2027"].dues, 150.46); assert.equal(config.bySeason["2027"].leagueId, "L27");
+});

@@ -84,7 +84,11 @@ export function openRoster(){
   document.getElementById("rSeason").value=state.config.season;
   document.getElementById("rStake").value=String(state.config.stake||25);
   document.getElementById("rKickoff").value=toLocalInput(state.config.kickoff||DEFAULT_KICKOFF);
-  ["rName","rStake","rKickoff"].forEach(function(id){ document.getElementById(id).disabled=!adm; });
+  // dues belong to the season on screen
+  var dues=Sn.settingsFor(state.config,shownSeason()).dues;
+  document.getElementById("rDuesLbl").textContent=shownSeason()+" league dues";
+  document.getElementById("rDuesAmt").value=dues?String(dues):"";
+  ["rName","rStake","rKickoff","rDuesAmt"].forEach(function(id){ document.getElementById(id).disabled=!adm; });
   document.getElementById("rSeason").disabled=true;   // shown, never typed into - see Start a season
   document.getElementById("rAddRow").hidden=!adm;
   document.getElementById("rAdd").hidden=!adm;
@@ -141,7 +145,8 @@ export function drawRoster(){
     :"";
   // League dues for the season on screen: who's paid, set by an admin, kept per season.
   var season=shownSeason(), tally=Sn.duesTally(state.config,season);
-  document.getElementById("rDues").textContent=tally.of?"· "+season+" dues "+tally.paid+" of "+tally.of+" paid":"";
+  var amt=Sn.settingsFor(state.config,season).dues;
+  document.getElementById("rDues").textContent=tally.of?"· "+season+" dues"+(amt?" "+Fmt.money(amt):"")+" · "+tally.paid+" of "+tally.of+" paid":"";
   var duesHtml=function(m){
     if(m.test||!Sn.inSeason(m,season)) return "";
     var paid=Sn.duesPaid(state.config,season,m.id), cls="r-dues"+(paid?" paid":"");

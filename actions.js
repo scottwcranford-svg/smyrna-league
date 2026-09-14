@@ -225,6 +225,8 @@ function saveLeague(){
   if(s>0) state.config.stake=Math.round(s*100)/100;
   var ko=new Date(document.getElementById("rKickoff").value);   // datetime-local reads as local time
   if(!isNaN(ko)) state.config.kickoff=ko.toISOString();
+  // the dues amount is the shown season's; blank clears it
+  Sn.setDuesAmount(state.config,shownSeason(),document.getElementById("rDuesAmt").value);
   B.saveConfig();
   document.getElementById("rosterDlg").close();
   toast("League saved");
