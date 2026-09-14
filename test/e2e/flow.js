@@ -138,6 +138,9 @@ let browser; const errors = [], checks = {};
     rowOneLocked: (s => s.disabled && s.options.length === 1 && /\(you\)/.test(s.options[0].textContent))(document.querySelector('#bEntries select[data-i="0"]')) })));
   await page.click('#bStats .chip[data-stat="rec_yd"]');
   checks.twoStats = await page.evaluate(() => document.querySelectorAll('#bStats .chip[aria-pressed="true"]').length);
+  // search for a week nobody has played yet: in the week under way, anyone whose game has
+  // started is left out of the picker, and on a Monday that's nearly everyone
+  await page.evaluate(() => { const w = document.getElementById("bWeek"); w.value = w.options[w.options.length - 1].value; });
   await page.type('#bEntries input[data-act="dSearch"][data-i="0"]', "chase");
   await page.waitForFunction(() => { const s = document.getElementById("sugg0"); return s && !s.hidden && s.querySelectorAll("button").length > 0; }, { timeout: 5000 });
   await page.click('#sugg0 button');
