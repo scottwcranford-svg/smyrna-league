@@ -326,7 +326,7 @@ export function drawScoring(){
   } else {
     var match=scope==="player"?document.getElementById("bMatch").value:"";
     var tracks=(STATS[scope]||[]).filter(function(s){ return state.draftStats.indexOf(s[0])>=0; }).map(function(s){ return { stat:s[0], metric:s[1], lower:!!s[2] }; });
-    b={ week:Number(document.getElementById("bWeek").value)||0, stats:{ scope:scope, tracks:tracks }, entries:state.draft, match:match,
+    b={ status:"open", week:Number(document.getElementById("bWeek").value)||0, stats:{ scope:scope, tracks:tracks }, entries:state.draft, match:match,
         joinable:match!=="field"&&document.getElementById("bJoin").checked, tiebreak:state.editId?!!(findBet(state.editId)||{}).tiebreak:true };
   }
   box.innerHTML='<span class="lbl">How it’s scored</span> '+esc(Bets.scoringText(b));

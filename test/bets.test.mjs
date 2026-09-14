@@ -147,13 +147,15 @@ test("scoringText: every kind of bet says how it's scored, in the words autoResu
   const p = (id, pos) => ({ id, name: id, pos, team: "KC" });
   const one = { week: 3, joinable: false, stats: { scope: "player", tracks: [{ stat: "rec_yd", metric: "Receiving yards" }] }, entries: [{ memberId: "a", picks: [p("1", "WR")] }, { memberId: "b", picks: [p("2", "WR")] }] };
   assert.equal(Bets.scoringText(one), "Most receiving yards in Week 3 wins. A tie for the top is a push. Settles once every game that week is final.");
-  assert.match(Bets.scoringText({ ...one, week: 0, joinable: true }), /^Most receiving yards over the whole season wins\. However many join, the one leader takes every stake\. .* Settles once every game through Week 17 is final\.$/);
+  assert.match(Bets.scoringText({ ...one, week: 0, joinable: true, status: "open" }), /^Most receiving yards over the whole season wins\. However many join, the one leader takes every stake\. .* Settles once every game through Week 17 is final\.$/);
   assert.match(Bets.scoringText({ ...one, stats: { scope: "team", tracks: [{ stat: "pts_allow", metric: "Points allowed", lower: true }] } }), /^Fewest points allowed in Week 3 wins\./);
   assert.match(Bets.scoringText({ ...one, entries: [{ memberId: "a", picks: [p("1", "WR"), p("3", "RB")] }, { memberId: "b", picks: [p("2", "WR"), p("4", "RB")] }] }), /A side's players are added together\./);
   const field = { ...one, match: "field", entries: [{ memberId: "a", picks: [p("1", "WR")] }, { memberId: "b", picks: ["2", "3", "4", "5"].map(x => p(x, "WR")) }] };
   assert.match(Bets.scoringText(field), /The field counts only its best player\./); assert.doesNotMatch(Bets.scoringText(field), /added together|However many/);
   const oldField = { ...one, stats: { scope: "player", tracks: [{ stat: "pts_ppr", metric: "PPR points · best of each side" }], rows: [{ key: "1", entry: 0 }, { key: "2", entry: 1 }, { key: "3", entry: 1 }] } };
   assert.match(Bets.scoringText(oldField), /^Most PPR points in Week 3 wins\. The field counts only its best player\./, "an older field bet is recognised from its rows");
+  assert.doesNotMatch(Bets.scoringText({ ...one, status: "active", joinable: false }), /However many/, "a head-to-head closed to joiners doesn't talk about them");
+  assert.match(Bets.scoringText({ ...one, stats: { scope: "team", tracks: [{ stat: "takeaways", metric: "Takeaways · INT + fumble recoveries" }] } }), /^Most takeaways in Week 3 wins\./);
   const two = { ...one, stats: { scope: "player", tracks: [{ stat: "rec_yd", metric: "Receiving yards" }, { stat: "fum_lost", metric: "Fumbles lost", lower: true }] } };
   assert.equal(Bets.scoringText({ ...two, tiebreak: true }), "Each stat is its own contest in Week 3: receiving yards and fumbles lost (fewest wins). Whoever wins more of them takes it. A stat that ends tied counts for nobody. If the stats won are level, the first one listed (receiving yards) decides it; if that's tied too, it's a push. Settles once every game that week is final.");
   assert.match(Bets.scoringText(two), /If the stats won are level, it's a push\./, "a bet from before the tiebreaker says so");

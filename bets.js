@@ -187,7 +187,8 @@ export function autoResult(b,games,now){
    filled in, and in the Join dialog. It reads the same fields autoResult settles on, so
    what it says is what happens. */
 function fmtLine(n){ n=Number(n); return isNaN(n)?"":String(n); }
-function statName(t){ return String((t&&(t.metric||t.stat))||"the stat").replace(/ · (combined|best of each side)$/,""); }
+// the stat by its short name: "Takeaways · INT + fumble recoveries" and "PPR points · combined" read as the part before the dot
+function statName(t){ return String((t&&(t.metric||t.stat))||"the stat").split(" · ")[0]; }
 function lower1(s){ return /^[A-Z]{2}/.test(s)?s:s.charAt(0).toLowerCase()+s.slice(1); }   // "PPR points" keeps its capitals
 // A field side: one row per player sharing a seat, or a bet set up as one.
 function fieldSide(b){
@@ -215,7 +216,8 @@ export function scoringText(b){
   var who=S.scope==="team"?"defense":"player";
   var side=field?"The field counts only its best "+who+". "
     :ents.some(function(e){ return (e.picks||[]).length>1; })?"A side's "+who+"s are added together. ":"";
-  var pot=(!field&&(b.joinable!==false||ents.length>2))?"However many join, the one leader takes every stake. ":"";
+  // only where more can still come in, or already have
+  var pot=(!field&&(canJoin(b)||ents.length>2))?"However many join, the one leader takes every stake. ":"";
   var out;
   if(tracks.length===1){
     var t=tracks[0];
