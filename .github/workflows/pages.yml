@@ -28,6 +28,17 @@ jobs:
           sha=$(git rev-parse --short=7 HEAD)
           sed -i "s/?v=dev/?v=$sha/g; s/build dev/build $sha/g" index.html *.js
           grep -c "$sha" index.html app.js
+      # One file instead of ~30: a phone on a slow connection spent most of sign-in fetching
+      # the modules one by one. The source stays as modules (the tests load them that way);
+      # only what's deployed is bundled. esbuild ignores the ?v= on each import.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Bundle the app into app.js
+        run: |
+          npx --yes esbuild@0.28.2 app.js --bundle --format=esm --minify --target=es2019 --outfile=app.bundle.js --log-level=warning
+          mv app.bundle.js app.js
+          head -c 200 app.js; echo; wc -c app.js
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

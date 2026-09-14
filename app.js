@@ -76,17 +76,37 @@ function enterBook(user){
   // the default-password check needs the roster; if it isn't here yet, the config
   // snapshot runs it once the names arrive
   if(state.typedPw&&memberForEmail(user.email)){ enforceFreshPassword(user,state.typedPw); state.typedPw=null; }
-  // If the book hasn't opened shortly, say why on the login screen instead of sitting there.
+  // If the book hasn't opened shortly: reconnect once on our own - a reload, still signed in,
+  // which is what always got past the stall on a first sign-in after a deploy - and only if
+  // that doesn't do it, say why on the login screen instead of sitting there.
   clearTimeout(state.bookTimer);
   var t0=Date.now();
   state.bookTimer=setTimeout(function(){
     if(!document.getElementById("app").hidden) return;
     console.warn("book not open after",Math.round((Date.now()-t0)/1000),"s; local=",state.local,"error=",state.bookError);
+    if(!state.bookError&&reconnectOnce()) return;
     var why=state.bookError?("The book refused to load: "+S.dbMsg(state.bookError)+" ("+(state.bookError.code||"")+").")
       :"Signed in, but the book hasn't loaded. Something on this browser may be blocking firestore.googleapis.com — an ad blocker or strict tracking prevention. Try another browser, or start over below.";
     document.getElementById("siHint").textContent=why;
     document.getElementById("siReset").hidden=false;
   },6000);
+}
+
+// One automatic reconnect per couple of minutes. A password typed at sign-in doesn't survive
+// the reload, so whether it was the starting one is carried over (as a yes, never the
+// password) for the forced-change check to pick up once the league has loaded.
+const RECONNECT_SS="smyrna.reconnectAt", DEFAULT_PW_SS="smyrna.typedDefault";
+function reconnectOnce(){
+  var last=0; try{ last=Number(sessionStorage.getItem(RECONNECT_SS))||0; }catch(e){ return false; }
+  if(Date.now()-last<2*60000) return false;
+  try{
+    sessionStorage.setItem(RECONNECT_SS,String(Date.now()));
+    var u=A.currentUser(), typed=state.typedPw;
+    if(u&&typed&&/123!$/.test(typed)&&Id.slugName(typed.slice(0,-4))+"@"+Id.AUTH_DOMAIN===String(u.email).toLowerCase()) sessionStorage.setItem(DEFAULT_PW_SS,"1");
+  }catch(e){ return false; }
+  document.getElementById("siHint").textContent="Still opening — reconnecting…";
+  location.reload();
+  return true;
 }
 
 // Everything the page reads, started once, after sign-in. Rules refuse these reads
@@ -123,6 +143,10 @@ function subscribeBook(db){
         applyAuth(A.currentUser());   // the roster may have arrived after sign-in
         var u=A.currentUser();
         if(u&&state.typedPw&&memberForEmail(u.email)){ enforceFreshPassword(u,state.typedPw); state.typedPw=null; }
+        // signed in on the starting password just before an automatic reconnect
+        var carried=false; try{ carried=sessionStorage.getItem(DEFAULT_PW_SS)==="1"; if(carried) sessionStorage.removeItem(DEFAULT_PW_SS); }catch(e){}
+        var cm=u&&carried?memberForEmail(u.email):null;
+        if(cm) enforceFreshPassword(u,Id.defaultPw(cm));
         // the book is here and you're signed in: show the app
         clearTimeout(state.bookTimer);
         mark("open");

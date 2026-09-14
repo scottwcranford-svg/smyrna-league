@@ -304,7 +304,7 @@ function draftBoard(D){
 function rosterView(){
   var host=document.getElementById("rosterView"), note=document.getElementById("rosterNote");
   var sel=document.getElementById("rosterOf");
-  var S=state.squads, D=state.draft;
+  var S=state.squads, D=state.draftBoard;
   if(!S||!S.rosters||!Object.keys(S.rosters).length){
     host.innerHTML='<div class="empty">Rosters haven’t arrived yet — they come with the next refresh.</div>';
     note.textContent=""; sel.innerHTML=""; return;
@@ -368,7 +368,7 @@ function rosterView(){
 
 function draftView(){
   var host=document.getElementById("draft"), note=document.getElementById("draftNote");
-  var D=state.draft;
+  var D=state.draftBoard;
   if(!D||!(D.picks||[]).length){
     host.innerHTML='<div class="empty">No draft in the book for '+esc(weekLabel(0)===""?"":"")+esc(Sn.shownSeasonOf(state))+" yet — it arrives with the next refresh.</div>";
     note.textContent=""; return;
