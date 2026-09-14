@@ -12,7 +12,7 @@ const { setGlobalOptions, logger } = require("firebase-functions/v2");
 const { initializeApp } = require("firebase-admin/app");
 const { getFirestore, FieldPath, FieldValue } = require("firebase-admin/firestore");
 const { getMessaging } = require("firebase-admin/messaging");
-const { betNotices, paymentNotices, highLowNotices } = require("./notices");
+const { statsOnly, betNotices, paymentNotices, highLowNotices } = require("./notices");
 
 setGlobalOptions({ region: "us-central1", maxInstances: 3, memory: "256MiB", timeoutSeconds: 60 });
 initializeApp();
@@ -72,6 +72,9 @@ const doc = s => (s && s.exists ? s.data() : null);
 
 exports.betChanged = onDocumentWritten("books/{book}/bets/{id}", async (ev) => {
   const before = doc(ev.data.before), after = doc(ev.data.after);
+  // A re-score has nothing to announce, and that is decided before the member list is
+  // read - otherwise every stat bet costs a document read every few minutes all Sunday.
+  if (statsOnly(before, after)) return;
   if (after) after.id = ev.params.id;
   const L = await leagueOf(ev.params.book);
   await deliver(ev.params.book, betNotices(before, after, L.members));

@@ -4,7 +4,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
-const { betNotices, paymentNotices, highLowNotices } = createRequire(import.meta.url)("../functions/notices.js");
+const { statsOnly, betNotices, paymentNotices, highLowNotices } = createRequire(import.meta.url)("../functions/notices.js");
 
 const members = [{ id: "a", name: "Alice" }, { id: "b", name: "Bob" }, { id: "c", name: "Cara" }, { id: "d", name: "Dan" }];
 const bet = (o) => Object.assign({ id: "x1", name: "NE @ SEA", amount: 10, status: "open", createdBy: "a", terms: "Straight up.",
@@ -78,4 +78,24 @@ test("high and low: the league hears when a week goes final, once per week", () 
   assert.deepEqual(brief(highLowNotices(null, w1, members, 5)), [["a,b,c,d", "Week 1 · high and low", "Alice +$5 · Cara −$5"]]);
   assert.deepEqual(brief(highLowNotices(w1, w2, members, 5)), [["a,b,c,d", "Week 2 · high and low", "Bob and Dan +$2.50 · Alice −$5"]]);
   assert.deepEqual(highLowNotices(w2, w2, members, 5), []);
+});
+
+test("statsOnly: a re-score says nothing, but a real change still does", () => {
+  const base = { week: 2, status: "active", amount: 25, winner: null,
+    entries: [{ memberId: "a", pick: "x" }, { memberId: "b", pick: "y" }],
+    stats: { rows: [{ key: "9", value: 10 }], updatedAt: "2026-09-13T18:00:00Z" } };
+  const rescored = { ...base, stats: { rows: [{ key: "9", value: 21 }], updatedAt: "2026-09-13T18:04:00Z" } };
+  assert.equal(statsOnly(base, rescored), true, "only the numbers moved — nothing to announce");
+
+  // the trigger stamps an id on `after`; the stored document has none, and that must not
+  // read as a change or the whole saving disappears
+  assert.equal(statsOnly(base, { ...rescored, id: "b1" }), true);
+
+  assert.equal(statsOnly(base, { ...rescored, status: "settled" }), false, "a settle is news");
+  assert.equal(statsOnly(base, { ...rescored, winner: "a" }), false);
+  assert.equal(statsOnly(base, { ...base, entries: [{ memberId: "a", pick: "x" }, { memberId: "c", pick: "y" }] }), false,
+    "somebody taking a seat is news");
+  assert.equal(statsOnly(null, base), false, "a brand new bet is very much news");
+  assert.equal(statsOnly(base, null), false, "and so is a deleted one");
+  assert.equal(statsOnly(base, base), true, "a write that changed nothing at all is also nothing to say");
 });

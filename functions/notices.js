@@ -12,6 +12,30 @@ function seated(b){ return ids(((b&&b.entries)||[]).map(function(e){ return e&&e
 function list(names){ return names.length<=2?names.join(" and "):names.slice(0,-1).join(", ")+" and "+names[names.length-1]; }
 
 // A bet document written: created, a seat taken, an invite passed, settled, voided, back on.
+// True when the only thing that moved is the numbers on the ticket. While games are on the
+// app re-scores every stat bet every few minutes, and each write reaches the trigger; there
+// is nothing to announce about a re-score, and deciding that before reading the member list
+// saves a document read per write. Ids are ignored: the trigger stamps one onto `after` and
+// the stored document has none.
+function statsOnly(before,after){
+  if(!before||!after) return false;
+  // Key order out of Firestore is not guaranteed, so compare a deterministic rendering.
+  // Not JSON.stringify's replacer argument: given an array it is an allowlist applied at
+  // every depth, so passing the top-level keys quietly empties nested objects and makes
+  // every change look like a re-score - which would silence bet notifications entirely.
+  var stable=function(v){
+    if(v===null||typeof v!=="object") return JSON.stringify(v);
+    if(Array.isArray(v)) return "["+v.map(stable).join(",")+"]";
+    return "{"+Object.keys(v).sort().map(function(k){ return JSON.stringify(k)+":"+stable(v[k]); }).join(",")+"}";
+  };
+  var strip=function(b){
+    var out={};
+    Object.keys(b).forEach(function(k){ if(k!=="stats"&&k!=="id") out[k]=b[k]; });
+    return stable(out);
+  };
+  return strip(before)===strip(after);
+}
+
 function betNotices(before,after,members){
   var out=[];
   if(!after) return out;   // deleted: nothing to say
@@ -90,4 +114,4 @@ function highLowNotices(before,after,members,stake){
   return out;
 }
 
-module.exports={ betNotices:betNotices, paymentNotices:paymentNotices, highLowNotices:highLowNotices, money:money };
+module.exports={ statsOnly, betNotices:betNotices, paymentNotices:paymentNotices, highLowNotices:highLowNotices, money:money };
