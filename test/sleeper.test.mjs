@@ -303,3 +303,42 @@ test("a draft record written before the keeper fields existed is refetched, not 
   assert.equal(hits.some((h) => /drafts|draft\//.test(h)), false, "a complete draft is never fetched twice");
   assert.equal(db2.writes.some((x) => x[1] === "league/draft"), false);
 });
+
+test("statsTick: bets re-score while games are live, and stay quiet when they aren't", async () => {
+  const stats = { rows: [{ key: "1", values: {}, value: 0 }], stat: "pts_ppr", tracks: [{ stat: "pts_ppr" }],
+    through: "Through week 1", updatedAt: new Date(Date.now() - 10 * 60000).toISOString() };
+  const bet = { id: "b1", stats };
+  const live = { games: [{ week: 1, status: "live", date: N.isoNow() }] };
+  const done = { games: [{ week: 1, status: "final", date: N.isoNow() }] };
+  const base = { config, holder: "m0", bets: [bet] };
+
+  let calls = 0;
+  globalThis.fetch = async (u) => { calls++; return { ok: true, json: async () => ({ 1: { pts_ppr: 21.5 } }) }; };
+
+  // no live game: the hourly pass is enough
+  let db = fakeDb();
+  await N.statsTick(db, { ...base, games: done });
+  assert.equal(calls, 0, "nothing is fetched when nothing is being played");
+  assert.equal(db.writes.length, 0);
+
+  // live, and the numbers are stale
+  db = fakeDb();
+  await N.statsTick(db, { ...base, games: live });
+  assert.equal(calls, 1, "one call for the season totals");
+  const w = db.writes.find((x) => x[1] === "bets/b1");
+  assert.ok(w, "and the bet is re-scored");
+  assert.equal(w[2].stats.rows[0].value, 21.5);
+  assert.equal(w[2].stats.through, "Through week 1", "the week it is through does not churn — only the numbers move");
+
+  // live but just done: left alone, or every open page would pull 150KB a minute
+  calls = 0; db = fakeDb();
+  const fresh = { ...bet, stats: { ...stats, updatedAt: N.isoNow() } };
+  await N.statsTick(db, { ...base, games: live, bets: [fresh] });
+  assert.equal(calls, 0, "inside the window, nothing happens");
+  assert.equal(db.writes.length, 0);
+
+  // a book with no stat bets never asks
+  calls = 0; db = fakeDb();
+  await N.statsTick(db, { ...base, games: live, bets: [{ id: "g1", game: { id: "x" } }] });
+  assert.equal(calls, 0, "a game bet tracks no stat, so there is nothing to re-score");
+});

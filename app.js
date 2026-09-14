@@ -28,7 +28,12 @@ mark("boot");
 // one someone happens to be reading.
 function refreshCtx(){ return { config:currentCfg(), games:state.games, refresh:state.refresh, bets:state.bets, roster:state.roster, proj:state.proj, sleeper:state.sleeper, highlow:state.allHighlow, scores:state.allScores, draft:state.allDraft, squads:state.allSquads, season:state.season,
                                 holder:state.me, mobile:/Mobi|Android/i.test(navigator.userAgent) }; }
-function scoresTick(db){ if(!db||state.local) return; N.scoresTick(db,refreshCtx()); }
+function scoresTick(db){
+  if(!db||state.local) return;
+  var ctx=refreshCtx();
+  N.scoresTick(db,ctx);
+  N.statsTick(db,ctx);   // bets re-scored while games are on, not once an hour
+}
 function runRefresh(db,by,forced){ return N.runRefresh(db,by,forced,refreshCtx()); }
 function makeDb(key){ return S.makeDb(key,{ refresh:runRefresh }); }
 

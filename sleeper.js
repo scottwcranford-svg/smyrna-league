@@ -242,6 +242,40 @@ export function boardTick(db,ctx,w){
   }).catch(function(){});
 }
 
+// Bets re-scored while games are on. The hourly pass already does this, but an hour is
+// far too long when the ticker beside it moves every minute: someone watches their player
+// score and the bet does not budge. This runs on the same minute tick, but only while a
+// game is actually live, and only every few minutes - the season totals are 150KB, so it
+// is not something to pull every sixty seconds from every open page.
+export const RESTAT_EVERY=4;   // minutes, while games are live
+
+export function statsTick(db,ctx){
+  if(!db) return Promise.resolve();
+  var G=Clock.allGames(ctx.games);
+  if(!G.some(function(g){ return g.status==="live"; })) return Promise.resolve();
+  var latest=null, tracked=0;
+  (ctx.bets||[]).forEach(function(b){
+    var S=b.stats;
+    if(!S||!Array.isArray(S.rows)) return;
+    tracked++;
+    if(S.updatedAt&&(!latest||String(S.updatedAt)>String(latest))) latest=S.updatedAt;
+  });
+  if(!tracked) return Promise.resolve();                       // nothing on the book tracks a stat
+  if(latest&&ageMin(latest)<RESTAT_EVERY) return Promise.resolve();
+  return lease(db,"restat",50000,holder(ctx)).then(function(ok){
+    if(!ok) return;
+    return sj(SLEEPER+"/v1/stats/nfl/regular/"+seasonOf(ctx.config)).then(function(totals){
+      var now=isoNow(), jobs=[];
+      (ctx.bets||[]).forEach(function(b){
+        // keep whatever "through week N" the hourly pass worked out; only the numbers move
+        var S=restat(b.stats,totals,(b.stats&&b.stats.through)||"",now);
+        if(S) jobs.push(db.doc("bets/"+b.id).update({ stats:S }));
+      });
+      return Promise.all(jobs);
+    });
+  }).catch(function(){});
+}
+
 export function scoresTick(db,ctx){
   if(!db) return Promise.resolve();
   var season=seasonOf(ctx.config), w=Clock.currentWeek(ctx.config,ctx.games), weeks=[w]; if(w<18) weeks.push(w+1);
