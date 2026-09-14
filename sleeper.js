@@ -118,7 +118,12 @@ export function draftRows(picks,traded){
 export function draftTick(db,ctx){
   var cfg=ctx.config||{}, here=Sn.currentSeason(cfg);
   var have=(ctx.draft&&ctx.draft.bySeason)||{};
-  if(have[here]&&(have[here].picks||[]).length) return Promise.resolve();
+  // A draft never changes, so this normally runs once - but "we already have one" is not
+  // the same as "we have all of it". A record written before byPlayer, rosters and
+  // keptPrev existed has picks and nothing to price a keeper with, and every player on
+  // the roster then reads as an undrafted waiver pickup. Refetch until the record is whole.
+  var rec=have[here];
+  if(rec&&(rec.picks||[]).length&&rec.byPlayer&&rec.rosters&&rec.keptPrev) return Promise.resolve();
   var lid=leagueIdOf(cfg);
   if(!lid) return Promise.resolve();
   return sj(SLEEPER+"/v1/league/"+lid+"/drafts").then(function(ds){

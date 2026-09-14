@@ -268,3 +268,38 @@ test("draftRows sorts into pick order whatever order Sleeper sends", () => {
     { round: 1, pick_no: 1, roster_id: 1, metadata: {} }], []);
   assert.deepEqual(out.map((r) => r.p), [1, 3, 15]);
 });
+
+test("a draft record written before the keeper fields existed is refetched, not trusted", async () => {
+  const hits = [];
+  globalThis.fetch = async (u) => {
+    hits.push(u.replace(/^.*\/v1\//, ""));
+    const j = /state\/nfl/.test(u) ? { week: 1 }
+      : /league\/L1\/drafts$/.test(u) ? [{ draft_id: "D1", season: "2026", type: "snake", settings: { rounds: 16 } }]
+      : /draft\/D1\/picks$/.test(u) ? [{ round: 4, pick_no: 40, draft_slot: 2, roster_id: 1, player_id: "p9",
+          metadata: { first_name: "Bo", last_name: "Nix", position: "QB", team: "DEN" } }]
+      : /draft\/D1\/traded_picks$/.test(u) ? []
+      : /league\/L1\/rosters$/.test(u) ? [{ roster_id: 1, owner_id: "u1", players: ["p9"], starters: ["p9"] }]
+      : /league\/L1\/users$/.test(u) ? [{ user_id: "u1", display_name: "hobnailboot" }]
+      : /stats\/nfl\/regular\/2026/.test(u) ? {} : [];
+    return { ok: true, json: async () => j, text: async () => "" };
+  };
+  const cfg = { ...config, sleeperLeagueId: "L1", scheduleUpdatedAt: N.isoNow(), members: [{ id: "m0", name: "hobnailboot" }] };
+  const base = { config: cfg, refresh: {}, bets: [], roster: { updatedAt: N.isoNow() }, holder: "m0", mobile: true };
+
+  // the old shape: picks and nothing to price a keeper with
+  const stale = { bySeason: { 2026: { draftId: "D1", picks: [{ r: 4, p: 40, roster: 1, name: "Bo Nix" }], byRoster: { 1: "hobnailboot" } } } };
+  const db = fakeDb();
+  await N.runRefresh(db, "m0", true, { ...base, draft: stale });
+  const w = db.writes.find((x) => x[1] === "league/draft");
+  assert.ok(w, "an incomplete record is refetched rather than left in place");
+  const rec = w[2].bySeason["2026"];
+  assert.deepEqual(rec.byPlayer, { p9: { r: 4, keeper: false } }, "so a drafted player can be priced");
+  assert.deepEqual(rec.rosters, { 1: ["p9"] });
+  assert.deepEqual(rec.keptPrev, {}, "no previous league here, but the field is present");
+
+  // and once it is whole, it is left alone
+  hits.length = 0; const db2 = fakeDb();
+  await N.runRefresh(db2, "m0", true, { ...base, draft: { bySeason: { 2026: rec } } });
+  assert.equal(hits.some((h) => /drafts|draft\//.test(h)), false, "a complete draft is never fetched twice");
+  assert.equal(db2.writes.some((x) => x[1] === "league/draft"), false);
+});
