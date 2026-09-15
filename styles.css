@@ -438,9 +438,11 @@ ol.dpicks li{display:flex;align-items:baseline;gap:7px;font-size:13px;min-width:
   border-radius:4px;padding:1px 5px;flex:none}
 .dfrom{font-size:10px;font-weight:700;color:var(--open);flex:none}
 .dgone{font-size:10px;font-weight:700;color:var(--ink-3);white-space:nowrap}
-/* the name gives way last: "from" and "now" tags shrink into an ellipsis first */
-ol.dpicks li .dnm{flex:0 1 auto;min-width:5.5em}
-ol.dpicks li .dfrom,ol.dpicks li .dgone{flex:0 50 auto;min-width:1.5em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* kept / from / now stack under the name rather than squeezing it */
+.dmgr ol.dpicks li{display:grid;grid-template-columns:38px minmax(0,1fr) auto;column-gap:7px;row-gap:1px;align-items:baseline}
+.dline{display:flex;align-items:baseline;gap:7px;min-width:0}
+.dmgr .drank{margin-left:0}
+.dtags{grid-column:2/-1;display:flex;flex-wrap:wrap;align-items:baseline;gap:3px 7px;margin-bottom:2px}
 ol.dpicks li.gone .dnm{color:var(--ink-3);text-decoration:line-through;text-decoration-color:var(--rule-2)}
 ol.dpicks li.gone .dpos{opacity:.55}
 ol.dpicks li[data-tip]:focus-visible{outline:none} ol.dpicks li[data-tip]:focus-visible .dnm{color:var(--accent)}

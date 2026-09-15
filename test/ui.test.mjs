@@ -1930,9 +1930,9 @@ test("Draft by manager: each player's position rank, an arrow against projection
     return { nix: read(nix), rice: read(rice), p1: read(li("Player 1")), p2: read(li("Player 2")),
       rightEdge: Math.round(nix.querySelector(".drank").getBoundingClientRect().right) === Math.round(nix.getBoundingClientRect().right) };
   });
-  assert.deepEqual(out.nix, { rank: "QB7▲", gone: false, tag: "", tip: "40.2 pts · 30 projected through WK 2", arrow: "dtrend up", strike: "none" }, "34% over: up");
-  assert.deepEqual(out.rice, { rank: "WR48▼", gone: true, tag: "now Alice", tip: "12 pts · 26.5 projected through WK 2 · now on Alice", arrow: "dtrend down", strike: "line-through" }, "Bob's pick, on Alice's team now");
-  assert.deepEqual(out.p1, { rank: "RB90", gone: true, tag: "dropped", tip: "3 pts · 3.1 projected through WK 2 · no longer on a roster", arrow: "", strike: "line-through" }, "within 10%: no arrow");
+  assert.deepEqual(out.nix, { rank: "QB7▲", gone: false, tag: "", tip: "Bo Nix · 40.2 pts · 30 projected through WK 2", arrow: "dtrend up", strike: "none" }, "34% over: up");
+  assert.deepEqual(out.rice, { rank: "WR48▼", gone: true, tag: "now Alice", tip: "Rashee Rice · 12 pts · 26.5 projected through WK 2 · now on Alice", arrow: "dtrend down", strike: "line-through" }, "Bob's pick, on Alice's team now");
+  assert.deepEqual(out.p1, { rank: "RB90", gone: true, tag: "dropped", tip: "Player 1 · 3 pts · 3.1 projected through WK 2 · no longer on a roster", arrow: "", strike: "line-through" }, "within 10%: no arrow");
   assert.deepEqual(out.p2, { rank: "", gone: false, tag: "", tip: "", arrow: "", strike: "none" }, "a pick with no id says nothing");
   assert.equal(out.rightEdge, true, "the rank sits at the card's right edge, a column down the list");
   assert.deepEqual(errors, []);

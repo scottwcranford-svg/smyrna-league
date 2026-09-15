@@ -275,6 +275,7 @@ function draftSeason(D,p){
   var tip=[];
   if(row) tip.push(row[0]+" pts · "+row[1]+" projected through "+weekLabel(state.players.through));
   if(now) tip.push(now==="dropped"?"no longer on a roster":"now on "+nowName);
+  if(tip.length) tip.unshift(p.name||"");   // a long name can be cut short on a narrow card
   return { gone:!!now, tip:tip.join(" · "),
     tag:now?'<span class="dgone">'+(now==="dropped"?"dropped":"now "+esc(nowName))+"</span>":"",
     rank:'<span class="drank">'+(row?(row[2]?esc(row[2]):"—"):"")+
@@ -295,10 +296,12 @@ function draftByManager(D){
     return '<div class="dmgr"><div class="dhead"><b>'+esc(who)+"</b><span>"+esc(meta)+"</span></div>"+
       '<ol class="dpicks">'+ps.map(function(p){
         var s=draftSeason(D,p);
+        // the name, position and rank on one line; kept, traded and gone on a line of their own under the name
+        var tags=(p.keeper?'<span class="dkept">KEPT</span>':"")+
+          (p.from!=null?'<span class="dfrom">from '+esc(draftName(D,p.from))+"</span>":"")+s.tag;
         return "<li"+(s.gone?' class="gone"':"")+(s.tip?' data-tip="'+esc(s.tip)+'" tabindex="0"':"")+"><span class='dno'>"+p.r+"."+(p.p<10?"0":"")+p.p+"</span>"+
-          "<span class='dnm'>"+esc(p.name||"—")+"</span>"+posTag(p.pos)+
-          (p.keeper?'<span class="dkept">KEPT</span>':"")+
-          (p.from!=null?'<span class="dfrom">from '+esc(draftName(D,p.from))+"</span>":"")+s.tag+s.rank+"</li>";
+          "<span class='dline'><span class='dnm'>"+esc(p.name||"—")+"</span>"+posTag(p.pos)+"</span>"+s.rank+
+          (tags?'<span class="dtags">'+tags+"</span>":"")+"</li>";
       }).join("")+"</ol></div>";
   }).join("")+"</div>";
 }
