@@ -45,6 +45,7 @@ try{ state.adminMode=localStorage.getItem(ADMIN_LS)==="on"; }catch(e){}
 try{ var savedTab=localStorage.getItem("smyrna.tab");
   if(savedTab==="hl"||savedTab==="scores") savedTab="league";
   if(["book","ledger","badges","league","rivals","settle"].indexOf(savedTab)>=0) state.tab=savedTab; }catch(e){}
+try{ state.rivalHL=localStorage.getItem("smyrna.rivalHL")==="on"; }catch(e){}
 // A tapped notification opens the app at its bet: ?bet=<id>, read before storedKey() tidies the address.
 var openBet=null; try{ openBet=new URLSearchParams(location.search).get("bet"); if(openBet) history.replaceState(null,"",location.pathname); }catch(e){}
 function applyAuth(user){ var w=A.whoAmI(user,state.config); state.me=w.me; state.isAdmin=w.admin; state.admin=w.admin&&state.adminMode; stampSeen(); }

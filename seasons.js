@@ -136,6 +136,15 @@ export function duesPayouts(config,season){
   });
   return { places:places, byId:byId, decided:any, treasurer:per.treasurer||null };
 }
+// Whether a season is over, for settling up: nobody pays until it is. A season behind the
+// one being played is over; the one being played is over once an admin has named its
+// playoff champion. Nothing here reads the clock, so it never changes on its own.
+export function seasonOver(config,season){
+  var s=String(season);
+  if(s<currentSeason(config)) return true;
+  var per=config&&config.bySeason&&config.bySeason[s];
+  return !!(per&&per.payoutWinners&&per.payoutWinners.champ);
+}
 // Mark a manager paid or unpaid for a season, in place. Unpaid is written as null rather
 // than removed, so the same change can go to Firestore as a merge. Returns the config.
 export function setDues(config,season,memberId,paid,by,at){

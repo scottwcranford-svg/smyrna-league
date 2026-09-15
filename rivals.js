@@ -8,10 +8,15 @@ import { entriesOf, r2 } from "./fmt.js?v=dev";
    so a four-way pot won by one manager is three wins for them and one loss each for
    the others — exactly what the money did. Pushes and voids count for nobody.
    `byId[a][b]` is a's record against b: net dollars from a's side, wins, losses, and
-   the bets behind them, newest first. Pure: the page hands it the book. */
-export function rivals(members,bets){
+   the bets behind them, newest first. Pure: the page hands it the book.
+   Hand it the season's hi/low too ({ weeks: { "3": { high, low } } } and the stake) and
+   each week counts as well: the low score paid the high score, so it is a win and the
+   stake on that pair, split if there was a tie - the same money Settle Up counts. Each
+   cell then also carries `weeks` (newest first) and `hl`, the hi/low part on its own. */
+export function rivals(members,bets,highlow,stake){
   var ids=(members||[]).map(function(m){ return m.id; });
-  var byId={}, blank=function(){ return { net:0, w:0, l:0, bets:[] }; };
+  var withHL=!!highlow;
+  var byId={}, blank=function(){ var c={ net:0, w:0, l:0, bets:[] }; if(withHL){ c.weeks=[]; c.hl={ net:0, w:0, l:0 }; } return c; };
   var cell=function(a,b){
     if(!byId[a]) byId[a]={};
     if(!byId[a][b]) byId[a][b]=blank();
@@ -36,10 +41,27 @@ export function rivals(members,bets){
     });
   });
 
+  if(withHL){
+    var st=Number(stake)||0, weeks=(highlow&&highlow.weeks)||{};
+    Object.keys(weeks).forEach(function(k){
+      var e=weeks[k], w=Number(k);
+      if(!(w>0)||!e||!e.high||!e.low||!e.high.length||!e.low.length) return;
+      var amt=st/(e.high.length*e.low.length);   // each high collects stake/highs, each low pays stake/lows
+      e.high.forEach(function(hi){ e.low.forEach(function(lo){
+        if(!hi.id||!lo.id||hi.id===lo.id||!byId[hi.id]||!byId[lo.id]) return;
+        var W=cell(hi.id,lo.id), L=cell(lo.id,hi.id);
+        W.net+=amt; W.w++; W.hl.net+=amt; W.hl.w++; W.weeks.push({ week:w, won:true, pts:hi.pts, theirPts:lo.pts, amount:amt });
+        L.net-=amt; L.l++; L.hl.net-=amt; L.hl.l++; L.weeks.push({ week:w, won:false, pts:lo.pts, theirPts:hi.pts, amount:amt });
+      }); });
+    });
+  }
+
   var order=function(x,y){ return String(y.at||"").localeCompare(String(x.at||""))||(y.week-x.week); };
   Object.keys(byId).forEach(function(a){ Object.keys(byId[a]).forEach(function(b){
-    byId[a][b].net=r2(byId[a][b].net);
-    byId[a][b].bets.sort(order);
+    var c=byId[a][b];
+    c.net=r2(c.net);
+    c.bets.sort(order);
+    if(withHL){ c.hl.net=r2(c.hl.net); c.weeks.sort(function(x,y){ return y.week-x.week; }); }
   }); });
 
   // one row per manager: their record across everyone

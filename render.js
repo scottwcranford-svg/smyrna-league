@@ -615,8 +615,12 @@ function badgesView(){
 function rivalsView(){
   var host=document.getElementById("rivals");
   var list=realMembers().filter(function(m){ return !m.test; });
-  var RV=Rivals.rivals(list,state.bets);
-  var played=Object.keys(RV.totals).some(function(id){ return RV.totals[id].w||RV.totals[id].l; });
+  // hi/low folds into the grid only with the switch on; the bragging rights stay about bets
+  var hlOn=!!state.rivalHL, hlStake=Ledger.hlStake(seasonCfg());
+  var bets0=Rivals.rivals(list,state.bets);
+  var RV=hlOn?Rivals.rivals(list,state.bets,state.highlow||{ weeks:{} },hlStake):bets0;
+  var hlWeeks=Object.keys((state.highlow&&state.highlow.weeks)||{}).length>0;
+  var played=hlWeeks||Object.keys(bets0.totals).some(function(id){ return bets0.totals[id].w||bets0.totals[id].l; });
   if(!played){
     host.innerHTML='<div class="empty">Nothing has settled yet. Once bets start paying out, this is where you see who owns whom — every pair, all season.</div>';
     return;
@@ -650,6 +654,16 @@ function rivalsView(){
   // the grid, richest season first
   var order=list.slice().sort(function(x,y){ return (RV.totals[y.id].net-RV.totals[x.id].net)||x.name.localeCompare(y.name); });
   var sel=state.rival;
+  // the hover: the record, and with hi/low on, how much of it is bets and how much hi/low
+  var tip=function(a,b,r){
+    var t=a.name+" vs "+b.name+" · "+rec(r);
+    if(!hlOn) return t;
+    var bn=Math.round((r.net-r.hl.net)*100)/100;
+    return t+"\nbets "+signed(bn)+" · "+(r.w-r.hl.w)+"–"+(r.l-r.hl.l)+
+      "\nhi/low "+signed(r.hl.net)+" · "+r.hl.w+"–"+r.hl.l+
+      (r.weeks.length?" ("+r.weeks.map(function(x){ return "wk "+x.week+" "+(x.won?"high":"low"); }).join(", ")+")":"");
+  };
+  h+='<label class="check riv-hl-tog"><input type="checkbox" data-act="rivalHL"'+(hlOn?" checked":"")+'> Include hi/low</label>';
   h+='<div class="riv-wrap"><table class="riv"><thead><tr><th></th>'+
     order.map(function(m){ return '<th'+(m.id===state.me?' class="me"':"")+' data-tip="'+esc(m.name)+'">'+avatarHtml(m.id,22)+"<span>"+esc(m.name)+"</span></th>"; }).join("")+
     '<th class="tot">Season</th></tr></thead><tbody>'+
@@ -662,11 +676,11 @@ function rivalsView(){
           if(!n) return '<td class="c none"><b>·</b></td>';
           var on=sel&&((sel.a===a.id&&sel.b===b.id)||(sel.a===b.id&&sel.b===a.id));
           return '<td class="c '+(r.net>0?"pos":r.net<0?"neg":"flat")+(on?" sel":"")+'" data-act="rival" data-a="'+esc(a.id)+'" data-b="'+esc(b.id)+'" tabindex="0"'+
-            ' data-tip="'+esc(a.name+" vs "+b.name+" · "+rec(r))+'"><b>'+esc(signed(r.net))+"</b><small>"+rec(r)+"</small></td>";
+            ' data-tip="'+esc(tip(a,b,r))+'"><b>'+esc(signed(r.net))+"</b><small>"+rec(r)+"</small></td>";
         }).join("")+
         '<td class="tot '+(t.net>0?"pos":t.net<0?"neg":"flat")+'"><b>'+esc(signed(t.net))+"</b><small>"+rec(t)+"</small></td></tr>";
     }).join("")+"</tbody></table></div>";
-  h+='<div class="riv-legend"><span><i class="sw pos"></i>the row is up on that column</span><span><i class="sw neg"></i>down</span><span>· the small line is wins–losses</span></div>';
+  h+='<div class="riv-legend"><span><i class="sw pos"></i>the row is up on that column</span><span><i class="sw neg"></i>down</span><span>· the small line is wins–losses'+(hlOn?", a hi/low week counting as one":"")+"</span></div>";
 
   // the bets behind the open cell
   if(sel&&RV.byId[sel.a]&&RV.byId[sel.a][sel.b]){
@@ -680,11 +694,20 @@ function rivalsView(){
           '<span class="riv-nm"><b>'+esc(x.name)+"</b><small>"+esc(money(x.amount))+" a side</small></span>"+
           '<span class="riv-w '+(x.won?"pos":"neg")+'">'+esc(name(x.won?sel.a:sel.b))+" won</span>"+
           '<b class="num '+(x.won?"pos":"neg")+'">'+esc(signed(x.won?x.amount:-x.amount))+"</b></div>";
-      }).join("")+"</div>";
+      }).join("")+
+      // with hi/low on, the weeks one of them was high and the other low, under the bets
+      (hlOn&&r.weeks.length?'<div class="riv-sub lbl">Hi / low</div>'+r.weeks.map(function(x){
+        var pts=function(v){ return v!=null?" · "+v:""; };
+        return '<div class="riv-bet hl">'+
+          '<span class="wk">'+esc(weekLabel(x.week))+"</span>"+
+          '<span class="riv-nm"><b>'+(x.won?"High score":"Low score")+esc(pts(x.pts))+"</b><small>"+(x.won?"over ":"under ")+esc(name(sel.b))+esc(pts(x.theirPts))+"</small></span>"+
+          '<span class="riv-w '+(x.won?"pos":"neg")+'">'+esc(name(sel.a))+" "+(x.won?"high":"low")+"</span>"+
+          '<b class="num '+(x.won?"pos":"neg")+'">'+esc(signed(x.won?x.amount:-x.amount))+"</b></div>";
+      }).join(""):"")+"</div>";
   }
 
   // bragging rights, and the last few results
-  var H=Rivals.rivalHighlights(RV,state.bets,list);
+  var H=Rivals.rivalHighlights(bets0,state.bets,list);
   var rows=[];
   if(H.rivalry) rows.push(["Biggest rivalry",esc(name(H.rivalry.a))+" vs "+esc(name(H.rivalry.b))+" · "+money(H.rivalry.moved)+" has changed hands",H.rivalry.w+"–"+H.rivalry.l,"gold",[H.rivalry.a,H.rivalry.b]]);
   if(H.lopsided) rows.push(["Most lopsided",esc(name(H.lopsided.a))+" owns "+esc(name(H.lopsided.b)),money(H.lopsided.net),"pos",[H.lopsided.a]]);
@@ -748,9 +771,9 @@ function settle(){
         '<b class="'+cls(n)+'" data-act="drill" data-m="'+esc(m.id)+'" data-row="total" data-tip="What’s behind this" tabindex="0">'+esc(signed(n))+"</b>"+
         '<div class="bal-lines">'+lines+"</div></div>"; }).join("")+"</div>";
 
-  // what would clear it
-  var T=B.transfers;
-  h+='<div class="bal-head" style="margin-top:16px"><span class="lbl">'+(T.length?"To clear it · "+T.length+(T.length===1?" payment":" payments"):"All square")+"</span>"+
+  // what would clear it - only once the season is over, since nobody pays before then
+  var T=Sn.seasonOver(state.config,Sn.shownSeasonOf(state))?B.transfers:[];
+  if(T.length||B.transfers.length===0) h+='<div class="bal-head" style="margin-top:16px"><span class="lbl">'+(T.length?"To clear it · "+T.length+(T.length===1?" payment":" payments"):"All square")+"</span>"+
     '<span class="note">'+(T.length?"The fewest transfers that zero everyone out. Mark each one paid as the money moves.":"Nobody owes anybody.")+"</span></div>";
   if(T.length) h+='<div class="settle">'+T.map(function(d){
     return '<div class="debt"><div class="debt-txt">'+avatarHtml(d.from,24)+"<b>"+esc(mName(d.from))+'</b><span class="pay-arrow">\u2192</span>'+avatarHtml(d.to,24)+"<b>"+esc(mName(d.to))+"</b></div>"+

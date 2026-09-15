@@ -380,7 +380,7 @@ dialog::backdrop{background:rgba(10,12,18,.6)}
    it is talking about. Fixed to the viewport so a scrolling wrapper can't clip it. */
 #tip{position:fixed;z-index:100;max-width:260px;padding:7px 11px;border-radius:9px;
   background:var(--ink);color:var(--bg);box-shadow:0 8px 24px -8px rgba(0,0,0,.55);
-  font-size:12px;font-weight:700;line-height:1.35;
+  font-size:12px;font-weight:700;line-height:1.35;white-space:pre-line;
   pointer-events:none;opacity:0;transform:translateY(2px);transition:opacity .12s ease,transform .12s ease}
 #tip.show{opacity:1;transform:translateY(0)}
 #tip::after{content:"";position:absolute;left:50%;margin-left:-4px;width:8px;height:8px;
@@ -678,6 +678,7 @@ button.bal-ln{cursor:pointer} button.bal-ln:hover{color:var(--ink-2)}
 .riv-n{font-variant-numeric:tabular-nums;font-weight:800}
 .riv-you .riv-n{font-family:"Poppins","Inter",system-ui,sans-serif;font-size:21px}
 .riv-n.pos{color:var(--win)} .riv-n.neg{color:var(--loss)} .riv-n.flat{color:var(--ink-3)} .riv-n.gold{color:var(--gold)}
+.riv-hl-tog{margin:0 2px 8px;width:max-content}
 .riv-wrap{overflow-x:auto;border:1px solid var(--rule);border-radius:16px;background:var(--surface-3)}
 .riv{border-collapse:separate;border-spacing:0;width:100%;min-width:600px;font-size:12px}
 .riv th,.riv td{padding:0;border-bottom:1px solid var(--rule)}
@@ -716,6 +717,8 @@ button.bal-ln{cursor:pointer} button.bal-ln:hover{color:var(--ink-2)}
 .riv-bet{display:grid;grid-template-columns:auto 1fr auto auto;gap:10px;align-items:center;padding:7px 0;border-top:1px solid var(--rule);font-size:13px;cursor:pointer}
 .riv-bet:hover .riv-nm b,.riv-bet:focus-visible .riv-nm b{color:var(--accent)}
 .riv-bet:focus-visible{outline:none}
+.riv-bet.hl{cursor:default} .riv-bet.hl:hover .riv-nm b{color:inherit}
+.riv-drill .riv-sub{display:block;margin:10px 0 2px}
 .riv-nm{min-width:0}
 .riv-nm b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .riv-nm small{color:var(--ink-3);font-size:11.5px}

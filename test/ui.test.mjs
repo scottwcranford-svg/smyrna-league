@@ -478,12 +478,17 @@ test("Settle Up: a balance card per manager with hi/low, weekly, season and what
     ];
     state.highlow = { weeks: { "1": { high: [{ id: "b", name: "Bob", pts: 140 }], low: [{ id: "c", name: "Cara", pts: 90 }] } } };
     V.render();
-    return { table: !!document.querySelector("#settle table"),
+    // nobody pays until the season's over: no transfers, no "To clear it", until the champion is named
+    const during = { debts: document.querySelectorAll("#settle .debt").length, heads: [...document.querySelectorAll("#settle .bal-head .lbl")].map(x => x.textContent) };
+    state.config = { ...state.config, bySeason: { "2026": { payoutWinners: { champ: "b" } } } };
+    V.render();
+    return { during, table: !!document.querySelector("#settle table"),
       you: document.querySelector("#settle .you-line").textContent,
       balances: [...document.querySelectorAll("#settle .bal")].map(b => [b.querySelector(".bal-name").textContent, b.querySelector("b").textContent, b.classList.contains("me")]),
       lines: [...document.querySelectorAll("#settle .bal")].map(b => [...b.querySelectorAll(".bal-ln")].map(x => x.textContent + (x.querySelector("span") ? ":" + x.querySelector("span").className : ""))),
       transfers: [...document.querySelectorAll("#settle .debt")].map(d => [d.querySelector(".debt-txt").textContent.replace(/^[A-Z]{2}/, "").replace(/→[A-Z]{2}/, "→"), d.querySelector(".debt-amt").textContent]) };
   });
+  assert.deepEqual(out.during, { debts: 0, heads: ["Balances · if the season ended now", "Paid so far · 1"] }, "mid-season: balances and the log, no transfers to mark paid");
   assert.equal(out.table, false, "no season table: the cards carry it");
   assert.deepEqual(out.lines, [
     ["hi/low +$5:pos", "side bets −$25:neg", "paid $25"],
@@ -1043,6 +1048,45 @@ test("Rivals: a grid of every pair, your two rivalries above it, and the bets be
   assert.equal(out.closed, true, "a second click on the open cell closes it");
   assert.deepEqual(out.brag, [["Biggest rivalry", "2–0"], ["Most lopsided", "$35"], ["The hammer", "2 W"], ["The nail", "3 L"], ["Biggest haul", "$40"]]);
   assert.deepEqual(out.feed, ["Cara beat Alice, Bob", "Alice beat Bob", "Alice beat Bob"]);
+  assert.deepEqual(errors, []);
+  await p.close();
+});
+
+test("Rivals: the Include hi/low switch folds hi/low weeks into the cells, the hover and the drill", { skip }, async () => {
+  const { p, errors } = await page();
+  const out = await p.evaluate(async (BETS) => {
+    const { state, setHighlow } = await import("./state.js?v=dev"); const V = await import("./render.js?v=dev");
+    state.bets = BETS; state.tab = "rivals";
+    setHighlow({ weeks: { "3": { high: [{ id: "a", name: "Alice", pts: 141.2 }], low: [{ id: "b", name: "Bob", pts: 88.4 }] } } });
+    V.render();
+    const w = () => new Promise(r => setTimeout(r, 40));
+    const cell = () => document.querySelector('#rivals .riv td.c[data-a="a"][data-b="b"]');
+    const res = {};
+    res.off = { checked: document.querySelector('#rivals [data-act="rivalHL"]').checked, cell: cell().querySelector("b").textContent, tip: cell().getAttribute("data-tip") };
+    const box = document.querySelector('#rivals [data-act="rivalHL"]'); box.checked = true; box.dispatchEvent(new Event("change", { bubbles: true })); await w();
+    res.on = { stored: localStorage.getItem("smyrna.rivalHL"), cell: cell().querySelector("b").textContent, rec: cell().querySelector("small").textContent, tip: cell().getAttribute("data-tip"),
+      tot: document.querySelector('#rivals .riv tbody tr:nth-child(1) td.tot b').textContent };
+    cell().click(); await w();
+    const d = document.querySelector("#rivals .riv-drill");
+    res.head = d.querySelector(".riv-rec").textContent;
+    res.drill = [...d.querySelectorAll(".riv-bet")].map(x => [x.querySelector(".wk").textContent, x.querySelector(".riv-nm b").textContent, x.querySelector(".riv-nm small").textContent, x.querySelector(".riv-w").textContent, x.querySelector("b.num").textContent, x.classList.contains("hl")]);
+    res.brag = [...document.querySelectorAll("#rivals .riv-brag")].map(x => [x.querySelector(".riv-t b").textContent, x.querySelector(".riv-n").textContent])[2];
+    // the tip draws the lines on their own rows
+    const { showTip } = await import("./tips.js?v=dev"); showTip(cell());
+    res.tipLines = document.getElementById("tip").getClientRects().length && getComputedStyle(document.getElementById("tip")).whiteSpace;
+    try { localStorage.removeItem("smyrna.rivalHL"); } catch (e) {}
+    return res;
+  }, RIVAL_BETS);
+  assert.deepEqual(out.off, { checked: false, cell: "+$35", tip: "Alice vs Bob · 2–0" }, "off by default: bets only");
+  assert.deepEqual(out.on, { stored: "on", cell: "+$40", rec: "3–0", tip: "Alice vs Bob · 3–0\nbets +$35 · 2–0\nhi/low +$5 · 1–0 (wk 3 high)", tot: "+$40" },
+    "on: week 3's high over Bob is +$5 and a win in the cell, and the hover splits it");
+  assert.equal(out.head, "3–0 · +$40");
+  assert.deepEqual(out.drill, [
+    ["WK 2", "Gun Slinger", "$10 a side", "Alice won", "+$10", false],
+    ["WK 1", "Opener", "$25 a side", "Alice won", "+$25", false],
+    ["WK 3", "High score · 141.2", "over Bob · 88.4", "Alice high", "+$5", true]], "the bets, then the hi/low weeks");
+  assert.deepEqual(out.brag, ["The hammer", "2 W"], "bragging rights stay about bets");
+  assert.equal(out.tipLines, "pre-line");
   assert.deepEqual(errors, []);
   await p.close();
 });

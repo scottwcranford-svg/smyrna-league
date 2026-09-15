@@ -126,6 +126,19 @@ test("league dues amount: per season, cleared by blank or zero", () => {
   S.setDuesAmount(config, "2027", 150.456); assert.equal(config.bySeason["2027"].dues, 150.46); assert.equal(config.bySeason["2027"].leagueId, "L27");
 });
 
+test("seasonOver: a past season is over; the one being played is over once its champion is named", () => {
+  const config = { season: "2027", bySeason: {} };
+  assert.equal(S.seasonOver(config, "2026"), true, "behind the one being played");
+  assert.equal(S.seasonOver(config, "2027"), false, "being played, no champion yet");
+  S.setPayoutWinner(config, "2027", "reg1", "a");
+  assert.equal(S.seasonOver(config, "2027"), false, "a regular-season place isn't the end");
+  S.setPayoutWinner(config, "2027", "champ", "a");
+  assert.equal(S.seasonOver(config, "2027"), true);
+  S.setPayoutWinner(config, "2027", "champ", null);
+  assert.equal(S.seasonOver(config, "2027"), false, "clearing the champion opens it again");
+  assert.equal(S.seasonOver({}, "2026"), false, "no config: 2026 is being played");
+});
+
 test("dues payouts: the treasurer, what each place pays, who won it, per season", () => {
   const config = { season: "2026", members: [{ id: "a" }, { id: "b" }, { id: "c" }], bySeason: { "2025": { payouts: { reg1: 500 } } } };
   S.setPayouts(config, "2026", "c", { reg1: "800", reg2: "400", reg3: "200", champ: "600" });

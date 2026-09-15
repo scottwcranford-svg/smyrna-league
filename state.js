@@ -28,6 +28,7 @@ export const state = {
   lines:null,     // league/lines: Vegas's spread and total per game, from the schedule file
   badges:null,    // league/badges: { byKey: { <badge>: { holder, value, at, week, from, since } } }
   rival:null,     // Rivals: { a, b } — the pair whose bets are open under the grid
+  rivalHL:false,  // Rivals: fold hi/low weeks into the grid — remembered per device
   unfolded:{},   // on a phone, tickets and ledger rows fold; ids opened by a tap live here
   timing:{},     // sign-in stopwatch, ms since navigation: boot, auth, click, key, signed, open — the footer shows it
   tab:"book",     // which panel is open: book, ledger, hl, settle — remembered per device   // league/seen: when each manager last opened the app

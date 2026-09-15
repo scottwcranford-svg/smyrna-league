@@ -33,6 +33,25 @@ test("rivals: every settled bet is a set of pairs; a pot is one win per loser", 
   assert.deepEqual(F.map(x => [x.name, x.winner, x.losers.length, x.pot]), [["Pot", "m0", 3, 30], ["Opener", "m1", 1, 25]], "newest first, one line per settled bet");
 });
 
+test("rivals with hi/low: the low paid the high, a win and the stake on that pair; a tie splits it like Settle Up", () => {
+  const members = [{ id: "a" }, { id: "b" }, { id: "c" }];
+  const bets = [{ id: "b1", status: "settled", week: 1, name: "Opener", amount: 25, winner: "b", entries: [{ memberId: "a" }, { memberId: "b" }] }];
+  const highlow = { weeks: {
+    "1": { high: [{ id: "a", pts: 140 }], low: [{ id: "b", pts: 90 }] },
+    "2": { high: [{ id: "a", pts: 150 }], low: [{ id: "b", pts: 80 }, { id: "c", pts: 80 }] },
+    "3": { high: [{ id: "c", pts: 130 }], low: [] },   // not finished: ignored
+  } };
+  const V = Rivals.rivals(members, bets, highlow, 5);
+  const ab = V.byId.a.b;
+  assert.deepEqual({ net: ab.net, w: ab.w, l: ab.l, hl: ab.hl }, { net: -17.5, w: 2, l: 1, hl: { net: 7.5, w: 2, l: 0 } }, "−25 on the bet, +5 and +2.50 on hi/low");
+  assert.deepEqual(ab.weeks.map(x => [x.week, x.won, x.pts, x.theirPts, x.amount]), [[2, true, 150, 80, 2.5], [1, true, 140, 90, 5]], "newest first");
+  assert.deepEqual(V.byId.b.a.hl, { net: -7.5, w: 0, l: 2 }, "the mirror");
+  assert.equal(V.byId.c.a.net, -2.5);
+  assert.equal(V.totals.a.net + V.totals.b.net + V.totals.c.net, 0, "money only moves between them");
+  assert.equal(V.totals.a.net - (-25), 10, "a's hi/low part matches hlTally: +5, +5");
+  assert.deepEqual(Rivals.rivals(members, bets).byId.a.b, { net: -25, w: 0, l: 1, bets: ab.bets }, "without hi/low the cell is bets only");
+});
+
 test("rivals: an empty book has every pair at zero and no highlights", () => {
   const members = [{ id: "a", name: "A" }, { id: "b", name: "B" }];
   const V = Rivals.rivals(members, []);

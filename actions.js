@@ -166,6 +166,12 @@ const CHANGES = {
     toast(t.checked?mm.name+" is an admin":mm.name+" is no longer an admin");
   },
   week:function(t){ state.filter.week=t.value; touch(); },
+  // Rivals: hi/low weeks in the grid or not, remembered on this device
+  rivalHL:function(t){
+    state.rivalHL=!!t.checked;
+    try{ localStorage.setItem("smyrna.rivalHL",t.checked?"on":"off"); }catch(e){}
+    touch();
+  },
   payWinner:function(t){ B.savePayoutWinner(shownSeason(),attr(t,"data-place"),t.value||null); },
   // the picker's filters
   dTeam:function(t){ state.draftTeam=t.value; F.refilter(); },
