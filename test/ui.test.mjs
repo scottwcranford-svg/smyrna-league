@@ -1911,6 +1911,34 @@ test("the League tab holds Scores, the Draft and the Roster", { skip }, async ()
   await p.close();
 });
 
+test("Draft by manager: each player's position rank, an arrow against projection, and who's no longer on the team", { skip }, async () => {
+  const { p, errors } = await page();
+  await withDraft(p);
+  const out = await p.evaluate(async () => {
+    const V = await import("./render.js?v=dev"); const St = await import("./state.js?v=dev");
+    St.state.draftView = "mgr";
+    const D = St.state.draftBoard;
+    // Bo Nix (p4) and Rashee Rice (p5) carry ids; Rice was Bob's pick and is now Alice's, Nix is still Alice's
+    D.picks.forEach(x => { if (x.name === "Bo Nix") x.pid = "p4"; if (x.name === "Rashee Rice") x.pid = "p5"; if (x.name === "Player 1") x.pid = "gone"; });
+    St.setSquads({ bySeason: { 2026: { byRoster: { 1: "Alice", 2: "Bob", 3: "Cara" }, rosters: { 1: ["p4", "p5"], 2: [], 3: [] } } } });
+    St.setPlayers({ bySeason: { 2026: { through: 2, field: "pts_ppr", rows: JSON.stringify({ p4: [40.2, 30, "QB7"], p5: [12, 26.5, "WR48"], gone: [3, 3.1, "RB90"] }) } } });
+    V.render(); await new Promise(r => setTimeout(r, 30));
+    const li = (name) => [...document.querySelectorAll("#draft .dpicks li")].find(l => l.querySelector(".dnm").textContent === name);
+    const read = (l) => ({ rank: l.querySelector(".drank").textContent, gone: l.classList.contains("gone"), tag: l.querySelector(".dgone")?.textContent || "", tip: l.getAttribute("data-tip") || "",
+      arrow: l.querySelector(".dtrend")?.className || "", strike: getComputedStyle(l.querySelector(".dnm")).textDecorationLine });
+    const nix = li("Bo Nix"), rice = li("Rashee Rice");
+    return { nix: read(nix), rice: read(rice), p1: read(li("Player 1")), p2: read(li("Player 2")),
+      rightEdge: Math.round(nix.querySelector(".drank").getBoundingClientRect().right) === Math.round(nix.getBoundingClientRect().right) };
+  });
+  assert.deepEqual(out.nix, { rank: "QB7▲", gone: false, tag: "", tip: "40.2 pts · 30 projected through WK 2", arrow: "dtrend up", strike: "none" }, "34% over: up");
+  assert.deepEqual(out.rice, { rank: "WR48▼", gone: true, tag: "now Alice", tip: "12 pts · 26.5 projected through WK 2 · now on Alice", arrow: "dtrend down", strike: "line-through" }, "Bob's pick, on Alice's team now");
+  assert.deepEqual(out.p1, { rank: "RB90", gone: true, tag: "dropped", tip: "3 pts · 3.1 projected through WK 2 · no longer on a roster", arrow: "", strike: "line-through" }, "within 10%: no arrow");
+  assert.deepEqual(out.p2, { rank: "", gone: false, tag: "", tip: "", arrow: "", strike: "none" }, "a pick with no id says nothing");
+  assert.equal(out.rightEdge, true, "the rank sits at the card's right edge, a column down the list");
+  assert.deepEqual(errors, []);
+  await p.close();
+});
+
 test("phone: the League tab's switches fill the width and the cards stack", { skip }, async () => {
   const { p, errors } = await page(null, PHONE);
   await withDraft(p);

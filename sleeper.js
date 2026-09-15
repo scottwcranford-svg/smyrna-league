@@ -11,6 +11,7 @@ import * as Sched from "./schedule.js?v=dev";
 import * as Stats from "./stats.js?v=dev";
 import * as Ledger from "./ledger.js?v=dev";
 import * as Sn from "./seasons.js?v=dev";
+import * as Players from "./players.js?v=dev";
 import { lease } from "./store.js?v=dev";
 
 export const SLEEPER="https://api.sleeper.app";
@@ -109,7 +110,7 @@ export function draftRows(picks,traded){
     var from=(slot!=null&&moved[String(x.round)+"|"+String(slot)])?slot:null;
     return { r:Number(x.round), p:Number(x.pick_no), slot:slot, roster:Number(x.roster_id),
       name:((m.first_name||"")+" "+(m.last_name||"")).trim(), pos:m.position||"", team:m.team||"",
-      keeper:!!x.is_keeper, from:(from!=null&&from!==Number(x.roster_id))?from:null };
+      keeper:!!x.is_keeper, from:(from!=null&&from!==Number(x.roster_id))?from:null, pid:String(x.player_id||"") };
   }).sort(function(a,b){ return a.p-b.p; });
 }
 
@@ -123,7 +124,8 @@ export function draftTick(db,ctx){
   // keptPrev existed has picks and nothing to price a keeper with, and every player on
   // the roster then reads as an undrafted waiver pickup. Refetch until the record is whole.
   var rec=have[here];
-  if(rec&&(rec.picks||[]).length&&rec.byPlayer&&rec.rosters&&rec.keptPrev) return Promise.resolve();
+  // Picks gained their player id later still, for the board's rank and roster check.
+  if(rec&&(rec.picks||[]).length&&rec.byPlayer&&rec.rosters&&rec.keptPrev&&rec.picks.every(function(p){ return "pid" in p; })) return Promise.resolve();
   var lid=leagueIdOf(cfg);
   if(!lid) return Promise.resolve();
   return sj(SLEEPER+"/v1/league/"+lid+"/drafts").then(function(ds){
@@ -163,6 +165,41 @@ export function draftTick(db,ctx){
         byRoster:byRoster, rosters:squads, byPlayer:byPlayer, keptPrev:all[4]||{}, picks:rows };
       return db.doc("league/draft").set(Object.assign({},ctx.draft||{},{ updatedAt:isoNow(), bySeason:out }));
     });
+  }).catch(function(){});
+}
+
+// Every player's season so far (players.js): points through the last finished week, the
+// projection for the same weeks, and the position rank. The weekly stats are the ones the
+// refresh has just walked; a finished week's projection is fetched once and kept. Written
+// only when something moved - no clock value is compared, so it can't loop.
+export function playersTick(db,ctx,byWeek,season){
+  var cfg=ctx.config||{}, here=Sn.currentSeason(cfg);
+  var rows=Roster.rosterRows(ctx.roster);
+  var F=Players.finalThrough(Clock.finalWeeks(ctx.games));
+  if(String(season)!==here||!rows.length||!F) return Promise.resolve();
+  for(var w=1;w<=F;w++) if(!byWeek[w]) return Promise.resolve();   // stats not all in yet: next hour
+  var field=Players.fieldFor(ctx.sleeper&&ctx.sleeper.league&&ctx.sleeper.league.scoring);
+  var doc=ctx.players||{}, cur=(doc.bySeason&&doc.bySeason[here])||{};
+  var have=cur.field===field?(cur.proj||{}):{};
+  var ids=rows.map(function(r){ return r[0]; }), need=[];
+  for(var k=1;k<=F;k++) if(!have[k]) need.push(k);
+  return Promise.all(need.map(function(w){
+    return sj(SLEEPER+"/v1/projections/nfl/regular/"+season+"/"+w)
+      .then(function(raw){ return [w,JSON.stringify(Players.weekPoints(raw,ids,field))]; })
+      .catch(function(){ return [w,null]; });
+  })).then(function(got){
+    var proj=Object.assign({},have);
+    got.forEach(function(g){ if(g[1]) proj[g[0]]=g[1]; });
+    var act=[], pw=[];
+    for(var w=1;w<=F;w++){
+      if(!proj[w]) return;   // a projection didn't arrive: try again next hour
+      act.push(byWeek[w]); pw.push(JSON.parse(proj[w]));
+    }
+    var out=JSON.stringify(Players.seasonRows(act,pw,rows,field));
+    if(cur.rows===out&&cur.through===F&&cur.field===field&&!got.length) return;
+    var bs=Object.assign({},doc.bySeason||{});
+    bs[here]={ through:F, field:field, rows:out, proj:proj };
+    return db.doc("league/players").set({ updatedAt:isoNow(), bySeason:bs });
   }).catch(function(){});
 }
 
@@ -480,6 +517,7 @@ export function runRefresh(db,by,forced,ctx){
           // the draft, once, whenever the book has none for this season
           writes.push(draftTick(db,ctx));
           writes.push(squadTick(db,ctx));
+          writes.push(playersTick(db,ctx,byWeek,season));
           var finals=Clock.finalWeeks(ctx.games);
           var isFinal={}; finals.forEach(function(w){ isFinal[String(w)]=true; });
           var need=finals.filter(function(w){

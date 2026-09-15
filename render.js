@@ -14,6 +14,7 @@ import * as Rivals from "./rivals.js?v=dev";
 import * as Sn from "./seasons.js?v=dev";
 import * as Keep from "./keepers.js?v=dev";
 import * as Badges from "./badges.js?v=dev";
+import * as Players from "./players.js?v=dev";
 import { state, members, realMembers, teamOf, touch , seasonCfg } from "./state.js?v=dev";
 import * as Nf from "./notify.js?v=dev";
 
@@ -263,6 +264,23 @@ function posTag(p){ return '<span class="dpos" style="color:'+(POSCOL[p]||"var(-
 // still reads as themselves.
 function draftName(D,rid){ return (D&&D.byRoster&&D.byRoster[rid])||(D&&D.byRoster&&D.byRoster[String(rid)])||"Roster "+rid; }
 
+// A drafted player's season beside his name: the position rank on points, an arrow when
+// he's running more than 10% over or under projection, and - dimmed, with where he went -
+// when he's no longer on the team that drafted him. Hover for the numbers.
+function draftSeason(D,p){
+  var P=Players.rowsOf(state.players), row=P&&p.pid?P[p.pid]:null;
+  var now=Players.whereNow(p.pid,p.roster,state.squads);
+  var nowName=now==="dropped"?"dropped":now?(state.squads.byRoster&&state.squads.byRoster[now])||draftName(D,now):"";
+  var tr=row?Players.trend(row[0],row[1]):"";
+  var tip=[];
+  if(row) tip.push(row[0]+" pts · "+row[1]+" projected through "+weekLabel(state.players.through));
+  if(now) tip.push(now==="dropped"?"no longer on a roster":"now on "+nowName);
+  return { gone:!!now, tip:tip.join(" · "),
+    tag:now?'<span class="dgone">'+(now==="dropped"?"dropped":"now "+esc(nowName))+"</span>":"",
+    rank:'<span class="drank">'+(row?(row[2]?esc(row[2]):"—"):"")+
+      (tr?'<i class="dtrend '+tr+'" aria-label="'+(tr==="up"?"ahead of":"behind")+' projection">'+(tr==="up"?"▲":"▼")+"</i>":"")+"</span>" };
+}
+
 function draftByManager(D){
   var by={}, order=[];
   (D.picks||[]).forEach(function(p){
@@ -276,10 +294,11 @@ function draftByManager(D){
     var meta=[kept?kept+" kept":"",got?got+" traded in":""].filter(Boolean).join(" · ");
     return '<div class="dmgr"><div class="dhead"><b>'+esc(who)+"</b><span>"+esc(meta)+"</span></div>"+
       '<ol class="dpicks">'+ps.map(function(p){
-        return "<li><span class='dno'>"+p.r+"."+(p.p<10?"0":"")+p.p+"</span>"+
+        var s=draftSeason(D,p);
+        return "<li"+(s.gone?' class="gone"':"")+(s.tip?' data-tip="'+esc(s.tip)+'" tabindex="0"':"")+"><span class='dno'>"+p.r+"."+(p.p<10?"0":"")+p.p+"</span>"+
           "<span class='dnm'>"+esc(p.name||"—")+"</span>"+posTag(p.pos)+
           (p.keeper?'<span class="dkept">KEPT</span>':"")+
-          (p.from!=null?'<span class="dfrom">from '+esc(draftName(D,p.from))+"</span>":"")+"</li>";
+          (p.from!=null?'<span class="dfrom">from '+esc(draftName(D,p.from))+"</span>":"")+s.tag+s.rank+"</li>";
       }).join("")+"</ol></div>";
   }).join("")+"</div>";
 }

@@ -257,6 +257,7 @@ test("draftRows: a traded pick credits who got the player, and says where it cam
     [40, 8, 1, "Bo Nix"],
     [47, 7, null, "Rashee Rice"]], "only the traded one carries a from, and it is the slot's owner");
   assert.equal(rows[2].keeper, true, "keepers are flagged where Sleeper flags them");
+  assert.deepEqual(N.draftRows([{ round: 1, pick_no: 1, roster_id: 1, player_id: "9509", metadata: {} }], [])[0].pid, "9509", "each pick keeps its player id");
   assert.equal(rows[0].keeper, false, "and absence is not a keeper — Sleeper sends null, not false");
   assert.deepEqual(N.draftRows(null, null), [], "no draft is not a crash");
 });
@@ -302,6 +303,39 @@ test("a draft record written before the keeper fields existed is refetched, not 
   await N.runRefresh(db2, "m0", true, { ...base, draft: { bySeason: { 2026: rec } } });
   assert.equal(hits.some((h) => /drafts|draft\//.test(h)), false, "a complete draft is never fetched twice");
   assert.equal(db2.writes.some((x) => x[1] === "league/draft"), false);
+});
+
+test("playersTick: season points, projections for finished weeks fetched once, ranks; quiet when nothing moved", async () => {
+  const hits = [];
+  globalThis.fetch = async (u) => {
+    hits.push(u.replace(/^.*\/v1\//, ""));
+    const j = /projections\/nfl\/regular\/2026\/1$/.test(u) ? { a: { pts_ppr: 15 }, b: { pts_ppr: 10 } }
+      : /projections\/nfl\/regular\/2026\/2$/.test(u) ? { a: { pts_ppr: 15 }, b: { pts_ppr: 10 } } : {};
+    return { ok: true, json: async () => j };
+  };
+  const ctx = { config, roster: { players: [["a", "A", "RB", "DET"], ["b", "B", "RB", "NYJ"]] },
+    games: { games: [{ week: 1, status: "final" }, { week: 2, status: "final" }, { week: 3, status: "live" }] },
+    sleeper: { league: { scoring: "PPR" } } };
+  const byWeek = { 1: { a: { pts_ppr: 20 } , b: { pts_ppr: 8 } }, 2: { a: { pts_ppr: 18 }, b: { pts_ppr: 6 } }, 3: { a: { pts_ppr: 30 } } };
+  const db = fakeDb();
+  await N.playersTick(db, ctx, byWeek, "2026");
+  assert.deepEqual(hits, ["projections/nfl/regular/2026/1", "projections/nfl/regular/2026/2"], "the finished weeks only - week 3 is still being played");
+  const rec = db.writes[0][2].bySeason["2026"];
+  assert.equal(rec.through, 2); assert.equal(rec.field, "pts_ppr");
+  assert.deepEqual(JSON.parse(rec.rows), { a: [38, 30, "RB1"], b: [14, 20, "RB2"] });
+
+  hits.length = 0; const db2 = fakeDb();
+  await N.playersTick(db2, { ...ctx, players: { bySeason: { 2026: rec } } }, byWeek, "2026");
+  assert.deepEqual(hits, [], "a kept week's projection isn't fetched again");
+  assert.equal(db2.writes.length, 0, "and nothing moved, so nothing is written");
+
+  const db3 = fakeDb();
+  await N.playersTick(db3, { ...ctx, players: { bySeason: { 2026: rec } } }, { ...byWeek, 2: { a: { pts_ppr: 19 }, b: { pts_ppr: 6 } } }, "2026");
+  assert.deepEqual(JSON.parse(db3.writes[0][2].bySeason["2026"].rows).a, [39, 30, "RB1"], "a stat correction is picked up");
+
+  const db4 = fakeDb();
+  await N.playersTick(db4, ctx, { 1: byWeek[1] }, "2026");
+  assert.equal(db4.writes.length, 0, "a finished week without stats waits for the next hour");
 });
 
 test("statsTick: bets re-score while games are live, and stay quiet when they aren't", async () => {

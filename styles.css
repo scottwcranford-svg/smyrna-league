@@ -437,6 +437,16 @@ ol.dpicks li{display:flex;align-items:baseline;gap:7px;font-size:13px;min-width:
 .dkept{font-size:9px;font-weight:800;letter-spacing:.06em;background:var(--gold-bg);color:var(--gold);
   border-radius:4px;padding:1px 5px;flex:none}
 .dfrom{font-size:10px;font-weight:700;color:var(--open);flex:none}
+.dgone{font-size:10px;font-weight:700;color:var(--ink-3);white-space:nowrap}
+/* the name gives way last: "from" and "now" tags shrink into an ellipsis first */
+ol.dpicks li .dnm{flex:0 1 auto;min-width:5.5em}
+ol.dpicks li .dfrom,ol.dpicks li .dgone{flex:0 50 auto;min-width:1.5em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+ol.dpicks li.gone .dnm{color:var(--ink-3);text-decoration:line-through;text-decoration-color:var(--rule-2)}
+ol.dpicks li.gone .dpos{opacity:.55}
+ol.dpicks li[data-tip]:focus-visible{outline:none} ol.dpicks li[data-tip]:focus-visible .dnm{color:var(--accent)}
+.drank{margin-left:auto;flex:none;display:inline-flex;align-items:baseline;gap:3px;font-size:10.5px;font-weight:800;font-variant-numeric:tabular-nums;color:var(--ink-2);white-space:nowrap}
+.dtrend{font-style:normal;font-size:8.5px}
+.dtrend.up{color:var(--win)} .dtrend.down{color:var(--loss)}
 .dyr{font-size:9px;font-weight:800;letter-spacing:.05em;color:var(--gold);flex:none}
 .dband{margin-top:8px}
 .dblab{font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3)}

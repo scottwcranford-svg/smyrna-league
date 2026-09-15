@@ -17,6 +17,7 @@ export const state = {
   allHighlow:null, allScores:null, allDraft:null, allSquads:null,   // the raw documents; the narrowed ones below
   draftBoard:null,   // league/draft: the season's picks, as the board draws them (not `draft`, the propose form's rows)
   squads:null,    // league/squads: who is on each team right now, refreshed hourly
+  allPlayers:null, players:null,   // league/players: each player's season so far (players.js); the narrowed one is the season shown
   rosterOf:null,  // which team the Roster view is showing; null means yours
   leagueTab:"scores",   // which half of the League tab is open: scores or draft
   draftView:"mgr",      // and which view of the draft: mgr, board, keep
@@ -60,11 +61,14 @@ function syncWeekly(){
   state.draftBoard=dr[shownSeason()]||null;
   var sq=(state.allSquads&&state.allSquads.bySeason)||{};
   state.squads=sq[shownSeason()]||null;
+  var pl=(state.allPlayers&&state.allPlayers.bySeason)||{};
+  state.players=pl[shownSeason()]||null;
 }
 
 export function setHighlow(doc){ state.allHighlow=doc||null; syncWeekly(); }
 export function setDraft(doc){ state.allDraft=doc||null; syncWeekly(); }
 export function setSquads(doc){ state.allSquads=doc||null; syncWeekly(); }
+export function setPlayers(doc){ state.allPlayers=doc||null; syncWeekly(); }
 export function setScores(doc){ state.allScores=doc||null; syncWeekly(); }
 
 // Replace the book wholesale (a snapshot arrived).
