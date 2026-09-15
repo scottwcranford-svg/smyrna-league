@@ -1993,8 +1993,18 @@ test("Roster: your team by default, what each player costs to keep, and who is s
     // switch to Alice's team
     sel.value = "1"; sel.dispatchEvent(new Event("change", { bubbles: true }));
     await new Promise(r => setTimeout(r, 40));
-    return { bob, alice: read(), noBodyScroll: document.documentElement.scrollWidth <= innerWidth };
+    const alice = read();
+    // each player's season so far, the same as the Draft cards
+    St.setPlayers({ bySeason: { 2026: { through: 2, field: "pts_ppr", rows: JSON.stringify({ p4: [40.2, 30, "QB7"], p1: [10, 30, "RB40"], free: [0, 4, ""] }) } } });
+    V.render(); await new Promise(r => setTimeout(r, 40));
+    const ranks = [...document.querySelectorAll("#rosterView .rlist li")].map(li => [li.querySelector(".rnm").textContent, li.querySelector(".rrank").textContent, li.querySelector(".dtrend")?.className || "", li.getAttribute("data-tip") || ""]);
+    return { bob, alice, ranks, noBodyScroll: document.documentElement.scrollWidth <= innerWidth };
   }, DRAFT);
+  assert.deepEqual(out.ranks, [
+    ["Bo Nix", "QB7▲", "dtrend up", "Bo Nix · 40.2 pts · 30 projected through WK 2"],
+    ["Jahmyr Gibbs", "RB40▼", "dtrend down", "Jahmyr Gibbs · 10 pts · 30 projected through WK 2"],
+    ["DK Metcalf", "", "", ""],
+    ["Kayshon Boutte", "—▼", "dtrend down", "Kayshon Boutte · 0 pts · 4 projected through WK 2"]], "the Roster carries the same rank and arrow");
 
   assert.equal(out.bob.picked, "2", "it opens on your own team, not the first in the list");
   assert.deepEqual(out.bob.options, ["Alice", "Bob · you", "Cara"], "and says which one is yours");

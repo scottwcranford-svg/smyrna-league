@@ -267,19 +267,28 @@ function draftName(D,rid){ return (D&&D.byRoster&&D.byRoster[rid])||(D&&D.byRost
 // A drafted player's season beside his name: the position rank on points, an arrow when
 // he's running more than 10% over or under projection, and - dimmed, with where he went -
 // when he's no longer on the team that drafted him. Hover for the numbers.
+// A player's season so far, shared by the Draft cards and the Roster: the rank-and-arrow
+// markup (in a span of the given class) and the numbers for the hover, "" when there's none.
+function seasonBits(pid,cls){
+  var P=Players.rowsOf(state.players), row=P&&pid?P[pid]:null;
+  var tr=row?Players.trend(row[0],row[1]):"";
+  return { row:row,
+    nums:row?row[0]+" pts · "+row[1]+" projected through "+weekLabel(state.players.through):"",
+    html:'<span class="'+cls+'">'+(row?(row[2]?esc(row[2]):"—"):"")+
+      (tr?'<i class="dtrend '+tr+'" aria-label="'+(tr==="up"?"ahead of":"behind")+' projection">'+(tr==="up"?"▲":"▼")+"</i>":"")+"</span>" };
+}
+
 function draftSeason(D,p){
-  var P=Players.rowsOf(state.players), row=P&&p.pid?P[p.pid]:null;
+  var sb=seasonBits(p.pid,"drank");
   var now=Players.whereNow(p.pid,p.roster,state.squads);
   var nowName=now==="dropped"?"dropped":now?(state.squads.byRoster&&state.squads.byRoster[now])||draftName(D,now):"";
-  var tr=row?Players.trend(row[0],row[1]):"";
   var tip=[];
-  if(row) tip.push(row[0]+" pts · "+row[1]+" projected through "+weekLabel(state.players.through));
+  if(sb.nums) tip.push(sb.nums);
   if(now) tip.push(now==="dropped"?"no longer on a roster":"now on "+nowName);
   if(tip.length) tip.unshift(p.name||"");   // a long name can be cut short on a narrow card
   return { gone:!!now, tip:tip.join(" · "),
     tag:now?'<span class="dgone">'+(now==="dropped"?"dropped":"now "+esc(nowName))+"</span>":"",
-    rank:'<span class="drank">'+(row?(row[2]?esc(row[2]):"—"):"")+
-      (tr?'<i class="dtrend '+tr+'" aria-label="'+(tr==="up"?"ahead of":"behind")+' projection">'+(tr==="up"?"▲":"▼")+"</i>":"")+"</span>" };
+    rank:sb.html };
 }
 
 function draftByManager(D){
@@ -362,9 +371,10 @@ function rosterView(){
     var cost=r.band==="wire"?"9/10":(r.cost!=null?"R"+r.cost:"—");
     var tag=r.band?'<span class="rkeep '+esc(r.band)+'">'+(r.band==="wire"?"WAIVER":r.band==="early"?"3–9":"10–16")+"</span>"
                   :'<span class="rno" data-tip="'+esc(r.why||"not eligible")+'">—</span>';
-    return '<li'+(r.start?' class="start"':"")+'><span class="rpos" style="color:'+(POSCOL[r.pos]||"var(--ink-3)")+'">'+esc(r.pos||"")+"</span>"+
+    var sb=seasonBits(r.id,"rrank");
+    return '<li'+(r.start?' class="start"':"")+(sb.nums?' data-tip="'+esc(r.name+" · "+sb.nums)+'" tabindex="0"':"")+'><span class="rpos" style="color:'+(POSCOL[r.pos]||"var(--ink-3)")+'">'+esc(r.pos||"")+"</span>"+
       '<span class="rnm">'+esc(r.name)+"</span>"+
-      '<span class="rteam">'+esc(r.team||"")+"</span>"+
+      '<span class="rteam">'+esc(r.team||"")+"</span>"+(state.players?sb.html:"")+
       '<span class="rcost">'+esc(cost)+"</span>"+tag+
       (r.years===1?'<span class="dyr">yr 2</span>':"")+"</li>";
   };
