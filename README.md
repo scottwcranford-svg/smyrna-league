@@ -193,9 +193,11 @@ does not exist — so replace an account by deleting it and using **Add user**.
 
 ## What it does
 
-- **Propose a bet** — a player stat, a team stat, or a game. Stat bets pick players or a
-  defense from Sleeper's roster and track one or many stats; game bets pick a game
-  (winner, or over/under on the proposer's total). Name and terms write themselves.
+- **Propose a bet** — a player stat, a team stat, a game, or a league result. Stat bets pick
+  players or a defense from Sleeper's roster and track one or many stats; game bets pick a
+  game (winner, or over/under on the proposer's total); a league result bet names a
+  manager's own fantasy team and what happens to it — for now, whether it makes the
+  playoffs — with Makes it and Misses as its two sides. Name and terms write themselves.
   The proposer sets the stake (props default to the league stake; games have no default).
 - **You can only put yourself on a bet.** Other sides are open seats anyone can take, or
   invitations the named manager accepts or passes from the ticket. Pot-style bets let
@@ -203,8 +205,10 @@ does not exist — so replace an account by deleting it and using **Add user**.
   while it's still waiting on takers; once both sides are in, the bet stands (an admin
   can void a live bet to undo a mistake).
 - **Locks five minutes before kickoff** — the week's first game for stat bets, that game for
-  game bets. Countdown on every ticket. A bet still waiting on a seat at lock is
-  cancelled automatically.
+  game bets, the opener for season-long bets. Countdown on every ticket. A bet still
+  waiting on a seat at lock is cancelled automatically. One exception, in `clock.js`:
+  league result bets arrived in week 2 of 2026, so that season alone they lock at week 3's
+  first kickoff; from 2027 they lock at the opener like any season bet.
 - **Projections and status** — until something has been played, a stat ticket's standings
   show Sleeper's projections for the bet's own stat (weekly or season-long), with the
   projected leader marked; once played, actuals lead, the projection sits beside each
@@ -218,8 +222,11 @@ does not exist — so replace an account by deleting it and using **Add user**.
   total against the line; a tie on the line is a push). A stat bet settles once every
   game of its period is final and the standings have refreshed after the last one
   ended: the leader on the stat wins, a tie is a push, and a bet tracking several stats
-  goes to whoever leads the most of them. Season bets run through week 17. An admin
-  can still record a result by hand, and reopen one.
+  goes to whoever leads the most of them. Season bets run through week 17. A league
+  result bet settles from Sleeper's own winners bracket once the regular season is over:
+  the seeded teams are the field, Sleeper's tiebreakers decide the seeds, and there is no
+  push. Until then its ticket shows the team's record, place and the table with the cut
+  line drawn. An admin can still record a result by hand, and reopen one.
 - **Settle up** nets who owes whom; marking paid is separate so the P&L and the debt
   list stay honest.
 
@@ -236,6 +243,8 @@ House takes nothing: the full pot goes to the winner, zero-sum.
 | `leases/<name>` | `{holder, until}` — seat, join, scores and refresh leases |
 | `bets/<id>` | `{createdAt, createdBy, week, kind, amount, name, terms, joinable, entries:[{memberId, invite?, declined?, pick, picks?:[{id,name,pos,team}], side?}], status, winner, paid:[memberId], stats?, game?, market?, line?}` |
 | `bets/<id>.stats` | `{scope, tracks:[{stat,metric,lower}], rows:[{key,label,team?,memberId,entry,values:{stat:n}}], through, source, updatedAt}` |
+| `bets/<id>.league` | `{subject: memberId, outcome: "playoffs"}` — a league result bet; its entries carry `side: yes\|no` and `kind` is `league` |
+| `league/standings` | `{updatedAt, bySeason:{<season>:{at, leagueId, teams, playoffStart, rows:[{rid,id,name,w,l,t,pf,pa}], playoffs:{rids, field:[memberId], complete}}}}` — every team's record in standing order, hourly; the field once Sleeper has seeded the bracket |
 
 `status`: `open` (a seat unclaimed) · `active` · `settled` · `void` (`cancelled` /
 `autoVoid` say why). `week` 0 = season-long; weeks 15–17 are playoffs.

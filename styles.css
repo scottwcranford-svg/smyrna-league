@@ -317,6 +317,27 @@ label.f > span{font-size:11px;font-weight:700;text-transform:uppercase;letter-sp
 .gameline .gl-line{font-size:12px;font-weight:700;color:var(--ink-2);background:var(--surface);border-radius:99px;padding:3px 10px;white-space:nowrap}
 .gameline .ball{color:var(--accent);font-size:10px} .gameline .ball.rz{color:var(--loss)}
 .side.cover .side-pick::after{content:" · covering";color:var(--gold);font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+.side.ahead .side-pick::after{content:" · as it stands";color:var(--gold);font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+/* the league table behind a league result bet */
+.leagueline{display:flex;flex-direction:column;gap:4px;background:var(--surface-2);border-radius:12px;padding:10px 14px}
+.leagueline .ll-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.leagueline .ll-who{display:flex;align-items:center;gap:7px;font-weight:800;font-size:15px}
+.leagueline .ll-rec{font-size:12.5px;color:var(--ink-2);font-variant-numeric:tabular-nums}
+.leagueline .ll-state{margin-left:auto;font-size:11px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-3);white-space:nowrap}
+.leagueline.in .ll-state{color:var(--win)}
+.leagueline.out .ll-state{color:var(--loss)}
+.ll-more summary{font-size:10.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);cursor:pointer;list-style:none;padding:2px 0}
+.ll-more summary::-webkit-details-marker{display:none}
+.ll-more summary::before{content:"▸ ";font-size:9px} .ll-more[open] summary::before{content:"▾ "}
+.ll-table{list-style:none;margin:4px 0 0;padding:0;display:grid;gap:2px;font-size:12.5px}
+.ll-table li{display:grid;grid-template-columns:22px minmax(0,1fr) auto auto;gap:10px;align-items:center;font-variant-numeric:tabular-nums;color:var(--ink-2)}
+.ll-table li.out{color:var(--ink-3)}
+.ll-table li.me{color:var(--ink);font-weight:700}
+.ll-table li.me .ll-name::after{content:" ◂";color:var(--gold)}
+.ll-table .ll-rank{color:var(--ink-3);text-align:right}
+.ll-table .ll-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ll-table .ll-pf{color:var(--ink-3);min-width:54px;text-align:right}
+.ll-table li.ll-cut{display:block;border-top:1px dashed var(--rule-2);margin:3px 0;padding-top:3px;font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--gold)}
 .side.pushing .side-pick::after{content:" · push";color:var(--ink-3);font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
 /* Two different questions, so two different controls. The scope is one-of-three —
    a segmented switch, sitting in its own track. The stats under it are a

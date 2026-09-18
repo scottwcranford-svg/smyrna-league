@@ -9,7 +9,7 @@ import * as Badges from "./badges.js?v=dev";
 import * as S from "./store.js?v=dev";
 import * as A from "./auth.js?v=dev";
 import * as N from "./sleeper.js?v=dev";
-import { state, members, onRender, touch, setBets, setHighlow, setScores, setDraft, setSquads, setPlayers, currentCfg } from "./state.js?v=dev";
+import { state, members, onRender, touch, setBets, setHighlow, setScores, setDraft, setSquads, setPlayers, setStandings, currentCfg } from "./state.js?v=dev";
 import { render, toast, ticker, statsBar, showBet } from "./render.js?v=dev";
 import { expireBets, settleFinished, syncBadges } from "./book.js?v=dev";
 import { drawScope, drawEntries, drawGameBox } from "./forms.js?v=dev";
@@ -26,7 +26,7 @@ mark("boot");
    The loops need a snapshot of what this page knows; nothing in sleeper.js reads state. */
 // Always the current season's settings: a refresh writes the season being played, not the
 // one someone happens to be reading.
-function refreshCtx(){ return { config:currentCfg(), games:state.games, refresh:state.refresh, bets:state.bets, roster:state.roster, proj:state.proj, sleeper:state.sleeper, highlow:state.allHighlow, scores:state.allScores, draft:state.allDraft, squads:state.allSquads, players:state.allPlayers, season:state.season,
+function refreshCtx(){ return { config:currentCfg(), games:state.games, refresh:state.refresh, bets:state.bets, roster:state.roster, proj:state.proj, sleeper:state.sleeper, highlow:state.allHighlow, scores:state.allScores, draft:state.allDraft, squads:state.allSquads, players:state.allPlayers, standings:state.allStandings, season:state.season,
                                 holder:state.me, mobile:/Mobi|Android/i.test(navigator.userAgent) }; }
 function scoresTick(db){
   if(!db||state.local) return;
@@ -228,6 +228,11 @@ function subscribeBook(db){
     setScores(snap.exists?snap.data():null);   // read-only; narrowed to the season shown
     touch();
   },function(){ /* the Scores tab says it's waiting on the first refresh */ });
+
+  db.doc("league/standings").onSnapshot(function(snap){
+    setStandings(snap.exists?snap.data():null);   // read-only; every team's record, and the playoff field once seeded
+    touch();   // league result tickets show where the team stands, and settle from the field
+  },function(){ /* league result tickets say the standings are on their way */ });
 
   db.doc("league/sleeper").onSnapshot(function(snap){
     state.sleeper=snap.exists?snap.data():null;   // read-only

@@ -96,6 +96,70 @@ export function squadTick(db,ctx){
   }).catch(function(){});
 }
 
+// Every team's record, in standing order, for the league result bets (bets.js). Owners map
+// to managers by Sleeper display name, as the Scores board does. Wins first, then fewest
+// losses, then points for - a fair picture of the table; Sleeper's own tiebreakers still
+// decide the seeds, which is why the playoff field is read from the bracket, not from this.
+export function standingsRows(rosters,users,memByName){
+  var uname={}; (users||[]).forEach(function(u){ uname[u.user_id]=u.display_name||u.username||""; });
+  var pts=function(s,k){ return Math.round(((Number(s[k])||0)+(Number(s[k+"_decimal"])||0)/100)*100)/100; };
+  return (rosters||[]).map(function(r){
+    var s=r.settings||{}, nm=uname[r.owner_id]||"";
+    return { rid:Number(r.roster_id), id:memByName[nm.toLowerCase()]||null, name:nm,
+      w:Number(s.wins)||0, l:Number(s.losses)||0, t:Number(s.ties)||0, pf:pts(s,"fpts"), pa:pts(s,"fpts_against") };
+  }).sort(function(a,b){ return b.w-a.w||a.l-b.l||b.pf-a.pf||a.rid-b.rid; });
+}
+// The roster ids Sleeper has seeded into the winners bracket. A seeded team sits in a
+// game as a number; everything else is a {w:m} or {l:m} reference to an earlier game, so
+// before the bracket is seeded this is empty, and once it is, it is the whole field -
+// the top seeds' byes included, since a bye is a later-round game with a number in it.
+export function bracketField(bracket){
+  var out=[];
+  (bracket||[]).forEach(function(m){ [m&&m.t1,m&&m.t2].forEach(function(t){ if(typeof t==="number"&&out.indexOf(t)<0) out.push(t); }); });
+  return out.sort(function(a,b){ return a-b; });
+}
+// What a standings record says, minus when it was written - so an unchanged table is
+// never rewritten (a write comes back as a snapshot, which draws, which would write again).
+function standingsSig(rec){
+  if(!rec) return "";
+  var PO=rec.playoffs||{};
+  return [rec.teams,rec.playoffStart,(rec.rows||[]).map(function(r){ return [r.rid,r.id,r.name,r.w,r.l,r.t,r.pf,r.pa].join(":"); }).join("|"),
+    (PO.rids||[]).join(","),(PO.field||[]).join(","),PO.complete?1:0].join("/");
+}
+// The table and the playoff field, hourly: league/standings = { updatedAt, bySeason: {
+// <season>: { at, leagueId, teams, playoffStart, rows, playoffs: { rids, field, complete } } } }.
+// `field` is the seeded teams as member ids, `complete` once Sleeper has seeded every spot
+// - that is what a "makes the playoffs" bet settles on. How many spots there are comes
+// from league/sleeper (the daily league read), six until that has landed. Three calls,
+// one write when something moved.
+export function standingsTick(db,ctx){
+  var cfg=ctx.config||{}, here=Sn.currentSeason(cfg);
+  var cur=(ctx.standings&&ctx.standings.bySeason&&ctx.standings.bySeason[here])||null;
+  if(cur&&ageMin(cur.at)<55) return Promise.resolve();
+  var lid=leagueIdOf(cfg);
+  if(!lid) return Promise.resolve();
+  var memByName={}; (cfg.members||[]).forEach(function(m){ memByName[String(m.name).toLowerCase()]=m.id; });
+  var L=(ctx.sleeper&&ctx.sleeper.league)||{};
+  return Promise.all([
+    sj(SLEEPER+"/v1/league/"+lid+"/rosters"),
+    sj(SLEEPER+"/v1/league/"+lid+"/users"),
+    sj(SLEEPER+"/v1/league/"+lid+"/winners_bracket").catch(function(){ return []; })
+  ]).then(function(all){
+    var rows=standingsRows(all[0],all[1],memByName);
+    if(!rows.length) return;
+    var teams=Number(L.playoffTeams)||(cur&&Number(cur.teams))||6;
+    var start=Number(L.playoffStart)||(cur&&Number(cur.playoffStart))||Clock.PLAYOFF_START;
+    var rids=bracketField(all[2]), byRid={}; rows.forEach(function(r){ byRid[r.rid]=r; });
+    var field=rids.map(function(rid){ return byRid[rid]?byRid[rid].id:null; }).filter(Boolean);
+    var next={ at:isoNow(), leagueId:lid, teams:teams, playoffStart:start, rows:rows,
+               playoffs:{ rids:rids, field:field, complete:rids.length>0&&rids.length>=teams } };
+    if(cur&&standingsSig(cur)===standingsSig(next)) return;   // nothing moved
+    var out=Object.assign({},(ctx.standings&&ctx.standings.bySeason)||{});
+    out[here]=next;
+    return db.doc("league/standings").set(Object.assign({},ctx.standings||{},{ updatedAt:isoNow(), bySeason:out }));
+  }).catch(function(){});
+}
+
 // The draft, trimmed to what the board draws. Sleeper's roster_id on a pick is who *got*
 // the player, not whose slot it was, so a traded pick already credits the right manager;
 // draft_slot is the original slot, and traded_picks says which ones moved. Keeping both
@@ -517,6 +581,7 @@ export function runRefresh(db,by,forced,ctx){
           // the draft, once, whenever the book has none for this season
           writes.push(draftTick(db,ctx));
           writes.push(squadTick(db,ctx));
+          writes.push(standingsTick(db,ctx));
           writes.push(playersTick(db,ctx,byWeek,season));
           var finals=Clock.finalWeeks(ctx.games);
           var isFinal={}; finals.forEach(function(w){ isFinal[String(w)]=true; });
@@ -578,7 +643,9 @@ export function runRefresh(db,by,forced,ctx){
                 if(!L||typeof L!=="object") return null;
                 var st=L.settings||{}, pos=Array.isArray(L.roster_positions)?L.roster_positions:[];
                 return { name:L.name||"", season:String(L.season||""), teams:Number(L.total_rosters)||0, keeper:Number(st.type)===1, dynasty:Number(st.type)===2,
-                         sf:pos.indexOf("SUPER_FLEX")>=0, scoring:Roster.scoringName((L.scoring_settings||{}).rec), avatar:(typeof L.avatar==="string")?L.avatar:"" };
+                         sf:pos.indexOf("SUPER_FLEX")>=0, scoring:Roster.scoringName((L.scoring_settings||{}).rec), avatar:(typeof L.avatar==="string")?L.avatar:"",
+                         // how many make the playoffs and when they start: the standings tick reads these rather than asking again
+                         playoffTeams:Number(st.playoff_teams)||0, playoffStart:Number(st.playoff_week_start)||0 };
               }).catch(function(){ return null; }):Promise.resolve(null);
               return Promise.all([lid?sj(SLEEPER+"/v1/league/"+lid+"/users").catch(function(){ return []; }):Promise.resolve([]), leagueP]).then(function(both){
                 var users=both[0], league=both[1];

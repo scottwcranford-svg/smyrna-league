@@ -51,7 +51,8 @@ export const ACTIONS = {
   dScope:function(t){
     state.draftScope=attr(t,"data-scope")||"";
     state.draft.forEach(function(e){ e.picks=[]; e.pick=""; e.side=""; });
-    if(state.draftScope==="game"){ state.draft=state.draft.slice(0,2); while(state.draft.length<2) state.draft.push({memberId:null,pick:"",picks:[],side:""}); }
+    // a game or a league result is two sides, no more
+    if(state.draftScope==="game"||state.draftScope==="league"){ state.draft=state.draft.slice(0,2); while(state.draft.length<2) state.draft.push({memberId:null,pick:"",picks:[],side:""}); }
     F.drawScope(); F.drawEntries();
   },
   dMarket:function(t){
@@ -176,6 +177,9 @@ const CHANGES = {
   // the picker's filters
   dTeam:function(t){ state.draftTeam=t.value; F.refilter(); },
   dPos:function(t){ state.draftPos=t.value; F.refilter(); },
+  // a league result bet: whose team, and what happens to it - the sides follow
+  dSubject:function(t){ state.draftSubject=t.value||""; F.drawEntries(); },
+  dOutcome:function(t){ state.draftOutcome=t.value||""; state.draft.forEach(function(e){ e.side=""; }); F.drawEntries(); },
   dMem:function(t){
     var i=num(t,"data-i"), d=state.draft[i];
     if(state.admin){ d.memberId=t.value||(i===0?state.me:null); d.invite=null; }   // admin on: seat anyone outright

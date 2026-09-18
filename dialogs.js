@@ -36,6 +36,12 @@ export function openSettleDlg(id){
     var g=gameOf(bet);
     if(g&&g.awayScore!=null&&g.homeScore!=null) head+="  ·  "+g.away+" "+g.awayScore+", "+g.home+" "+g.homeScore+(g.status==="final"?" (Final)":" (in progress)");
   }
+  if(bet.league){
+    // where the team stands, so the admin calling it by hand can see what the table says
+    var st=Bets.leagueStanding(bet,state.standings);
+    if(st) head+="  ·  "+mName(bet.league.subject)+" "+st.me.w+"–"+st.me.l+(st.me.t?"–"+st.me.t:"")+", "+st.me.rank+" of "+st.rows.length+
+      (st.decided?(st.inField?" (in the playoff field)":" (out of the playoff field)"):(st.inField?" (inside the top "+st.teams+" as it stands)":" (outside the top "+st.teams+" as it stands)"));
+  }
   document.getElementById("sTerms").textContent=head;
   document.getElementById("sOptions").innerHTML =
     live.map(function(e){

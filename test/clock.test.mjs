@@ -94,3 +94,14 @@ test("a game reads as kicking off soon only inside the hour before it starts", (
   assert.equal(Clock.kicksSoon({ id: "x", date: "" }, now), false, "no date, no judgement");
   assert.equal(Clock.kicksSoon(null, now), false);
 });
+
+test("a season-long league result bet locks at the opener, except 2026's, which lock at week 3's kickoff", () => {
+  const b = { league: { subject: "m1", outcome: "playoffs" }, week: 0, status: "open", entries: [] };
+  assert.equal(Clock.leagueLockWeek(b), 3, "an untagged bet is 2026");
+  assert.equal(Clock.leagueLockWeek({ ...b, season: "2026" }), 3);
+  assert.equal(Clock.leagueLockWeek({ ...b, season: "2027" }), 0);
+  assert.equal(Clock.betLock(b, config), Clock.lockTime(3, config), "2026: end of week 2, so week 3's first kickoff");
+  assert.equal(Clock.betLock(b, config), Date.parse("2026-09-25T00:15:00Z") - 300e3, "the Thursday night of week 3, on the anchor cadence");
+  assert.equal(Clock.betLock({ ...b, season: "2027" }, config), Clock.lockTime(0, config), "any other season: the opener");
+  assert.equal(Clock.betLock({ ...b, week: 5 }, config), Clock.lockTime(5, config), "a weekly one, if there ever is one, locks on its week");
+});

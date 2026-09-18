@@ -22,6 +22,7 @@ export const state = {
   leagueTab:"scores",   // which half of the League tab is open: scores or draft
   draftView:"mgr",      // and which view of the draft: mgr, board, keep
   scores:null,    // league/scores: every manager's fantasy points and projection, by week
+  allStandings:null, standings:null,   // league/standings: every team's record and, once seeded, the playoff field; narrowed to the season shown
   scoreWeek:null, // which week the Scores tab is showing; null follows the current week
   season:null,    // which season is being shown; null follows config.season
   rosterSync:null, // league/rosterSync: the Sync from Sleeper request, and what came back
@@ -36,6 +37,7 @@ export const state = {
   // the propose / join forms' draft
   draftScope:"", draftStats:[], editId:null,
   draftGame:null, draftMarket:"ml", draftLine:"", draftFav:"", joinId:null,
+  draftSubject:"", draftOutcome:"playoffs",   // a league result bet: whose team, and what happens to it
   draftTeam:"", draftPos:"", suggRow:0,   // the picker's Team and Position filters, and the row whose list is open
   draft:[],
   // sign-in bookkeeping
@@ -63,6 +65,8 @@ function syncWeekly(){
   state.squads=sq[shownSeason()]||null;
   var pl=(state.allPlayers&&state.allPlayers.bySeason)||{};
   state.players=pl[shownSeason()]||null;
+  var stg=(state.allStandings&&state.allStandings.bySeason)||{};
+  state.standings=stg[shownSeason()]||null;
 }
 
 export function setHighlow(doc){ state.allHighlow=doc||null; syncWeekly(); }
@@ -70,6 +74,7 @@ export function setDraft(doc){ state.allDraft=doc||null; syncWeekly(); }
 export function setSquads(doc){ state.allSquads=doc||null; syncWeekly(); }
 export function setPlayers(doc){ state.allPlayers=doc||null; syncWeekly(); }
 export function setScores(doc){ state.allScores=doc||null; syncWeekly(); }
+export function setStandings(doc){ state.allStandings=doc||null; syncWeekly(); }
 
 // Replace the book wholesale (a snapshot arrived).
 export function setBets(list){ state.allBets=Array.isArray(list)?list.slice():[]; syncBets(); }

@@ -49,15 +49,35 @@ export function prefillLine(){
   var el=document.getElementById("bLine"); if(el) el.value=state.draftLine;
 }
 
+// The league result box: whose team, and what happens to it. Every manager in the
+// season is offered, yourself included - a bet on your own team is the usual one.
+function drawLeagueBox(){
+  var box=document.getElementById("bLeagueBox"), isLeague=state.draftScope==="league";
+  box.hidden=!isLeague;
+  if(!isLeague) return;
+  var who=document.getElementById("bSubject"), what=document.getElementById("bOutcome");
+  who.innerHTML='<option value="">Whose team…</option>'+realMembers().map(function(m){
+    return '<option value="'+esc(m.id)+'"'+(m.id===state.draftSubject?" selected":"")+">"+esc(m.name)+(m.id===state.me?" (you)":"")+"</option>"; }).join("");
+  who.value=state.draftSubject||"";
+  what.innerHTML=Bets.LEAGUE_OUTCOMES.map(function(o){ return '<option value="'+esc(o.key)+'"'+(o.key===state.draftOutcome?" selected":"")+">"+esc(o.label)+"</option>"; }).join("");
+  what.value=state.draftOutcome||Bets.LEAGUE_OUTCOMES[0].key;
+}
+// Season-long league result bets close for the year at their lock (clock.js leagueLockWeek).
+export function leagueClosed(){
+  return Date.now()>=Clock.betLock({ league:{ subject:"" }, week:0, season:shownSeason() },seasonCfg(),state.games);
+}
+
 export function drawGameBox(){
   var scope=state.draftScope, box=document.getElementById("bGameBox");
   box.hidden=scope!=="game";
-  // A game bet fills in its own name, terms, type and week — hide those fields.
-  var isGame=scope==="game";
-  ["bNameRow","bKindRow","bWeekRow","bAddSide","bJoinRow"].forEach(function(id){ document.getElementById(id).hidden=isGame; });
+  // A game bet fills in its own name, terms, type and week — hide those fields. So does a
+  // league result bet: it is always two sides, on the season, named after its subject.
+  var isGame=scope==="game", isLeague=scope==="league", twoSided=isGame||isLeague;
+  ["bNameRow","bKindRow","bWeekRow","bAddSide","bJoinRow"].forEach(function(id){ document.getElementById(id).hidden=twoSided; });
+  drawLeagueBox();
   // Stat bets write their own terms from the stat, the period and the picks.
   document.getElementById("bTermsRow").hidden=!!scope;
-  document.getElementById("bWhoLbl").textContent=isGame?"Your side, and who you're betting":"Who's in, and what they're taking";
+  document.getElementById("bWhoLbl").textContent=twoSided?"Your side, and who you're betting":"Who's in, and what they're taking";
   // A game bet has no default stake — the proposer names it every time.
   var amt=document.getElementById("bAmt"), dflt=String((seasonCfg()&&seasonCfg().stake)||25);
   if(isGame){
@@ -144,6 +164,16 @@ export function drawScope(){
     hint.textContent=allGames().length?"Pick the game, take a side, say who you're betting, set the stake. The other owner gets the other side. Locks five minutes before that game.":"Schedule isn't loaded yet — hit Refresh stats first.";
     return;
   }
+  // The league result chip goes away once the season's bets have closed, unless a bet is being edited.
+  var lchip=document.querySelector('#bScope .chip[data-scope="league"]');
+  if(lchip) lchip.hidden=leagueClosed()&&!state.editId;
+  if(scope==="league"){
+    box.hidden=true;
+    hint.textContent=leagueClosed()&&!state.editId
+      ? "Season league result bets are closed for the year."
+      : "Pick whose team, take Makes it or Misses, say who you're betting, set the stake. The other manager gets the other side. Sleeper's playoff bracket settles it. Locks "+fmtWhen(Clock.betLock({ league:{ subject:"" }, week:0, season:shownSeason() },seasonCfg(),state.games))+".";
+    return;
+  }
   box.hidden=!scope;
   if(scope){
     // one or many stats; the first is on by default so the common case is one click
@@ -186,9 +216,14 @@ export function drawEntries(hostId){
         return '<option value="'+esc(m.id)+'"'+(m.id===e.invite?" selected":"")+">Invite "+esc(m.name)+"</option>"; }).join("");
     }
     var pickUi;
-    if(scope==="game"){
-      var g=state.draftGame, choices;
-      if(!g) choices=[];
+    if(scope==="game"||scope==="league"){
+      var g=state.draftGame, choices, logos=scope==="game";
+      if(scope==="league"){
+        // yes or no on the subject's team; nothing to choose until there is a subject
+        var oc=Bets.leagueOutcome(state.draftOutcome);
+        choices=state.draftSubject&&oc?[["yes",oc.yes],["no",oc.no]]:[];
+      }
+      else if(!g) choices=[];
       else if(state.draftMarket==="total") choices=[["over","Over"],["under","Under"]];
       else if(state.draftMarket==="spread"){
         // whoever is giving the points is shown with them, the other side getting them
@@ -199,8 +234,8 @@ export function drawEntries(hostId){
       else choices=[[g.away,teamName(g.away)],[g.home,teamName(g.home)]];
       if(i===0){
         pickUi='<div class="side-chips">'+(choices.length?choices.map(function(c){
-          return '<button type="button" class="chip" data-act="dSide" data-i="'+i+'" data-side="'+esc(c[0])+'" aria-pressed="'+(e.side===c[0])+'">'+logoHtml(c[0],16)+esc(c[1])+"</button>";
-        }).join(""):'<span class="hint">Pick a game above</span>')+"</div>";
+          return '<button type="button" class="chip" data-act="dSide" data-i="'+i+'" data-side="'+esc(c[0])+'" aria-pressed="'+(e.side===c[0])+'">'+(logos?logoHtml(c[0],16):"")+esc(c[1])+"</button>";
+        }).join(""):'<span class="hint">'+(scope==="league"?"Pick whose team above":"Pick a game above")+"</span>")+"</div>";
       } else {
         // the opponent's side is whatever you didn't take
         var mine0=state.draft[0].side, other=choices.filter(function(c){ return c[0]!==mine0; });
@@ -225,7 +260,7 @@ export function drawEntries(hostId){
       '<span class="entry-tag" style="margin-top:11px">'+(i===0?(admin&&e.memberId&&e.memberId!==state.me?"For":"You"):"vs")+"</span>"+
       '<select class="field" data-act="dMem" data-i="'+i+'"'+(lockedSeat?" disabled":"")+'>'+opts+"</select>"+
       pickUi+
-      (i>0&&scope!=="game"?'<button class="btn danger rm" data-act="dRm" data-i="'+i+'">✕</button>':"")+
+      (i>0&&scope!=="game"&&scope!=="league"?'<button class="btn danger rm" data-act="dRm" data-i="'+i+'">✕</button>':"")+
     "</div>";
   }).join("");
   drawPickFilters(host.id==="jEntries"?"jPickFilters":"bPickFilters");
@@ -329,6 +364,8 @@ export function drawScoring(){
   if(scope==="game"){
     if(!state.draftGame){ box.hidden=true; return; }
     b={ game:state.draftGame, market:state.draftMarket, line:state.draftLine, fav:state.draftFav||state.draftGame.home };
+  } else if(scope==="league"){
+    b={ league:{ subject:state.draftSubject, outcome:state.draftOutcome }, week:0, entries:state.draft };
   } else {
     var match=scope==="player"?document.getElementById("bMatch").value:"";
     var tracks=(STATS[scope]||[]).filter(function(s){ return state.draftStats.indexOf(s[0])>=0; }).map(function(s){ return { stat:s[0], metric:s[1], lower:!!s[2] }; });
@@ -397,6 +434,7 @@ export function openBetDlg(editId){
     ? (state.admin&&isLocked(bet)?"Admin update on a locked bet — everyone will see the change. ":"")+"Changing sides or stats resets the standings until the next refresh."
     : "Default stake is "+money(stake)+".";
   state.draftGame=null; state.draftMarket="ml"; state.draftLine=""; state.draftFav="";
+  state.draftSubject=state.me||""; state.draftOutcome=Bets.LEAGUE_OUTCOMES[0].key;   // a league result bet opens on your own team
   state.draftTeam=""; state.draftPos=""; state.suggRow=0;
   // an older bet has no setting; it opens on the rule it has been playing by
   var mSel=document.getElementById("bMatch");
@@ -411,6 +449,8 @@ export function openBetDlg(editId){
     if(bet.game){
       state.draftScope="game"; state.draftGame=clone(bet.game);
       state.draftMarket=bet.market||"ml"; state.draftLine=bet.line!=null?String(bet.line):""; state.draftFav=bet.fav||"";
+    } else if(bet.league){
+      state.draftScope="league"; state.draftSubject=bet.league.subject||""; state.draftOutcome=bet.league.outcome||Bets.LEAGUE_OUTCOMES[0].key;
     } else {
       state.draftScope=S.scope||"player";   // no free-text bets any more
       state.draftStats=(Array.isArray(S.tracks)?S.tracks:[]).map(function(t){ return t.stat; }).filter(Boolean);
@@ -450,6 +490,19 @@ export function submitBet(){
     state.draft[1].side=other0;
     if(!state.editId&&Date.now()>=Date.parse(G.date)-LOCK_LEAD) return toast("That game is about to kick off — pick another");
   }
+  var isLeague=state.draftScope==="league", oc=isLeague?Bets.leagueOutcome(state.draftOutcome):null;
+  if(isLeague){
+    if(!oc) return toast("Pick what happens");
+    if(!state.draftSubject||!Id.member(state.draftSubject,members())) return toast("Pick whose team it's about");
+    if(!state.draft[0].side) return toast("Take "+oc.yes+" or "+oc.no);
+    // two sides, yes and no; the opponent gets whatever you didn't take
+    state.draft=state.draft.slice(0,2);
+    if(state.draft.length<2) state.draft.push({memberId:null,pick:"",picks:[],side:""});
+    state.draft[1].side=state.draft[0].side==="yes"?"no":"yes";
+    if(!name) name=Bets.leagueName(state.draftSubject,oc.key,members());
+    if(!terms) terms=Bets.leagueTerms(oc.key);
+    if(!state.editId&&leagueClosed()) return toast("Season league result bets are closed for the year");
+  }
   var statScope=state.draftScope==="player"||state.draftScope==="team"||state.draftScope==="offense";
   if(statScope&&rosterRows().length){
     // An open seat with nothing picked adds nothing — joiners bring their own players.
@@ -465,12 +518,12 @@ export function submitBet(){
   if(statScope) terms="(auto)";   // rewritten from the picks once the strip is built
   if(!terms) return toast("Write the terms first");
   if(!(amt>0)) return toast(isGame?"Set the stake — it's yours to name":"Set a stake above zero");
-  var wkPick=isGame?G.week:(Number(document.getElementById("bWeek").value)||0);
+  var wkPick=isGame?G.week:isLeague?(oc.week||0):(Number(document.getElementById("bWeek").value)||0);
   // A weekly stat bet can be posted while any of the week's games is still to come —
   // its picks are held to that below. Without that week's schedule or picks, or season
   // long, the week's first game is the line (and that is where such a bet locks).
   var adminEdit=!!(state.editId&&state.admin);
-  if(!isGame&&!adminEdit){
+  if(!isGame&&!isLeague&&!adminEdit){
     if(wkPick&&statScope&&rosterRows().length&&allGames().some(function(g){ return g.week===wkPick; })){ if(!openGames(wkPick).length) return toast("Week "+wkPick+"'s games have all kicked off — pick a later week"); }
     else if(weekLocked(wkPick)) return toast(wkPick?"Week "+wkPick+" has kicked off — pick a later week":"The season's underway — season-long bets are locked");
   }
@@ -515,6 +568,7 @@ export function submitBet(){
     var out={ memberId:e.memberId||null, pick:(e.pick||"").trim() };
     if(!out.memberId&&e.invite) out.invite=e.invite;
     if(isGame){ out.side=e.side; out.pick=gameSideText(e.side); }
+    else if(isLeague){ out.side=e.side; out.pick=Bets.leagueSideText(e.side,oc.key); }
     else if(e.picks&&e.picks.length) out.picks=e.picks.map(function(p){ return { id:p.id, name:p.name, pos:p.pos, team:p.team }; });
     return out;
   });
@@ -524,7 +578,7 @@ export function submitBet(){
     createdBy:existing&&!admin?existing.createdBy:proposer,
     season:existing?(existing.season||shownSeason()):shownSeason(),
     week:wkPick,
-    kind:isGame?"matchup":document.getElementById("bKind").value,
+    kind:isGame?"matchup":isLeague?"league":document.getElementById("bKind").value,
     amount:Math.round(amt*100)/100, name:name, terms:terms,
     entries:entries,
     winner:null, paid:existing?(existing.paid||[]):[]
@@ -533,9 +587,10 @@ export function submitBet(){
     bet.game={ id:G.id, week:G.week, away:G.away, home:G.home, date:G.date };
     bet.market=(state.draftMarket==="total"||state.draftMarket==="spread")?state.draftMarket:"ml";
   }
-  // Pot-style: others can add themselves after posting. Never on a two-team game bet;
-  // always on a stat bet with nobody named against you, or nobody ever could.
-  bet.joinable=!isGame&&(document.getElementById("bJoin").checked||entries.length<2);
+  if(isLeague) bet.league={ subject:state.draftSubject, outcome:oc.key };
+  // Pot-style: others can add themselves after posting. Never on a two-sided game or
+  // league result bet; always on a stat bet with nobody named against you, or nobody ever could.
+  bet.joinable=!isGame&&!isLeague&&(document.getElementById("bJoin").checked||entries.length<2);
   if(state.draftScope==="player"){ var mv=document.getElementById("bMatch").value; bet.match=/^(any|lineup|field)$/.test(mv)?mv:"count"; }
   // a field bet is its two sides and nobody else
   if(bet.match==="field") bet.joinable=false;

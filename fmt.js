@@ -22,7 +22,7 @@ export function picksText(picks){ return (picks||[]).map(function(p){ return p.n
 
 export function weekLabel(w){ w=Number(w); return w===0?"SEASON":"WK "+w; }
 
-export function kindLabel(k){ return k==="matchup"?"Head to head":k==="future"?"Season future":"Prop"; }
+export function kindLabel(k){ return k==="matchup"?"Head to head":k==="future"?"Season future":k==="league"?"League result":"Prop"; }
 
 export function clone(o){ return o?JSON.parse(JSON.stringify(o)):o; }
 

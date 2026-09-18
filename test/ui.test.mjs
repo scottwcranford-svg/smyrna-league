@@ -809,7 +809,7 @@ test("offense stat: a fourth scope, teams in the search, one team a side, and a 
     V.render(); res.scoring = (document.querySelector("article.ticket .scoring") || {}).textContent;
     return res;
   });
-  assert.deepEqual(out.scopes, ["player:Player stat", "offense:Offense stat", "team:Defense stat", "game:A game"]);
+  assert.deepEqual(out.scopes, ["player:Player stat", "offense:Offense stat", "team:Defense stat", "game:A game", "league:League result"]);
   assert.deepEqual(out.stats, ["Points scored", "Total yards", "Passing yards", "Rushing yards", "Turnovers"]);
   assert.equal(out.placeholder, "Search a team…"); assert.equal(out.filters, true, "no player filters on a team bet");
   assert.deepEqual(out.sugg, ["SEA"], "teams, found by name or code");
@@ -2028,6 +2028,96 @@ test("Roster: your team by default, what each player costs to keep, and who is s
   assert.match(out.alice.summary, /Only one of the two may be a QB/, "the rule that catches people out");
   assert.match(out.alice.summary, /kept two seasons running goes back in the draft pool/);
   assert.equal(out.noBodyScroll, true);
+  assert.deepEqual(errors, []);
+  await p.close();
+});
+
+test("league result: a bet on a manager's own team - the form, the ticket's table and cut line, and the season's cutoff", { skip }, async () => {
+  const { p, errors } = await page();
+  const out = await p.evaluate(async () => {
+    const { state } = await import("./state.js?v=dev"); const V = await import("./render.js?v=dev"); const F = await import("./forms.js?v=dev");
+    state.config.weekStarts = { "3": "2036-09-25T00:15:00Z" };   // 2026's cutoff is week 3's kickoff; kept in the future for the test
+    const res = {};
+    // the form: the chip hides the stat and week machinery and shows whose team and what happens
+    state.me = "a"; state.local = false; F.openBetDlg(); state.local = true;
+    document.querySelector('#bScope .chip[data-scope="league"]').click();
+    const hidden = id => document.getElementById(id).hidden;
+    res.rows = { league: hidden("bLeagueBox"), week: hidden("bWeekRow"), name: hidden("bNameRow"), kind: hidden("bKindRow"), join: hidden("bJoinRow"), add: hidden("bAddSide"), stats: hidden("bStats") };
+    res.subjects = [...document.getElementById("bSubject").options].map(o => o.textContent);
+    res.subject = document.getElementById("bSubject").value;
+    res.outcomes = [...document.getElementById("bOutcome").options].map(o => o.textContent);
+    res.chips = [...document.querySelectorAll('#bEntries [data-act="dSide"]')].map(c => c.textContent);
+    res.otherSide = document.querySelectorAll("#bEntries .entry-row")[1].querySelector(".hint").textContent;
+    res.hint = document.getElementById("bScopeHint").textContent;
+    // Bob's team, Makes it, Cara invited to the other side
+    const who = document.getElementById("bSubject"); who.value = "b"; who.dispatchEvent(new Event("change", { bubbles: true }));
+    document.querySelector('#bEntries [data-act="dSide"][data-side="yes"]').click();
+    res.scoring = document.getElementById("bScoring").textContent;
+    const inv = document.querySelectorAll('#bEntries [data-act="dMem"]')[1]; inv.value = "c"; inv.dispatchEvent(new Event("change", { bubbles: true }));
+    document.getElementById("bAmt").value = "20"; document.getElementById("bName").value = ""; document.getElementById("bTerms").value = "";
+    F.submitBet();
+    const b = state.bets[0];
+    res.saved = b && { kind: b.kind, week: b.week, league: b.league, joinable: b.joinable, name: b.name, terms: b.terms, status: b.status, amount: b.amount,
+      entries: b.entries.map(e => [e.memberId, e.invite || null, e.side, e.pick]) };
+    res.dlgOpen = document.getElementById("betDlg").open;
+    // the ticket before the standings have arrived
+    state.standings = null; V.render();
+    const t = () => document.querySelector('article.ticket[data-bet="' + b.id + '"]');
+    res.noTable = t().querySelector(".leagueline").textContent;
+    res.kind = t().querySelector(".kind").textContent; res.wk = t().querySelector(".wk").textContent;
+    res.ticketScoring = t().querySelector(".scoring").textContent;
+    // with a table: two spots, Bob third of four
+    state.standings = { teams: 2, playoffStart: 15, rows: [
+      { rid: 1, id: "a", name: "Alice", w: 3, l: 0, t: 0, pf: 400, pa: 300 }, { rid: 2, id: "c", name: "Cara", w: 2, l: 1, t: 0, pf: 380, pa: 320 },
+      { rid: 3, id: "b", name: "Bob", w: 2, l: 1, t: 0, pf: 350.5, pa: 330 }, { rid: 4, id: null, name: "ghost", w: 0, l: 3, t: 0, pf: 200, pa: 400 } ],
+      playoffs: { rids: [], field: [], complete: false } };
+    V.render();
+    const ll = t().querySelector(".leagueline");
+    res.head = { who: ll.querySelector(".ll-who").textContent, rec: ll.querySelector(".ll-rec").textContent, state: ll.querySelector(".ll-state").textContent, cls: ll.className };
+    res.table = [...ll.querySelectorAll(".ll-table li")].map(li => li.classList.contains("ll-cut") ? "cut: " + li.textContent
+      : [li.querySelector(".ll-rank").textContent, li.querySelector(".ll-name").textContent, li.querySelector(".ll-wl").textContent, li.className]);
+    // (the app is hidden behind the login card here, so a box height can't be read; the fold is the element's own state)
+    res.folded = !ll.querySelector("details").open; res.foldLabel = ll.querySelector("summary").textContent;
+    res.ahead = [...t().querySelectorAll(".side")].map(s => [s.querySelector(".side-pick").textContent, s.classList.contains("ahead")]);
+    const probe = document.createElement("span"); probe.style.color = "var(--loss)"; document.body.appendChild(probe);
+    res.stateColor = getComputedStyle(ll.querySelector(".ll-state")).color; res.lossColor = getComputedStyle(probe).color; probe.remove();
+    // seeded: the bracket has Bob in, whatever the table says
+    state.standings.playoffs = { rids: [1, 3], field: ["a", "b"], complete: true }; V.render();
+    res.decided = { state: t().querySelector(".ll-state").textContent, ahead: [...t().querySelectorAll(".side")].map(s => s.classList.contains("ahead")) };
+    // after the cutoff: the chip is gone and a post is refused
+    state.config.weekStarts = { "3": "2020-09-25T00:15:00Z" };
+    state.local = false; F.openBetDlg(); state.local = true;
+    res.chipAfter = document.querySelector('#bScope .chip[data-scope="league"]').hidden;
+    state.draftScope = "league"; state.draftSubject = "b"; state.draftOutcome = "playoffs"; state.editId = null;
+    state.draft = [{ memberId: "a", pick: "", picks: [], side: "yes" }, { memberId: null, pick: "", picks: [], side: "" }];
+    document.getElementById("bAmt").value = "20"; F.submitBet();
+    res.betsAfter = state.bets.length;
+    document.getElementById("betDlg").close();
+    return res;
+  });
+  assert.deepEqual(out.rows, { league: false, week: true, name: true, kind: true, join: true, add: true, stats: true }, "whose team and what happens; no week, name, type, joiners or extra sides");
+  assert.deepEqual(out.subjects, ["Whose team…", "Alice (you)", "Bob", "Cara"]); assert.equal(out.subject, "a", "opens on your own team");
+  assert.deepEqual(out.outcomes, ["Makes the playoffs"]);
+  assert.deepEqual(out.chips, ["Makes it", "Misses"]); assert.equal(out.otherSide, "gets the other side");
+  assert.match(out.hint, /^Pick whose team, take Makes it or Misses.*Locks /);
+  assert.match(out.scoring, /If the team is in Sleeper's playoff field when the regular season ends after Week 14, Makes it wins; otherwise Misses does\./);
+  assert.deepEqual(out.saved, { kind: "league", week: 0, league: { subject: "b", outcome: "playoffs" }, joinable: false, name: "Bob makes the playoffs",
+    terms: "Makes it vs Misses — Sleeper's playoff bracket decides it once the regular season is over.", status: "open", amount: 20,
+    entries: [["a", null, "yes", "Makes it"], [null, "c", "no", "Misses"]] }, "saved as a two-sided season bet on Bob's team, Cara invited to Misses");
+  assert.equal(out.dlgOpen, false);
+  assert.match(out.noTable, /Bob.*Standings arrive with the next refresh/);
+  assert.equal(out.kind, "League result"); assert.equal(out.wk, "SEASON");
+  assert.match(out.ticketScoring, /How it’s scored If the team is in Sleeper's playoff field/);
+  assert.match(out.head.who, /Bob$/); assert.equal(out.head.rec, "2–1 · 3rd of 4 · 350.5 pts");
+  assert.equal(out.head.state, "Outside the top 2 as it stands"); assert.match(out.head.cls, /\bout\b/);
+  assert.deepEqual(out.table, [["1", "Alice", "3–0", "in"], ["2", "Cara", "2–1", "in"], "cut: Top 2 make the playoffs", ["3", "Bob", "2–1", "out me"], ["4", "ghost", "0–3", "out"]],
+    "the table in standing order, the cut line after the last spot, the subject marked");
+  assert.equal(out.folded, true, "the table is behind a fold"); assert.equal(out.foldLabel, "The table");
+  assert.deepEqual(out.ahead, [["Makes it", false], ["Misses", true]], "the side the table points to is marked as it stands");
+  assert.equal(out.stateColor, out.lossColor, "outside reads in the loss colour, by computed style");
+  assert.deepEqual(out.decided, { state: "In the playoffs", ahead: [true, false] }, "once seeded the bracket decides");
+  assert.equal(out.chipAfter, true, "after the cutoff the chip is gone");
+  assert.equal(out.betsAfter, 1, "and a post is refused");
   assert.deepEqual(errors, []);
   await p.close();
 });

@@ -932,6 +932,11 @@ function sideHtml(e,i,b){
     var mine=e.side==="over"||e.side==="under"?e.side:(e.side===b.game.away?"away":e.side===b.game.home?"home":"");
     if(cv==="push") cls+=" pushing"; else if(cv&&cv===mine) cls+=" cover";
   }
+  else if(b.league&&e.side&&(b.status==="open"||b.status==="active")){
+    // the side the table points to as things stand
+    var ls=Bets.leagueStanding(b,state.standings);
+    if(ls&&(ls.inField?"yes":"no")===e.side) cls+=" ahead";
+  }
   if(vacant) cls+=" vacant";
   // A seat is either taken, reserved for someone who hasn't accepted yet, or open to anyone.
   var invited=vacant&&e.invite&&!e.declined?e.invite:null;
@@ -971,6 +976,30 @@ function gamelineHtml(b){
   return '<div class="gameline">'+team(g.away,g.awayScore,hw)+'<span class="gl-at">@</span>'+team(g.home,g.homeScore,aw)+
     (b.market&&b.market!=="ml"?'<span class="gl-line">'+esc(lineText(b))+
       (function(){ var o=Bets.lineOrigin(b); return o?'<i class="src '+o+'">'+(o==="vegas"?"Vegas":"their number")+"</i>":""; })()+"</span>":"")+stateHtml+"</div>";
+}
+
+// The league table behind a league result bet: the subject's record and place, whether
+// they are inside the playoff line - as things stand, or for good once Sleeper has seeded
+// the bracket - and the whole table behind a fold, the cut line drawn through it.
+function ord(n){ var s=["th","st","nd","rd"], v=n%100; return n+(s[(v-20)%10]||s[v]||s[0]); }
+function leaguelineHtml(b){
+  var L=b.league, who=mName(L.subject), st=Bets.leagueStanding(b,state.standings);
+  var head='<span class="ll-who">'+avatarHtml(L.subject,18)+esc(who)+"</span>";
+  if(!st) return '<div class="leagueline"><div class="ll-head">'+head+'<span class="ll-state">Standings arrive with the next refresh</span></div></div>';
+  var me=st.me, rec=me.w+"–"+me.l+(me.t?"–"+me.t:"");
+  var stateTxt=st.decided?(st.inField?"In the playoffs":"Missed the playoffs")
+    :(st.inField?"Inside the top "+st.teams:"Outside the top "+st.teams)+" as it stands";
+  var rows=st.rows.map(function(r,i){
+    var h='<li class="'+(r.rank<=st.teams?"in":"out")+(r.id===me.id?" me":"")+'"><span class="ll-rank">'+r.rank+'</span><span class="ll-name">'+esc(r.name||(r.id?mName(r.id):"Roster "+r.rid))+
+      '</span><span class="ll-wl">'+r.w+"–"+r.l+(r.t?"–"+r.t:"")+'</span><span class="ll-pf">'+esc(String(r.pf))+"</span></li>";
+    if(r.rank===st.teams&&i<st.rows.length-1) h+='<li class="ll-cut"><span>Top '+st.teams+" make the playoffs</span></li>";
+    return h;
+  }).join("");
+  return '<div class="leagueline '+(st.inField?"in":"out")+(st.decided?" decided":"")+'">'+
+    '<div class="ll-head">'+head+'<span class="ll-rec">'+esc(rec)+" · "+esc(ord(me.rank))+" of "+st.rows.length+" · "+esc(String(me.pf))+" pts</span>"+
+      '<span class="ll-state">'+esc(stateTxt)+"</span></div>"+
+    '<details class="ll-more"><summary>The table</summary><ol class="ll-table">'+rows+"</ol></details>"+
+  "</div>";
 }
 
 // The standings strip: a bet tracks one stat or several. Older bets carry a single
@@ -1138,7 +1167,7 @@ function ticketHtml(b){
       chip+"</div></div>"+
     '<p class="terms">'+esc(b.name||b.terms)+"</p>"+
     (b.name?'<p class="bet-desc">'+esc(b.terms)+"</p>":"")+
-    (b.game?gamelineHtml(b):"")+
+    (b.game?gamelineHtml(b):b.league?leaguelineHtml(b):"")+
     '<p class="scoring"><span class="lbl">How it’s scored</span> '+esc(Bets.scoringText(b))+"</p>"+
     '<div class="sides">'+sides+"</div>"+
     strip+

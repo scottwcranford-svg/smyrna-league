@@ -29,13 +29,22 @@ function firstGame(week,config){
 
 export function lockTime(week,config){ return firstGame(week,config)-LOCK_LEAD; }
 
+// A season-long league result bet (bets.js) locks at the opener like any season bet. The
+// type arrived in week 2 of 2026, so for that season alone it locks at week 3's first
+// kickoff - the managers agreed to an end-of-week-2 cutoff. Delete the entry after 2026.
+// An untagged bet is 2026 (seasons.js).
+const LEAGUE_LOCK_WEEK={ "2026":3 };
+export function leagueLockWeek(b){ return LEAGUE_LOCK_WEEK[String((b&&b.season)||"2026")]||0; }
+
 // A game bet locks on its game. A weekly stat bet locks on the first game any of its
 // picks plays in, so it stays open through the week while nobody on it has started —
 // and nobody joins knowing how a pick already on it did. Without the schedule (or a
-// pick's game in it) it falls back to the week's first game. Season bets: the opener.
+// pick's game in it) it falls back to the week's first game. Season bets: the opener,
+// except a league result bet in a season that had a later cutoff (leagueLockWeek).
 export function betLock(b,config,games){
   if(b&&b.game&&b.game.date){ var t=Date.parse(b.game.date); if(!isNaN(t)) return t-LOCK_LEAD; }
   var week=b?Number(b.week)||0:0;
+  if(b&&b.league&&!week) return lockTime(leagueLockWeek(b),config);
   if(week&&games){
     var first=Infinity, found=true, any=false;
     (Array.isArray(b.entries)?b.entries:[]).forEach(function(e){ (e.picks||[]).forEach(function(p){
