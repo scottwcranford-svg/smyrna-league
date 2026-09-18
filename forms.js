@@ -122,17 +122,11 @@ export function drawGameBox(){
   // Stat bets write their own terms from the stat, the period and the picks.
   document.getElementById("bTermsRow").hidden=!!scope;
   document.getElementById("bWhoLbl").textContent=twoSided?"Your side, and who you're betting":"Who's in, and what they're taking";
-  // A game bet has no default stake — the proposer names it every time.
-  var amt=document.getElementById("bAmt"), dflt=String((seasonCfg()&&seasonCfg().stake)||25);
-  if(isGame){
-    if(!state.editId&&amt.value===dflt) amt.value="";
-    amt.placeholder="your stake";
-    document.getElementById("bHint").textContent="You set the stake. Nothing's assumed on a game bet.";
-  } else {
-    if(!amt.value) amt.value=dflt;
-    amt.placeholder="";
-    if(!state.editId) document.getElementById("bHint").textContent="Default stake is "+money(Number(dflt))+".";
-  }
+  // No bet has a default stake: the proposer names it every time, the league's usual
+  // stake beside the box as a hint rather than a number that gets posted unread.
+  var amt=document.getElementById("bAmt"), usual=Number((seasonCfg()&&seasonCfg().stake)||25);
+  amt.placeholder="your stake";
+  if(!state.editId) document.getElementById("bHint").textContent="League stake is "+money(usual)+" — set yours.";
   drawScoring();
   if(!isGame) return;
   var wk=document.getElementById("bWeek"), sel=document.getElementById("bGame");
@@ -474,10 +468,10 @@ export function openBetDlg(editId){
     wk.value=String(currentWeek());
     if(!wk.value) wk.value=wk.options[0]?wk.options[0].value:"";
   }
-  document.getElementById("bAmt").value=String(bet?bet.amount:stake);
+  document.getElementById("bAmt").value=bet?String(bet.amount):"";   // a new bet opens with no stake; the proposer sets it
   document.getElementById("bHint").textContent=bet
     ? (state.admin&&isLocked(bet)?"Admin update on a locked bet — everyone will see the change. ":"")+"Changing sides or stats resets the standings until the next refresh."
-    : "Default stake is "+money(stake)+".";
+    : "League stake is "+money(stake)+" — set yours.";
   state.draftGame=null; state.draftMarket="ml"; state.draftLine=""; state.draftFav="";
   state.draftSubject=state.me||""; state.draftOpp=""; state.draftOutcome=Bets.LEAGUE_OUTCOMES[0].key;   // a league result bet opens on your own team
   state.draftTeam=""; state.draftPos=""; state.suggRow=0;

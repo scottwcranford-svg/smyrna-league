@@ -203,7 +203,8 @@ does not exist — so replace an account by deleting it and using **Add user**.
   you take the yes side (Not last, on "finishes last"), and in your own matchup you take
   yourself; anyone else can take either side of a bet about you. Name and terms write
   themselves.
-  The proposer sets the stake (props default to the league stake; games have no default).
+  The proposer sets the stake on every bet; the form suggests the league stake beside the
+  box but never fills it in.
 - **You can only put yourself on a bet.** Other sides are open seats anyone can take, or
   invitations the named manager accepts or passes from the ticket. Pot-style bets let
   anyone add themselves. Only the proposer can edit, and only the proposer can cancel,
