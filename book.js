@@ -101,7 +101,7 @@ export function expireBets(){
 export function settleFinished(){
   var now=Date.now();
   state.bets.forEach(function(b){
-    var r=Bets.autoResult(b,state.games,now,state.standings); if(!r) return;
+    var r=Bets.autoResult(b,state.games,now,{ standings:state.standings, scores:state.scores }); if(!r) return;
     b.status="settled"; b.winner=r.winner; b.settledAt=new Date(now).toISOString(); b.settledBy="auto"; b.settledNote=r.note;
     if(!Array.isArray(b.paid)) b.paid=[];
     if(state.db&&!state.local) state.db.doc("bets/"+b.id).update({ status:"settled", winner:r.winner, settledAt:b.settledAt, settledBy:"auto", settledNote:r.note })

@@ -178,8 +178,9 @@ const CHANGES = {
   dTeam:function(t){ state.draftTeam=t.value; F.refilter(); },
   dPos:function(t){ state.draftPos=t.value; F.refilter(); },
   // a league result bet: whose team, and what happens to it - the sides follow
-  dSubject:function(t){ state.draftSubject=t.value||""; F.drawEntries(); },
-  dOutcome:function(t){ state.draftOutcome=t.value||""; state.draft.forEach(function(e){ e.side=""; }); F.drawEntries(); },
+  // (a matchup's value is "a|b", the two managers of the week's pairing)
+  dSubject:function(t){ var v=String(t.value||"").split("|"); state.draftSubject=v[0]||""; state.draftOpp=v[1]||""; state.draft.forEach(function(e){ e.side=""; }); F.drawEntries(); },
+  dOutcome:function(t){ state.draftOutcome=t.value||""; state.draft.forEach(function(e){ e.side=""; }); F.drawScope(); F.drawEntries(); },
   dMem:function(t){
     var i=num(t,"data-i"), d=state.draft[i];
     if(state.admin){ d.memberId=t.value||(i===0?state.me:null); d.invite=null; }   // admin on: seat anyone outright
@@ -270,6 +271,8 @@ export function bindEvents(hooks){
     if(act&&CHANGES[act]) return CHANGES[act](t);
     if(t.id==="bMatch") return F.matchChanged();
     if(t.id==="bJoin"||(t.id==="bWeek"&&state.draftScope!=="game")) F.drawScoring();
+    // a league matchup is the week's pairing: a new week, a new list
+    if(t.id==="bWeek"&&state.draftScope==="league"){ state.draft.forEach(function(e){ e.side=""; }); F.drawScope(); F.drawEntries(); }
     if(t.id==="bWeek"&&state.draftScope==="game"){ state.draftGame=null; state.draftFav=""; state.draft.forEach(function(e){ e.side=""; }); F.drawGameBox(); F.drawEntries(); }
     else if(t.id==="bGame"){
       var gid=t.value, pick=null;

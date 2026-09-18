@@ -195,9 +195,11 @@ does not exist — so replace an account by deleting it and using **Add user**.
 
 - **Propose a bet** — a player stat, a team stat, a game, or a league result. Stat bets pick
   players or a defense from Sleeper's roster and track one or many stats; game bets pick a
-  game (winner, or over/under on the proposer's total); a league result bet names a
-  manager's own fantasy team and what happens to it — for now, whether it makes the
-  playoffs — with Makes it and Misses as its two sides. Name and terms write themselves.
+  game (winner, or over/under on the proposer's total); a league result bet is about the
+  Smyrna League itself: a manager's own fantasy team and what happens to it (makes the
+  playoffs, finishes 1st / top 3 / last in the regular season, wins the championship), yes
+  and no as its two sides — or one of the week's Sleeper matchups, each side a team, like
+  a game bet. Name and terms write themselves.
   The proposer sets the stake (props default to the league stake; games have no default).
 - **You can only put yourself on a bet.** Other sides are open seats anyone can take, or
   invitations the named manager accepts or passes from the ticket. Pot-style bets let
@@ -223,10 +225,14 @@ does not exist — so replace an account by deleting it and using **Add user**.
   game of its period is final and the standings have refreshed after the last one
   ended: the leader on the stat wins, a tie is a push, and a bet tracking several stats
   goes to whoever leads the most of them. Season bets run through week 17. A league
-  result bet settles from Sleeper's own winners bracket once the regular season is over:
-  the seeded teams are the field, Sleeper's tiebreakers decide the seeds, and there is no
-  push. Until then its ticket shows the team's record, place and the table with the cut
-  line drawn. An admin can still record a result by hand, and reopen one.
+  result bet settles from Sleeper: the playoff field from its winners bracket once the
+  regular season is over (Sleeper seeds it from the live table all season, with its own
+  tiebreakers, so until then the ticket says "as it stands"); the regular-season places
+  from the table, ordered as Sleeper's default seeding is (record, then points for — a
+  league seeded any other way is settled by hand); the champion from the bracket's final;
+  a matchup from the week's board, a tie a push. The ticket shows the team's record, place
+  and the table with the cut line drawn, or the matchup's points. An admin can still record
+  a result by hand, and reopen one.
 - **Settle up** nets who owes whom; marking paid is separate so the P&L and the debt
   list stay honest.
 
@@ -243,8 +249,8 @@ House takes nothing: the full pot goes to the winner, zero-sum.
 | `leases/<name>` | `{holder, until}` — seat, join, scores and refresh leases |
 | `bets/<id>` | `{createdAt, createdBy, week, kind, amount, name, terms, joinable, entries:[{memberId, invite?, declined?, pick, picks?:[{id,name,pos,team}], side?}], status, winner, paid:[memberId], stats?, game?, market?, line?}` |
 | `bets/<id>.stats` | `{scope, tracks:[{stat,metric,lower}], rows:[{key,label,team?,memberId,entry,values:{stat:n}}], through, source, updatedAt}` |
-| `bets/<id>.league` | `{subject: memberId, outcome: "playoffs"}` — a league result bet; its entries carry `side: yes\|no` and `kind` is `league` |
-| `league/standings` | `{updatedAt, bySeason:{<season>:{at, leagueId, teams, playoffStart, rows:[{rid,id,name,w,l,t,pf,pa}], playoffs:{rids, field:[memberId], complete}}}}` — every team's record in standing order, hourly; the field once Sleeper has seeded the bracket |
+| `bets/<id>.league` | `{subject: memberId, outcome: playoffs\|reg1\|top3\|last\|champ\|matchup, opp?: memberId}` — a league result bet, `kind` `league`; entries carry `side: yes\|no`, or on a matchup the member id of the team taken |
+| `league/standings` | `{updatedAt, bySeason:{<season>:{at, leagueId, teams, playoffStart, seedType, over, rows:[{rid,id,name,w,l,t,pf,pa}], playoffs:{rids, field:[memberId], seeded, complete, champion}}}}` — every team's record in standing order, hourly. Sleeper seeds its bracket from the live table all season (`seeded`, the line as it stands); `complete` and `over` once the last regular-season week is final, which is what settles a bet; `champion` once the final is played |
 
 `status`: `open` (a seat unclaimed) · `active` · `settled` · `void` (`cancelled` /
 `autoVoid` say why). `week` 0 = season-long; weeks 15–17 are playoffs.

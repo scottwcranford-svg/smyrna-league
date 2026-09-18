@@ -318,6 +318,11 @@ label.f > span{font-size:11px;font-weight:700;text-transform:uppercase;letter-sp
 .gameline .ball{color:var(--accent);font-size:10px} .gameline .ball.rz{color:var(--loss)}
 .side.cover .side-pick::after{content:" · covering";color:var(--gold);font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
 .side.ahead .side-pick::after{content:" · as it stands";color:var(--gold);font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+/* the Sleeper matchup behind a league matchup bet: the game line's shape */
+.matchline .ml-team{display:flex;align-items:center;gap:6px;font-weight:800;font-size:15px}
+.matchline .ml-team .sc{font-size:20px;font-variant-numeric:tabular-nums;margin-left:2px}
+.matchline .ml-team .proj{font-size:11px;font-weight:700;color:var(--ink-3);font-variant-numeric:tabular-nums}
+.matchline .ml-team.lead .sc{color:var(--win)}
 /* the league table behind a league result bet */
 .leagueline{display:flex;flex-direction:column;gap:4px;background:var(--surface-2);border-radius:12px;padding:10px 14px}
 .leagueline .ll-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap}

@@ -49,23 +49,43 @@ export function prefillLine(){
   var el=document.getElementById("bLine"); if(el) el.value=state.draftLine;
 }
 
-// The league result box: whose team, and what happens to it. Every manager in the
-// season is offered, yourself included - a bet on your own team is the usual one.
+// The league result box: what happens, and whose team - or, on the weekly matchup, which
+// of the week's Sleeper pairings. Every manager in the season is offered, yourself
+// included - a bet on your own team is the usual one. After the season's cutoff only the
+// weekly outcome is on offer.
 function drawLeagueBox(){
   var box=document.getElementById("bLeagueBox"), isLeague=state.draftScope==="league";
   box.hidden=!isLeague;
   if(!isLeague) return;
-  var who=document.getElementById("bSubject"), what=document.getElementById("bOutcome");
-  who.innerHTML='<option value="">Whose team…</option>'+realMembers().map(function(m){
-    return '<option value="'+esc(m.id)+'"'+(m.id===state.draftSubject?" selected":"")+">"+esc(m.name)+(m.id===state.me?" (you)":"")+"</option>"; }).join("");
-  who.value=state.draftSubject||"";
-  what.innerHTML=Bets.LEAGUE_OUTCOMES.map(function(o){ return '<option value="'+esc(o.key)+'"'+(o.key===state.draftOutcome?" selected":"")+">"+esc(o.label)+"</option>"; }).join("");
-  what.value=state.draftOutcome||Bets.LEAGUE_OUTCOMES[0].key;
+  var who=document.getElementById("bSubject"), what=document.getElementById("bOutcome"), lbl=document.getElementById("bSubjectLbl");
+  var closed=leagueClosed()&&!state.editId, oc=Bets.leagueOutcome(state.draftOutcome);
+  if(!oc||(closed&&oc.period==="season")){ state.draftOutcome=closed?"matchup":Bets.LEAGUE_OUTCOMES[0].key; oc=Bets.leagueOutcome(state.draftOutcome); }
+  what.innerHTML=Bets.LEAGUE_OUTCOMES.map(function(o){
+    var off=closed&&o.period==="season";
+    return '<option value="'+esc(o.key)+'"'+(o.key===state.draftOutcome?" selected":"")+(off?" disabled":"")+">"+esc(o.label)+(off?" · closed for the season":o.period==="week"?" · weekly":"")+"</option>"; }).join("");
+  what.value=state.draftOutcome;
+  if(oc.period==="week"){
+    lbl.textContent="Which matchup";
+    var w=Number(document.getElementById("bWeek").value)||0, pairs=Bets.leaguePairings(w,state.scores);
+    if(!pairs.some(function(p){ return p.a===state.draftSubject&&p.b===state.draftOpp; })){ state.draftSubject=""; state.draftOpp=""; }
+    who.innerHTML=pairs.length
+      ? '<option value="">Pick a matchup…</option>'+pairs.map(function(p){
+          var v=p.a+"|"+p.b, on=p.a===state.draftSubject&&p.b===state.draftOpp;
+          return '<option value="'+esc(v)+'"'+(on?" selected":"")+">"+esc(mName(p.a)+" vs "+mName(p.b))+"</option>"; }).join("")
+      : '<option value="">'+(w?"Week "+w+" isn’t paired yet":"Pick a week")+"</option>";
+    who.value=state.draftSubject?state.draftSubject+"|"+state.draftOpp:"";
+  } else {
+    lbl.textContent="Whose team";
+    who.innerHTML='<option value="">Whose team…</option>'+realMembers().map(function(m){
+      return '<option value="'+esc(m.id)+'"'+(m.id===state.draftSubject?" selected":"")+">"+esc(m.name)+(m.id===state.me?" (you)":"")+"</option>"; }).join("");
+    who.value=state.draftSubject||"";
+  }
 }
 // Season-long league result bets close for the year at their lock (clock.js leagueLockWeek).
 export function leagueClosed(){
   return Date.now()>=Clock.betLock({ league:{ subject:"" }, week:0, season:shownSeason() },seasonCfg(),state.games);
 }
+function leagueWeekly(){ var o=state.draftScope==="league"?Bets.leagueOutcome(state.draftOutcome):null; return !!o&&o.period==="week"; }
 
 export function drawGameBox(){
   var scope=state.draftScope, box=document.getElementById("bGameBox");
@@ -74,6 +94,11 @@ export function drawGameBox(){
   // league result bet: it is always two sides, on the season, named after its subject.
   var isGame=scope==="game", isLeague=scope==="league", twoSided=isGame||isLeague;
   ["bNameRow","bKindRow","bWeekRow","bAddSide","bJoinRow"].forEach(function(id){ document.getElementById(id).hidden=twoSided; });
+  // the weekly matchup is the one league result bet with a week to pick, and it needs a real one
+  if(isLeague&&leagueWeekly()){
+    var lwk=document.getElementById("bWeek"); lwk.parentNode.hidden=false;
+    if(!(Number(lwk.value)>0)){ var firstW=Array.prototype.filter.call(lwk.options,function(o){ return Number(o.value)>0; })[0]; if(firstW) lwk.value=firstW.value; }
+  }
   drawLeagueBox();
   // Stat bets write their own terms from the stat, the period and the picks.
   document.getElementById("bTermsRow").hidden=!!scope;
@@ -164,14 +189,13 @@ export function drawScope(){
     hint.textContent=allGames().length?"Pick the game, take a side, say who you're betting, set the stake. The other owner gets the other side. Locks five minutes before that game.":"Schedule isn't loaded yet — hit Refresh stats first.";
     return;
   }
-  // The league result chip goes away once the season's bets have closed, unless a bet is being edited.
-  var lchip=document.querySelector('#bScope .chip[data-scope="league"]');
-  if(lchip) lchip.hidden=leagueClosed()&&!state.editId;
   if(scope==="league"){
     box.hidden=true;
-    hint.textContent=leagueClosed()&&!state.editId
-      ? "Season league result bets are closed for the year."
-      : "Pick whose team, take Makes it or Misses, say who you're betting, set the stake. The other manager gets the other side. Sleeper's playoff bracket settles it. Locks "+fmtWhen(Clock.betLock({ league:{ subject:"" }, week:0, season:shownSeason() },seasonCfg(),state.games))+".";
+    hint.textContent=leagueWeekly()
+      ? "Pick the week and one of its Sleeper matchups, take a team, say who you're betting, set the stake. The other manager gets the other team. Most points wins; a tie is a push. Locks five minutes before that week's first game."
+      : leagueClosed()&&!state.editId
+      ? "Season league result bets are closed for the year — the weekly matchup is still on."
+      : "Pick whose team and what happens, take a side, say who you're betting, set the stake. The other manager gets the other side. Sleeper settles it. Season bets lock "+fmtWhen(Clock.betLock({ league:{ subject:"" }, week:0, season:shownSeason() },seasonCfg(),state.games))+".";
     return;
   }
   box.hidden=!scope;
@@ -219,9 +243,11 @@ export function drawEntries(hostId){
     if(scope==="game"||scope==="league"){
       var g=state.draftGame, choices, logos=scope==="game";
       if(scope==="league"){
-        // yes or no on the subject's team; nothing to choose until there is a subject
+        // yes or no on the subject's team, or the two teams of a matchup; nothing to choose until there is one
         var oc=Bets.leagueOutcome(state.draftOutcome);
-        choices=state.draftSubject&&oc?[["yes",oc.yes],["no",oc.no]]:[];
+        if(!oc) choices=[];
+        else if(oc.period==="week") choices=state.draftSubject&&state.draftOpp?[[state.draftSubject,mName(state.draftSubject)],[state.draftOpp,mName(state.draftOpp)]]:[];
+        else choices=state.draftSubject?[["yes",oc.yes],["no",oc.no]]:[];
       }
       else if(!g) choices=[];
       else if(state.draftMarket==="total") choices=[["over","Over"],["under","Under"]];
@@ -235,7 +261,7 @@ export function drawEntries(hostId){
       if(i===0){
         pickUi='<div class="side-chips">'+(choices.length?choices.map(function(c){
           return '<button type="button" class="chip" data-act="dSide" data-i="'+i+'" data-side="'+esc(c[0])+'" aria-pressed="'+(e.side===c[0])+'">'+(logos?logoHtml(c[0],16):"")+esc(c[1])+"</button>";
-        }).join(""):'<span class="hint">'+(scope==="league"?"Pick whose team above":"Pick a game above")+"</span>")+"</div>";
+        }).join(""):'<span class="hint">'+(scope==="league"?(leagueWeekly()?"Pick a matchup above":"Pick whose team above"):"Pick a game above")+"</span>")+"</div>";
       } else {
         // the opponent's side is whatever you didn't take
         var mine0=state.draft[0].side, other=choices.filter(function(c){ return c[0]!==mine0; });
@@ -365,7 +391,7 @@ export function drawScoring(){
     if(!state.draftGame){ box.hidden=true; return; }
     b={ game:state.draftGame, market:state.draftMarket, line:state.draftLine, fav:state.draftFav||state.draftGame.home };
   } else if(scope==="league"){
-    b={ league:{ subject:state.draftSubject, outcome:state.draftOutcome }, week:0, entries:state.draft };
+    b={ league:{ subject:state.draftSubject, opp:state.draftOpp, outcome:state.draftOutcome }, week:leagueWeekly()?(Number(document.getElementById("bWeek").value)||0):0, entries:state.draft };
   } else {
     var match=scope==="player"?document.getElementById("bMatch").value:"";
     var tracks=(STATS[scope]||[]).filter(function(s){ return state.draftStats.indexOf(s[0])>=0; }).map(function(s){ return { stat:s[0], metric:s[1], lower:!!s[2] }; });
@@ -434,7 +460,7 @@ export function openBetDlg(editId){
     ? (state.admin&&isLocked(bet)?"Admin update on a locked bet — everyone will see the change. ":"")+"Changing sides or stats resets the standings until the next refresh."
     : "Default stake is "+money(stake)+".";
   state.draftGame=null; state.draftMarket="ml"; state.draftLine=""; state.draftFav="";
-  state.draftSubject=state.me||""; state.draftOutcome=Bets.LEAGUE_OUTCOMES[0].key;   // a league result bet opens on your own team
+  state.draftSubject=state.me||""; state.draftOpp=""; state.draftOutcome=Bets.LEAGUE_OUTCOMES[0].key;   // a league result bet opens on your own team
   state.draftTeam=""; state.draftPos=""; state.suggRow=0;
   // an older bet has no setting; it opens on the rule it has been playing by
   var mSel=document.getElementById("bMatch");
@@ -450,7 +476,7 @@ export function openBetDlg(editId){
       state.draftScope="game"; state.draftGame=clone(bet.game);
       state.draftMarket=bet.market||"ml"; state.draftLine=bet.line!=null?String(bet.line):""; state.draftFav=bet.fav||"";
     } else if(bet.league){
-      state.draftScope="league"; state.draftSubject=bet.league.subject||""; state.draftOutcome=bet.league.outcome||Bets.LEAGUE_OUTCOMES[0].key;
+      state.draftScope="league"; state.draftSubject=bet.league.subject||""; state.draftOpp=bet.league.opp||""; state.draftOutcome=bet.league.outcome||Bets.LEAGUE_OUTCOMES[0].key;
     } else {
       state.draftScope=S.scope||"player";   // no free-text bets any more
       state.draftStats=(Array.isArray(S.tracks)?S.tracks:[]).map(function(t){ return t.stat; }).filter(Boolean);
@@ -490,18 +516,27 @@ export function submitBet(){
     state.draft[1].side=other0;
     if(!state.editId&&Date.now()>=Date.parse(G.date)-LOCK_LEAD) return toast("That game is about to kick off — pick another");
   }
-  var isLeague=state.draftScope==="league", oc=isLeague?Bets.leagueOutcome(state.draftOutcome):null;
+  var isLeague=state.draftScope==="league", oc=isLeague?Bets.leagueOutcome(state.draftOutcome):null, weekly=!!(oc&&oc.period==="week");
+  var leagueWeek=weekly?(Number(document.getElementById("bWeek").value)||0):0;
   if(isLeague){
     if(!oc) return toast("Pick what happens");
-    if(!state.draftSubject||!Id.member(state.draftSubject,members())) return toast("Pick whose team it's about");
-    if(!state.draft[0].side) return toast("Take "+oc.yes+" or "+oc.no);
-    // two sides, yes and no; the opponent gets whatever you didn't take
+    var side0=state.draft[0].side;
+    if(weekly){
+      // one of the week's Sleeper pairings, and a team from it
+      if(!leagueWeek) return toast("Pick a week");
+      if(!Bets.leaguePairings(leagueWeek,state.scores).some(function(p){ return p.a===state.draftSubject&&p.b===state.draftOpp; })) return toast("Pick one of Week "+leagueWeek+"'s matchups");
+      if(side0!==state.draftSubject&&side0!==state.draftOpp) return toast("Take a team");
+    } else {
+      if(!state.draftSubject||!Id.member(state.draftSubject,members())) return toast("Pick whose team it's about");
+      if(side0!=="yes"&&side0!=="no") return toast("Take "+oc.yes+" or "+oc.no);
+      if(!state.editId&&leagueClosed()) return toast("Season league result bets are closed for the year");
+    }
+    // two sides; the opponent gets whatever you didn't take
     state.draft=state.draft.slice(0,2);
     if(state.draft.length<2) state.draft.push({memberId:null,pick:"",picks:[],side:""});
-    state.draft[1].side=state.draft[0].side==="yes"?"no":"yes";
-    if(!name) name=Bets.leagueName(state.draftSubject,oc.key,members());
+    state.draft[1].side=weekly?(side0===state.draftSubject?state.draftOpp:state.draftSubject):(side0==="yes"?"no":"yes");
+    if(!name) name=Bets.leagueName(state.draftSubject,oc.key,members(),leagueWeek,state.draftOpp);
     if(!terms) terms=Bets.leagueTerms(oc.key);
-    if(!state.editId&&leagueClosed()) return toast("Season league result bets are closed for the year");
   }
   var statScope=state.draftScope==="player"||state.draftScope==="team"||state.draftScope==="offense";
   if(statScope&&rosterRows().length){
@@ -518,12 +553,13 @@ export function submitBet(){
   if(statScope) terms="(auto)";   // rewritten from the picks once the strip is built
   if(!terms) return toast("Write the terms first");
   if(!(amt>0)) return toast(isGame?"Set the stake — it's yours to name":"Set a stake above zero");
-  var wkPick=isGame?G.week:isLeague?(oc.week||0):(Number(document.getElementById("bWeek").value)||0);
+  var wkPick=isGame?G.week:isLeague?leagueWeek:(Number(document.getElementById("bWeek").value)||0);
   // A weekly stat bet can be posted while any of the week's games is still to come —
   // its picks are held to that below. Without that week's schedule or picks, or season
-  // long, the week's first game is the line (and that is where such a bet locks).
+  // long, the week's first game is the line (and that is where such a bet locks). A
+  // season league result bet has its own cutoff, checked above; a weekly one is its week.
   var adminEdit=!!(state.editId&&state.admin);
-  if(!isGame&&!isLeague&&!adminEdit){
+  if(!isGame&&!(isLeague&&!weekly)&&!adminEdit){
     if(wkPick&&statScope&&rosterRows().length&&allGames().some(function(g){ return g.week===wkPick; })){ if(!openGames(wkPick).length) return toast("Week "+wkPick+"'s games have all kicked off — pick a later week"); }
     else if(weekLocked(wkPick)) return toast(wkPick?"Week "+wkPick+" has kicked off — pick a later week":"The season's underway — season-long bets are locked");
   }
@@ -568,7 +604,7 @@ export function submitBet(){
     var out={ memberId:e.memberId||null, pick:(e.pick||"").trim() };
     if(!out.memberId&&e.invite) out.invite=e.invite;
     if(isGame){ out.side=e.side; out.pick=gameSideText(e.side); }
-    else if(isLeague){ out.side=e.side; out.pick=Bets.leagueSideText(e.side,oc.key); }
+    else if(isLeague){ out.side=e.side; out.pick=Bets.leagueSideText(e.side,oc.key,members()); }
     else if(e.picks&&e.picks.length) out.picks=e.picks.map(function(p){ return { id:p.id, name:p.name, pos:p.pos, team:p.team }; });
     return out;
   });
@@ -587,7 +623,7 @@ export function submitBet(){
     bet.game={ id:G.id, week:G.week, away:G.away, home:G.home, date:G.date };
     bet.market=(state.draftMarket==="total"||state.draftMarket==="spread")?state.draftMarket:"ml";
   }
-  if(isLeague) bet.league={ subject:state.draftSubject, outcome:oc.key };
+  if(isLeague){ bet.league={ subject:state.draftSubject, outcome:oc.key }; if(weekly) bet.league.opp=state.draftOpp; }
   // Pot-style: others can add themselves after posting. Never on a two-sided game or
   // league result bet; always on a stat bet with nobody named against you, or nobody ever could.
   bet.joinable=!isGame&&!isLeague&&(document.getElementById("bJoin").checked||entries.length<2);

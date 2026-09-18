@@ -37,7 +37,7 @@ export const state = {
   // the propose / join forms' draft
   draftScope:"", draftStats:[], editId:null,
   draftGame:null, draftMarket:"ml", draftLine:"", draftFav:"", joinId:null,
-  draftSubject:"", draftOutcome:"playoffs",   // a league result bet: whose team, and what happens to it
+  draftSubject:"", draftOpp:"", draftOutcome:"playoffs",   // a league result bet: whose team (and, on a matchup, whose against), and what happens
   draftTeam:"", draftPos:"", suggRow:0,   // the picker's Team and Position filters, and the row whose list is open
   draft:[],
   // sign-in bookkeeping

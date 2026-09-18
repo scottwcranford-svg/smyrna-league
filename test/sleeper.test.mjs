@@ -180,7 +180,7 @@ test("runRefresh: the Sleeper league's team names and avatars, one call for ever
   const w = db.writes.find((x) => x[1] === "league/sleeper");
   assert.equal(w[2].leagueId, "L1");
   assert.deepEqual(w[2].byId, { m0: { avatar: "6dcbee5f", team: "Cheat 2 Win" }, m1: { avatar: "t3st", team: "" } }, "league members get team names; others their public avatar");
-  assert.deepEqual(w[2].league, { name: "Smyrna League", season: "2026", teams: 10, keeper: true, dynasty: false, sf: true, scoring: "PPR", avatar: "", playoffTeams: 0, playoffStart: 0 }, "and the league's own settings ride along (this league says nothing about its playoffs)");
+  assert.deepEqual(w[2].league, { name: "Smyrna League", season: "2026", teams: 10, keeper: true, dynasty: false, sf: true, scoring: "PPR", avatar: "", playoffTeams: 0, playoffStart: 0, seedType: 0 }, "and the league's own settings ride along (this league says nothing about its playoffs)");
   // the identity block asks for everyone at once rather than per member; the board block
   // asks again for the week being played, which is one extra pair on the hourly refresh;
   // the standings block adds the bracket. The week being played is the real clock's.
@@ -580,7 +580,8 @@ test("standingsTick: the table and the field hourly, written only when something
   const rec = w[2].bySeason["2026"];
   assert.deepEqual([rec.teams, rec.playoffStart, rec.leagueId], [2, 15, "L1"]);
   assert.deepEqual(rec.rows.map((r) => [r.rid, r.id, r.w, r.l]), [[2, "m0", 3, 0], [1, "m1", 2, 1], [3, "m2", 1, 2]]);
-  assert.deepEqual(rec.playoffs, { rids: [], field: [], complete: false }, "nobody seeded yet");
+  assert.deepEqual(rec.playoffs, { rids: [], field: [], seeded: false, complete: false, champion: null }, "nobody seeded yet");
+  assert.deepEqual([rec.seedType, rec.over], [0, false], "Sleeper's default seeding; the regular season is on");
   assert.ok(rec.at, "stamped");
   // an hour on, nothing moved: no write (a write would come back as a snapshot and loop)
   hits = []; db = fakeDb();
@@ -592,16 +593,29 @@ test("standingsTick: the table and the field hourly, written only when something
   hits = []; db = fakeDb();
   await N.standingsTick(db, { config: cfg, holder: "m0", sleeper, standings: { bySeason: { "2026": rec } } });
   assert.deepEqual(hits, []);
-  // the regular season ends: Sleeper seeds the bracket, the field lands as member ids
+  // Sleeper seeds the bracket from the live table mid-season: the field lands as member ids,
+  // seeded but not complete while week 14 is still to be played
   bracket = [{ r: 1, m: 1, t1: 2, t2: 1 }];
   db = fakeDb();
-  await N.standingsTick(db, { config: cfg, holder: "m0", sleeper, standings: { bySeason: { "2026": stale, "2025": { at: "old", rows: [] } } } });
+  const midSeason = { games: [{ id: "a", week: 14, status: "live", date: "2026-12-14T00:00:00Z" }] };
+  await N.standingsTick(db, { config: cfg, holder: "m0", sleeper, games: midSeason, standings: { bySeason: { "2026": stale, "2025": { at: "old", rows: [] } } } });
   const w2 = db.writes.find((x) => x[1] === "league/standings");
-  assert.deepEqual(w2[2].bySeason["2026"].playoffs, { rids: [1, 2], field: ["m1", "m0"], complete: true }, "two spots, two seeds: complete");
+  assert.deepEqual(w2[2].bySeason["2026"].playoffs, { rids: [1, 2], field: ["m1", "m0"], seeded: true, complete: false, champion: null }, "two spots, two seeds, as it stands");
   assert.deepEqual(w2[2].bySeason["2025"], { at: "old", rows: [] }, "other seasons are left exactly as they were");
+  // the regular season ends in the book's own schedule: the same seeding is now the result
+  db = fakeDb();
+  const over = { games: [{ id: "a", week: 14, status: "final", date: "2026-12-14T00:00:00Z" }] };
+  await N.standingsTick(db, { config: cfg, holder: "m0", sleeper, games: over, standings: { bySeason: { "2026": { ...stale, playoffs: w2[2].bySeason["2026"].playoffs } } } });
+  assert.deepEqual(db.writes[0][2].bySeason["2026"].playoffs, { rids: [1, 2], field: ["m1", "m0"], seeded: true, complete: true, champion: null }, "complete once week 14 is final");
+  assert.equal(db.writes[0][2].bySeason["2026"].over, true);
+  // the final is played: its winner is the champion
+  bracket = [{ r: 1, m: 1, t1: 2, t2: 1, w: 1, l: 2, p: 1 }];
+  db = fakeDb();
+  await N.standingsTick(db, { config: cfg, holder: "m0", sleeper, games: over, standings: { bySeason: { "2026": { ...stale, over: true, playoffs: { rids: [1, 2], field: ["m1", "m0"], seeded: true, complete: true, champion: null } } } } });
+  assert.equal(db.writes[0][2].bySeason["2026"].playoffs.champion, "m1", "JPorch, roster 1");
   // a bracket the feed can't give (a league before the playoffs are set up) is just no field
   globalThis.fetch = async (u) => { if (/winners_bracket$/.test(u)) return { ok: false, status: 404 }; return { ok: true, json: async () => (/rosters$/.test(u) ? rosters : users) }; };
   db = fakeDb();
-  await N.standingsTick(db, { config: cfg, holder: "m0", sleeper, standings: { bySeason: { "2026": { ...stale, playoffs: { rids: [1, 2], field: ["m1", "m0"], complete: true } } } } });
-  assert.deepEqual(db.writes[0][2].bySeason["2026"].playoffs, { rids: [], field: [], complete: false });
+  await N.standingsTick(db, { config: cfg, holder: "m0", sleeper, standings: { bySeason: { "2026": { ...stale, playoffs: { rids: [1, 2], field: ["m1", "m0"], seeded: true, complete: true } } } } });
+  assert.deepEqual(db.writes[0][2].bySeason["2026"].playoffs, { rids: [], field: [], seeded: false, complete: false, champion: null });
 });

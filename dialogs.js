@@ -37,10 +37,16 @@ export function openSettleDlg(id){
     if(g&&g.awayScore!=null&&g.homeScore!=null) head+="  ·  "+g.away+" "+g.awayScore+", "+g.home+" "+g.homeScore+(g.status==="final"?" (Final)":" (in progress)");
   }
   if(bet.league){
-    // where the team stands, so the admin calling it by hand can see what the table says
-    var st=Bets.leagueStanding(bet,state.standings);
-    if(st) head+="  ·  "+mName(bet.league.subject)+" "+st.me.w+"–"+st.me.l+(st.me.t?"–"+st.me.t:"")+", "+st.me.rank+" of "+st.rows.length+
-      (st.decided?(st.inField?" (in the playoff field)":" (out of the playoff field)"):(st.inField?" (inside the top "+st.teams+" as it stands)":" (outside the top "+st.teams+" as it stands)"));
+    // where the team stands, or the matchup's score, so the admin calling it by hand can see what Sleeper says
+    var lo=Bets.leagueOutcome(bet.league.outcome);
+    if(lo&&lo.period==="week"){
+      var M=Bets.leagueMatchup(bet,state.scores);
+      if(M) head+="  ·  "+M.me.name+" "+M.me.pts+", "+M.opp.name+" "+M.opp.pts+(M.final?" (Final)":" (in progress)");
+    } else {
+      var st=Bets.leagueStanding(bet,state.standings);
+      if(st&&lo) head+="  ·  "+mName(bet.league.subject)+" "+st.me.w+"–"+st.me.l+(st.me.t?"–"+st.me.t:"")+", "+Bets.ordinal(st.me.rank)+" of "+st.rows.length+
+        " ("+(st.inField?lo.yes:lo.no)+(st.decided?"":" as it stands")+")";
+    }
   }
   document.getElementById("sTerms").textContent=head;
   document.getElementById("sOptions").innerHTML =

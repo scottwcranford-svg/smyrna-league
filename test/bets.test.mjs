@@ -187,24 +187,83 @@ test("league result: yes/no sides, the subject's standing, and a name and terms 
   assert.deepEqual([st.me.rank, st.me.w, st.me.l, st.teams, st.inField, st.decided], [2, 2, 1, 2, true, false], "2nd of 3, inside a top two, not decided yet");
   assert.equal(Bets.leagueStanding({ ...b, league: { subject: "m0", outcome: "playoffs" } }, ST), null, "a manager the table doesn't have");
   assert.equal(Bets.leagueStanding(b, null), null);
+  // Sleeper seeds its bracket from the live table all season: while it has a full field that is
+  // the line as it stands (its tiebreakers, not ours), and only `complete` makes it final
+  const live = { ...ST, playoffs: { rids: [1, 3], field: ["m2"], seeded: true, complete: false } };
+  const lv = Bets.leagueStanding(b, live);
+  assert.deepEqual([lv.seeded, lv.decided, lv.inField, lv.rows.map(r => r.in)], [true, false, false, [true, false, false]], "the seeded field is the line, not the table's top two; nothing decided yet");
   const seeded = { ...ST, playoffs: { rids: [1, 3], field: ["m2"], complete: true } };
   const sd = Bets.leagueStanding(b, seeded);
-  assert.deepEqual([sd.decided, sd.inField], [true, false], "once seeded the bracket decides, whatever the table says");
+  assert.deepEqual([sd.decided, sd.inField], [true, false], "once complete the bracket decides, whatever the table says");
+  assert.deepEqual(st.rows.map(r => r.in), [true, true, false], "no bracket: the table's top two");
   assert.match(Bets.scoringText(b), /^If the team is in Sleeper's playoff field when the regular season ends after Week 14, Makes it wins; otherwise Misses does\. .*there's no push\./);
 });
 
 test("autoResult: a league result bet settles from the seeded bracket once the regular season is final, and never guesses", () => {
   const b = { league: { subject: "m1", outcome: "playoffs" }, status: "active", week: 0, entries: [{ memberId: "m0", side: "yes" }, { memberId: "m2", side: "no" }] };
   const reg = (status) => ({ games: [{ id: "a", week: 14, status, date: "2026-12-14T00:00:00Z" }, { id: "b", week: 15, status: "pre", date: "2026-12-21T00:00:00Z" }] });
-  const table = (playoffs) => ({ teams: 2, playoffStart: 15, rows: [{ rid: 1, id: "m2", name: "RTownsend", w: 9, l: 5 }, { rid: 2, id: "m1", name: "JPorch", w: 8, l: 6 }, { rid: 3, id: "m0", name: "gmelan1", w: 8, l: 6 }], playoffs });
-  const inField = table({ rids: [1, 2], field: ["m2", "m1"], complete: true });
+  const table = (playoffs, extra) => ({ standings: { teams: 2, playoffStart: 15, seedType: 0, over: true, rows: [{ rid: 1, id: "m2", name: "RTownsend", w: 9, l: 5 }, { rid: 2, id: "m1", name: "JPorch", w: 8, l: 6 }, { rid: 3, id: "m0", name: "gmelan1", w: 8, l: 6 }], playoffs, ...extra } });
+  const inField = table({ rids: [1, 2], field: ["m2", "m1"], seeded: true, complete: true });
   assert.deepEqual(Bets.autoResult(b, reg("final"), 0, inField), { winner: "m0", note: "Regular season over · in the playoff field" });
-  assert.equal(Bets.autoResult(b, reg("final"), 0, table({ rids: [1, 3], field: ["m2", "m0"], complete: true })).winner, "m2", "missed: No wins");
+  assert.equal(Bets.autoResult(b, reg("final"), 0, table({ rids: [1, 3], field: ["m2", "m0"], seeded: true, complete: true })).winner, "m2", "missed: No wins");
   assert.equal(Bets.autoResult(b, reg("final"), 0, table({ rids: [1], field: ["m2"], complete: false })), null, "a half-seeded bracket waits");
+  assert.equal(Bets.autoResult(b, reg("final"), 0, table({ rids: [1, 2], field: ["m2", "m1"], seeded: true, complete: false })), null, "Sleeper's live seeding is not a result");
   assert.equal(Bets.autoResult(b, reg("final"), 0, table(null)), null, "no bracket yet");
   assert.equal(Bets.autoResult(b, reg("live"), 0, inField), null, "the book's own week 14 isn't final yet");
   assert.equal(Bets.autoResult(b, reg("final"), 0, null), null, "no standings at all");
   assert.equal(Bets.autoResult({ ...b, league: { subject: "mX", outcome: "playoffs" } }, reg("final"), 0, inField), null, "a subject the table doesn't know is settled by hand");
-  assert.equal(Bets.autoResult({ ...b, league: { subject: "m1", outcome: "title" } }, reg("final"), 0, inField), null, "an outcome that doesn't settle itself");
+  assert.equal(Bets.autoResult({ ...b, league: { subject: "m1", outcome: "title" } }, reg("final"), 0, inField), null, "an outcome that doesn't exist");
   assert.equal(Bets.autoResult({ ...b, status: "open" }, reg("final"), 0, inField), null, "an unfilled bet never settles");
+
+  // the places read off the table once the regular season is over - JPorch is 2nd of 3
+  const at = (outcome) => ({ ...b, league: { subject: "m1", outcome } });
+  const done = table({ rids: [1, 2], field: ["m2", "m1"], seeded: true, complete: true });
+  assert.deepEqual(Bets.autoResult(at("reg1"), reg("final"), 0, done), { winner: "m2", note: "Regular season over · finished 2nd of 3" }, "not 1st: No");
+  assert.equal(Bets.autoResult(at("top3"), reg("final"), 0, done).winner, "m0", "top 3: Yes");
+  assert.equal(Bets.autoResult(at("last"), reg("final"), 0, done).winner, "m2", "not last: No");
+  assert.equal(Bets.autoResult(at("reg1"), reg("final"), 0, table({ rids: [1, 2], field: ["m2", "m1"], seeded: true, complete: true }, { over: false })), null, "the table isn't final yet");
+  assert.equal(Bets.autoResult(at("reg1"), reg("final"), 0, table({ rids: [1, 2], field: ["m2", "m1"], seeded: true, complete: true }, { seedType: 1 })), null, "a league seeded some other way is settled by hand");
+  // the champion is the final's winner, whenever that is played
+  assert.equal(Bets.autoResult(at("champ"), reg("final"), 0, done), null, "no final yet");
+  assert.deepEqual(Bets.autoResult(at("champ"), reg("live"), 0, table({ rids: [1, 2], field: ["m2", "m1"], seeded: true, complete: true, champion: "m1" })), { winner: "m0", note: "Playoff final played · champion" });
+  assert.equal(Bets.autoResult(at("champ"), reg("live"), 0, table({ rids: [1, 2], field: ["m2", "m1"], seeded: true, complete: true, champion: "m2" })).winner, "m2", "somebody else won it");
+});
+
+test("league matchup: the week's pairings, the bet's matchup as the board has it, and a settlement on points", () => {
+  const scores = { weeks: { "5": { final: false, rows: [
+    { id: "m1", name: "JPorch", pts: 88.6, proj: 104.2, mid: 1 }, { id: "m2", name: "RTownsend", pts: 131, proj: 118.5, mid: 1 },
+    { id: "m0", name: "gmelan1", pts: 0, proj: 99.4, mid: 2 }, { id: null, name: "ghost", pts: 0, proj: null, mid: 2 } ] } } };
+  assert.deepEqual(Bets.leaguePairings(5, scores), [{ a: "m1", b: "m2" }], "a pairing needs both managers known to the book");
+  assert.deepEqual(Bets.leaguePairings(6, scores), [], "a week the book has no board for");
+  assert.deepEqual(Bets.leaguePairings(5, null), []);
+  const b = { league: { subject: "m1", opp: "m2", outcome: "matchup" }, week: 5, status: "active", entries: [{ memberId: "m0", side: "m1" }, { memberId: "m2", side: "m2" }] };
+  const M = Bets.leagueMatchup(b, scores);
+  assert.deepEqual([M.week, M.me.name, M.opp.name, M.final], [5, "JPorch", "RTownsend", false]);
+  assert.equal(Bets.leagueMatchup({ ...b, week: 6 }, scores), null, "no board for the week");
+  assert.equal(Bets.leagueName("m1", "matchup", config.members, 5, "m2"), "JPorch vs RTownsend · Week 5");
+  assert.equal(Bets.leagueSideText("m2", "matchup", config.members), "RTownsend", "a matchup side is the manager");
+  assert.match(Bets.scoringText(b), /^Whoever scores more in the Week 5 Sleeper matchup wins\. A tie is a push\./);
+  assert.equal(Bets.autoResult(b, null, 0, { scores }), null, "not while the week is on");
+  const fin = (a, c) => ({ scores: { weeks: { "5": { final: true, rows: [{ id: "m1", name: "JPorch", pts: a, mid: 1 }, { id: "m2", name: "RTownsend", pts: c, mid: 1 }] } } } });
+  assert.deepEqual(Bets.autoResult(b, null, 0, fin(88.6, 131)), { winner: "m2", note: "Week 5 final · JPorch 88.6, RTownsend 131" }, "RTownsend's side wins");
+  assert.equal(Bets.autoResult(b, null, 0, fin(131, 88.6)).winner, "m0", "JPorch's side wins");
+  assert.equal(Bets.autoResult(b, null, 0, fin(100, 100)).winner, "push", "level is a push");
+  assert.equal(Bets.autoResult(b, null, 0, { scores: { weeks: { "5": { final: true, rows: [{ id: "m1", pts: 1, mid: 1 }] } } } }), null, "the opponent's row missing: wait");
+  assert.equal(Bets.ordinal(1) + Bets.ordinal(2) + Bets.ordinal(3) + Bets.ordinal(4) + Bets.ordinal(11) + Bets.ordinal(12) + Bets.ordinal(13) + Bets.ordinal(21), "1st2nd3rd4th11th12th13th21st");
+});
+
+test("league standing: the line moves with the outcome - the field, 1st, top 3, last, the champion", () => {
+  const ST = { teams: 2, over: false, rows: [{ rid: 1, id: "m2", name: "RTownsend", w: 3, l: 0 }, { rid: 2, id: "m1", name: "JPorch", w: 2, l: 1 }, { rid: 3, id: "m0", name: "gmelan1", w: 2, l: 1 }, { rid: 4, id: null, name: "ghost", w: 0, l: 3 }],
+    playoffs: { rids: [1, 3], field: ["m2", "m0"], seeded: true, complete: false } };
+  const at = (outcome, id) => ({ league: { subject: id || "m1", outcome } });
+  const pick = (st) => [st.cut, st.cutLabel, st.inField, st.decided, st.rows.map(r => r.in)];
+  assert.deepEqual(pick(Bets.leagueStanding(at("playoffs"), ST)), [2, "Top 2 make the playoffs", false, false, [true, false, true, false]], "the seeded field, not the table's top two");
+  assert.deepEqual(pick(Bets.leagueStanding(at("reg1"), ST)), [1, "1st place", false, false, [true, false, false, false]]);
+  assert.deepEqual(pick(Bets.leagueStanding(at("top3"), ST)), [3, "Top 3", true, false, [true, true, true, false]]);
+  assert.deepEqual(pick(Bets.leagueStanding(at("last"), ST)), [3, "Last place", false, false, [false, false, false, true]]);
+  assert.deepEqual(pick(Bets.leagueStanding(at("champ"), ST)), [2, "Top 2 make the playoffs", false, false, [true, false, true, false]], "the champion's line is the field until the final");
+  const over = { ...ST, over: true, playoffs: { ...ST.playoffs, complete: true } };
+  assert.deepEqual(Bets.leagueStanding(at("reg1", "m2"), over).decided, true, "the places are decided once the regular season is over");
+  assert.deepEqual([Bets.leagueStanding(at("champ"), over).decided, Bets.leagueStanding(at("champ"), { ...over, playoffs: { ...over.playoffs, champion: "m1" } }).inField], [false, true], "the champion is decided by the final alone");
+  assert.equal(Bets.leagueStanding(at("matchup"), ST), null, "a matchup has no table");
 });

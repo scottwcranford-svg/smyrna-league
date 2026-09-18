@@ -8,30 +8,97 @@ import { mName } from "./identity.js?v=dev";
 /* ---- league result bets ----
    A bet on what a manager's own team does in the Smyrna League, settled by Sleeper rather
    than by NFL stats: b.league = { subject: memberId, outcome }. Two sides, yes and no,
-   one seat each, nobody joins, and no push - Sleeper's own tiebreakers decide everything.
-   Season-long only for now (week 0); the outcome list is where a weekly one would go. */
+   one seat each, nobody joins. Season outcomes settle from league/standings (sleeper.js
+   standingsTick) and never push; the weekly one settles from league/scores and a tie is
+   a push. `cut` is where the line falls in the table: after that many rows, or before the
+   last one. */
 export const LEAGUE_OUTCOMES=[
-  { key:"playoffs", label:"Makes the playoffs", yes:"Makes it", no:"Misses", week:0,
+  { key:"playoffs", period:"season", label:"Makes the playoffs", yes:"Makes it", no:"Misses", cut:"teams",
     name:function(who){ return who+" makes the playoffs"; },
-    terms:"Makes it vs Misses — Sleeper's playoff bracket decides it once the regular season is over." }
+    terms:"Makes it vs Misses — Sleeper's playoff bracket decides it once the regular season is over.",
+    rule:"is in Sleeper's playoff field when the regular season ends after Week "+(PLAYOFF_START-1) },
+  { key:"reg1", period:"season", label:"Finishes 1st in the regular season", yes:"1st", no:"Not 1st", cut:1,
+    name:function(who){ return who+" finishes 1st"; },
+    terms:"1st vs Not 1st — the regular-season table decides it after Week "+(PLAYOFF_START-1)+": record, then points for.",
+    rule:"tops the regular-season table after Week "+(PLAYOFF_START-1)+" (record, then points for — Sleeper's own seeding)" },
+  { key:"top3", period:"season", label:"Finishes top 3 in the regular season", yes:"Top 3", no:"Not top 3", cut:3,
+    name:function(who){ return who+" finishes top 3"; },
+    terms:"Top 3 vs Not top 3 — the regular-season table decides it after Week "+(PLAYOFF_START-1)+": record, then points for.",
+    rule:"is in the top three of the regular-season table after Week "+(PLAYOFF_START-1)+" (record, then points for — Sleeper's own seeding)" },
+  { key:"last", period:"season", label:"Finishes last in the regular season", yes:"Last", no:"Not last", cut:"last",
+    name:function(who){ return who+" finishes last"; },
+    terms:"Last vs Not last — the regular-season table decides it after Week "+(PLAYOFF_START-1)+": record, then points for.",
+    rule:"is bottom of the regular-season table after Week "+(PLAYOFF_START-1)+" (record, then points for — Sleeper's own seeding)" },
+  { key:"champ", period:"season", label:"Wins the championship", yes:"Champion", no:"Not champion", cut:"teams",
+    name:function(who){ return who+" wins the championship"; },
+    terms:"Champion vs Not champion — the playoff final decides it.",
+    rule:"wins the playoff final" },
+  // The weekly one is a matchup pick, like a game bet: the week's Sleeper pairing is chosen,
+  // b.league.subject and b.league.opp are its two managers, and each side is a member id.
+  { key:"matchup", period:"week", label:"Wins their matchup", yes:"", no:"",
+    name:function(who,opp,week){ return who+" vs "+opp+" · Week "+week; },
+    terms:"Whoever scores more in the Sleeper matchup takes it. A tie is a push." }
 ];
 export function leagueOutcome(key){ var hit=null; LEAGUE_OUTCOMES.forEach(function(o){ if(o.key===key) hit=o; }); return hit; }
-export function leagueSideText(side,key){ var o=leagueOutcome(key); return o?(side==="yes"?o.yes:side==="no"?o.no:""):""; }
-export function leagueName(subject,key,members){ var o=leagueOutcome(key); return o?o.name(mName(subject,members)):""; }
+// What a side is called on the ticket: yes or no on a season outcome, the manager on a matchup.
+export function leagueSideText(side,key,members){
+  var o=leagueOutcome(key); if(!o) return "";
+  if(o.key==="matchup") return side?mName(side,members):"";
+  return side==="yes"?o.yes:side==="no"?o.no:"";
+}
+export function leagueName(subject,key,members,week,opp){ var o=leagueOutcome(key); return o?o.name(mName(subject,members),opp?mName(opp,members):"",week):""; }
 export function leagueTerms(key){ var o=leagueOutcome(key); return o?o.terms:""; }
 
-// Where the subject's team stands, from league/standings (sleeper.js standingsTick): the
-// rows in standing order with a rank on each, the subject's own, how many make the
-// playoffs, and whether the subject is inside that line - as things stand until Sleeper
-// seeds the bracket, then for good. Null until the book has standings with the subject in them.
+// A week's Sleeper pairings, from league/scores: [{ a, b }] of member ids, both known to
+// the book. Empty until the book has that week's board (the week being played arrives
+// with the hourly refresh), so a matchup bet is on a week Sleeper has paired.
+export function leaguePairings(week,scores){
+  var wk=scores&&scores.weeks&&scores.weeks[String(Number(week)||0)];
+  if(!wk||!Array.isArray(wk.rows)) return [];
+  var byMid={}, out=[];
+  wk.rows.forEach(function(r){ if(r.mid==null||!r.id) return; if(byMid[r.mid]){ out.push({ a:byMid[r.mid].id, b:r.id }); } else byMid[r.mid]=r; });
+  return out;
+}
+// The bet's matchup as the board has it: both rows, and whether the week is final. Null
+// until the book has that week's board with both teams on it.
+export function leagueMatchup(b,scores){
+  if(!b||!b.league) return null;
+  var w=String(Number(b.week)||0), wk=scores&&scores.weeks&&scores.weeks[w];
+  if(!wk||!Array.isArray(wk.rows)) return null;
+  var me=null, opp=null;
+  wk.rows.forEach(function(r){ if(!me&&r.id&&r.id===b.league.subject) me=r; if(!opp&&r.id&&r.id===b.league.opp) opp=r; });
+  if(!me||!opp) return null;
+  return { week:Number(w), me:me, opp:opp, final:!!wk.final };
+}
+
+// Where the subject's team stands against a season outcome, from league/standings: the
+// rows in standing order with a rank and an `in` on each, the subject's own, where the
+// line falls, and whether the subject is inside it. Sleeper seeds its bracket from the
+// live standings all season, with its own tiebreakers, so while it has a full field that
+// is the playoff line - "as it stands" until the regular season is over, then for good.
+// The places read straight off the table (record, then points for - Sleeper's default
+// seeding, which is also how standingsTick orders it). The champion is the final's winner.
+// Null until the book has standings with the subject in them.
 export function leagueStanding(b,ST){
   if(!b||!b.league||!ST||!Array.isArray(ST.rows)||!ST.rows.length) return null;
-  var rows=ST.rows.map(function(r,i){ return Object.assign({},r,{ rank:i+1 }); });
+  var o=leagueOutcome(b.league.outcome); if(!o||o.period!=="season") return null;
+  var teams=Number(ST.teams)||6, PO=ST.playoffs||{}, n=ST.rows.length;
+  var seeded=!!(PO.seeded||PO.complete)&&Array.isArray(PO.field);
+  var cut=o.cut==="teams"?teams:o.cut==="last"?n-1:Number(o.cut)||1;
+  var inLine=function(r,i){
+    if(o.cut==="teams") return seeded?(!!r.id&&PO.field.indexOf(r.id)>=0):i<teams;
+    if(o.cut==="last") return i===n-1;
+    return i<cut;
+  };
+  var rows=ST.rows.map(function(r,i){ return Object.assign({},r,{ rank:i+1, "in":inLine(r,i) }); });
   var me=null; rows.forEach(function(r){ if(!me&&r.id&&r.id===b.league.subject) me=r; });
   if(!me) return null;
-  var teams=Number(ST.teams)||6, PO=ST.playoffs||{};
-  var decided=!!PO.complete&&Array.isArray(PO.field);
-  return { rows:rows, me:me, teams:teams, decided:decided, inField:decided?PO.field.indexOf(me.id)>=0:me.rank<=teams };
+  var decided, inField=me["in"];
+  if(o.key==="champ"){ decided=!!PO.champion; if(decided) inField=PO.champion===me.id; }
+  else if(o.key==="playoffs") decided=seeded&&!!PO.complete;
+  else decided=!!ST.over;
+  var label=o.cut==="teams"?"Top "+teams+" make the playoffs":o.key==="reg1"?"1st place":o.key==="top3"?"Top 3":"Last place";
+  return { rows:rows, me:me, teams:teams, cut:cut, cutLabel:label, seeded:seeded, decided:decided, inField:inField };
 }
 
 /* ---- game bets ---- */
@@ -169,7 +236,11 @@ export function matchLabel(b){
 
 export const SETTLE_LAG=4*3600000;   // a game is over this long after kickoff; stats after that count
 
-export function autoResult(b,games,now,standings){
+export function ordinal(n){ n=Number(n)||0; var s=["th","st","nd","rd"], v=n%100; return n+(s[(v-20)%10]||s[v]||s[0]); }
+
+// `league` is what a league result bet settles on: { standings, scores } - league/standings
+// and league/scores for the bet's season.
+export function autoResult(b,games,now,league){
   if(!b||b.status!=="active") return null;
   var ents=entriesOf(b), owner=function(e){ return e&&e.memberId||null; };
   var sideWins=function(code,note){
@@ -177,17 +248,37 @@ export function autoResult(b,games,now,standings){
     return hit?{ winner:hit.memberId, note:note }:null;
   };
   if(b.league){
-    // Sleeper seeds the bracket with its own tiebreakers; the field is read from it, never
-    // worked out from the records. Waits until the book's own schedule agrees the regular
-    // season is over, and leaves a team the standings don't know to be settled by hand.
-    var L=b.league, ST=standings||null, PO=ST&&ST.playoffs;
-    if(L.outcome!=="playoffs"||!PO||!PO.complete||!Array.isArray(PO.field)) return null;
+    var L=b.league, o=leagueOutcome(L.outcome), ST=(league&&league.standings)||null, PO=ST&&ST.playoffs;
+    if(!o) return null;
+    if(o.key==="matchup"){
+      // the week's board, final, with both teams on it; more points wins, level is a push
+      var M=leagueMatchup(b,league&&league.scores);
+      if(!M||!M.final) return null;
+      var a=Number(M.me.pts)||0, c=Number(M.opp.pts)||0, score=M.me.name+" "+a+", "+M.opp.name+" "+c;
+      if(a===c) return { winner:"push", note:"Week "+M.week+" final · "+score+" · tied" };
+      return sideWins(a>c?L.subject:L.opp,"Week "+M.week+" final · "+score);
+    }
+    if(!ST||!(ST.rows||[]).some(function(r){ return r.id&&r.id===L.subject; })) return null;   // a team the standings don't know: by hand
+    if(o.key==="champ"){
+      if(!PO||!PO.champion) return null;
+      var won=PO.champion===L.subject;
+      return sideWins(won?"yes":"no","Playoff final played · "+(won?"champion":"not the champion"));
+    }
+    // The season's table is final once the book's own schedule agrees the regular season is
+    // over. The playoff field is read from Sleeper's seeded bracket, never worked out from
+    // the records; the places read off the table, which orders as Sleeper's default seeding
+    // does (record, then points for) - a league seeded any other way is settled by hand.
     var lastReg=(Number(ST.playoffStart)||PLAYOFF_START)-1;
     var reg=allGames(games).filter(function(x){ return x.week===lastReg; });
     if(!reg.length||reg.some(function(x){ return x.status!=="final"; })) return null;
-    if(!(ST.rows||[]).some(function(r){ return r.id&&r.id===L.subject; })) return null;
-    var made=PO.field.indexOf(L.subject)>=0;
-    return sideWins(made?"yes":"no","Regular season over · "+(made?"in the playoff field":"out of the playoff field"));
+    if(o.key==="playoffs"){
+      if(!PO||!PO.complete||!Array.isArray(PO.field)) return null;
+      var made=PO.field.indexOf(L.subject)>=0;
+      return sideWins(made?"yes":"no","Regular season over · "+(made?"in the playoff field":"out of the playoff field"));
+    }
+    if(!ST.over||(ST.seedType!=null&&Number(ST.seedType)!==0)) return null;
+    var st=leagueStanding(b,ST); if(!st) return null;
+    return sideWins(st.inField?"yes":"no","Regular season over · finished "+ordinal(st.me.rank)+" of "+st.rows.length);
   }
   if(b.game){
     var g=gameOf(b,games);
@@ -245,10 +336,12 @@ function fieldSide(b){
 export function scoringText(b){
   if(!b) return "";
   if(b.league){
-    var o=leagueOutcome(b.league.outcome);
-    if(!o) return "Settled by hand: the result is recorded once it's decided.";
-    return "If the team is in Sleeper's playoff field when the regular season ends after Week "+(PLAYOFF_START-1)+", "+o.yes+" wins; otherwise "+o.no+" does. "+
-      "Sleeper's own tiebreakers seed the bracket, so there's no push. Settles once the bracket is set.";
+    var lo=leagueOutcome(b.league.outcome);
+    if(!lo) return "Settled by hand: the result is recorded once it's decided.";
+    if(lo.key==="matchup") return "Whoever scores more in the Week "+(Number(b.week)||0)+" Sleeper matchup wins. A tie is a push. Settles once every game that week is final.";
+    var when=lo.key==="champ"?"Settles once the final is played.":lo.key==="playoffs"?"Settles once the bracket is set.":"Settles once Week "+(PLAYOFF_START-1)+" is final.";
+    return "If the team "+lo.rule+", "+lo.yes+" wins; otherwise "+lo.no+" does. "+
+      (lo.key==="playoffs"?"Sleeper's own tiebreakers seed the bracket, so there's no push. ":"There's no push. ")+when;
   }
   if(b.game){
     var g=b.game, ln=fmtLine(b.line);

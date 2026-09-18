@@ -933,9 +933,15 @@ function sideHtml(e,i,b){
     if(cv==="push") cls+=" pushing"; else if(cv&&cv===mine) cls+=" cover";
   }
   else if(b.league&&e.side&&(b.status==="open"||b.status==="active")){
-    // the side the table points to as things stand
-    var ls=Bets.leagueStanding(b,state.standings);
-    if(ls&&(ls.inField?"yes":"no")===e.side) cls+=" ahead";
+    // the side the table points to as things stand, or the team ahead in the matchup
+    var lo=Bets.leagueOutcome(b.league.outcome);
+    if(lo&&lo.period==="week"){
+      var M=Bets.leagueMatchup(b,state.scores), pa=M?Number(M.me.pts)||0:0, pc=M?Number(M.opp.pts)||0:0;
+      if(M&&pa!==pc&&(pa||pc)&&(pa>pc?b.league.subject:b.league.opp)===e.side) cls+=" ahead";
+    } else {
+      var ls=Bets.leagueStanding(b,state.standings);
+      if(ls&&(ls.inField?"yes":"no")===e.side) cls+=" ahead";
+    }
   }
   if(vacant) cls+=" vacant";
   // A seat is either taken, reserved for someone who hasn't accepted yet, or open to anyone.
@@ -981,18 +987,33 @@ function gamelineHtml(b){
 // The league table behind a league result bet: the subject's record and place, whether
 // they are inside the playoff line - as things stand, or for good once Sleeper has seeded
 // the bracket - and the whole table behind a fold, the cut line drawn through it.
-function ord(n){ var s=["th","st","nd","rd"], v=n%100; return n+(s[(v-20)%10]||s[v]||s[0]); }
+var ord=Bets.ordinal;
+// The week's Sleeper matchup behind a matchup bet: both teams, their points and projection
+// as the board has them, the leader marked, and where the week stands.
+function matchlineHtml(b){
+  var L=b.league, M=Bets.leagueMatchup(b,state.scores), a=M?Number(M.me.pts)||0:0, c=M?Number(M.opp.pts)||0:0, played=a>0||c>0;
+  var team=function(id,row,lead){
+    return '<span class="ml-team'+(lead?" lead":"")+'">'+avatarHtml(id,18)+"<span>"+esc(mName(id))+"</span>"+
+      (row?'<span class="sc">'+esc(String(row.pts))+"</span>"+(row.proj!=null?'<small class="proj" data-tip="Sleeper projection">proj '+esc(String(row.proj))+"</small>":""):"")+"</span>";
+  };
+  var stateTxt=!M?"Week "+(Number(b.week)||0)+" · board arrives with the refresh":"Week "+M.week+" · "+(M.final?"Final":played?"In progress":"Yet to play");
+  return '<div class="gameline matchline">'+team(L.subject,M&&M.me,played&&a>c)+'<span class="gl-at">vs</span>'+team(L.opp,M&&M.opp,played&&c>a)+
+    '<span class="gl-state'+(M&&!M.final&&played?" live":"")+'">'+esc(stateTxt)+"</span></div>";
+}
 function leaguelineHtml(b){
-  var L=b.league, who=mName(L.subject), st=Bets.leagueStanding(b,state.standings);
+  var L=b.league, o=Bets.leagueOutcome(L.outcome);
+  if(o&&o.period==="week") return matchlineHtml(b);
+  var who=mName(L.subject), st=Bets.leagueStanding(b,state.standings);
   var head='<span class="ll-who">'+avatarHtml(L.subject,18)+esc(who)+"</span>";
-  if(!st) return '<div class="leagueline"><div class="ll-head">'+head+'<span class="ll-state">Standings arrive with the next refresh</span></div></div>';
+  if(!st||!o) return '<div class="leagueline"><div class="ll-head">'+head+'<span class="ll-state">Standings arrive with the next refresh</span></div></div>';
   var me=st.me, rec=me.w+"–"+me.l+(me.t?"–"+me.t:"");
-  var stateTxt=st.decided?(st.inField?"In the playoffs":"Missed the playoffs")
-    :(st.inField?"Inside the top "+st.teams:"Outside the top "+st.teams)+" as it stands";
+  // where the team stands against the line: settled wording once decided, "as it stands" until then
+  var stateTxt=st.decided?(o.key==="playoffs"?(st.inField?"In the playoffs":"Missed the playoffs"):(st.inField?o.yes:o.no))
+    :(o.key==="playoffs"||o.key==="champ"?(st.inField?"In the playoff field":"Outside the playoff field"):(st.inField?o.yes:o.no))+" as it stands";
   var rows=st.rows.map(function(r,i){
-    var h='<li class="'+(r.rank<=st.teams?"in":"out")+(r.id===me.id?" me":"")+'"><span class="ll-rank">'+r.rank+'</span><span class="ll-name">'+esc(r.name||(r.id?mName(r.id):"Roster "+r.rid))+
+    var h='<li class="'+(r["in"]?"in":"out")+(r.id===me.id?" me":"")+'"><span class="ll-rank">'+r.rank+'</span><span class="ll-name">'+esc(r.name||(r.id?mName(r.id):"Roster "+r.rid))+
       '</span><span class="ll-wl">'+r.w+"–"+r.l+(r.t?"–"+r.t:"")+'</span><span class="ll-pf">'+esc(String(r.pf))+"</span></li>";
-    if(r.rank===st.teams&&i<st.rows.length-1) h+='<li class="ll-cut"><span>Top '+st.teams+" make the playoffs</span></li>";
+    if(r.rank===st.cut&&i<st.rows.length-1) h+='<li class="ll-cut"><span>'+esc(st.cutLabel)+"</span></li>";
     return h;
   }).join("");
   return '<div class="leagueline '+(st.inField?"in":"out")+(st.decided?" decided":"")+'">'+
