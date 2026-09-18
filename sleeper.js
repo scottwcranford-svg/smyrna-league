@@ -139,16 +139,17 @@ function standingsSig(rec){
 export function standingsTick(db,ctx){
   var cfg=ctx.config||{}, here=Sn.currentSeason(cfg);
   var cur=(ctx.standings&&ctx.standings.bySeason&&ctx.standings.bySeason[here])||null;
-  if(cur&&ageMin(cur.at)<55) return Promise.resolve();
   var lid=leagueIdOf(cfg);
   if(!lid) return Promise.resolve();
-  var memByName={}; (cfg.members||[]).forEach(function(m){ memByName[String(m.name).toLowerCase()]=m.id; });
   var L=(ctx.sleeper&&ctx.sleeper.league)||{};
   var start=Number(L.playoffStart)||(cur&&Number(cur.playoffStart))||Clock.PLAYOFF_START;
   // The rest of the regular season's pairings, for the weekly matchup bets: Sleeper fixes
-  // the schedule up front, so each week is fetched once and kept.
+  // the schedule up front, so each week is fetched once and kept. A week the book lacks
+  // is fetched on the next pass whatever the hour - the form is offering it.
   var have=(cur&&cur.pairings)||{}, wantW=[];
   for(var w=Math.max(1,Math.min(start-1,Clock.currentWeek(cfg,ctx.games)));w<=start-1;w++) if(!have[String(w)]) wantW.push(w);
+  if(cur&&ageMin(cur.at)<55&&!wantW.length) return Promise.resolve();
+  var memByName={}; (cfg.members||[]).forEach(function(m){ memByName[String(m.name).toLowerCase()]=m.id; });
   return Promise.all([
     sj(SLEEPER+"/v1/league/"+lid+"/rosters"),
     sj(SLEEPER+"/v1/league/"+lid+"/users"),

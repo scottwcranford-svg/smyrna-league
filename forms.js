@@ -86,7 +86,7 @@ function drawLeagueBox(){
       ? '<option value="">Pick a matchup…</option>'+pairs.map(function(p){
           var v=p.a+"|"+p.b, on=p.a===state.draftSubject&&p.b===state.draftOpp;
           return '<option value="'+esc(v)+'"'+(on?" selected":"")+">"+esc(mName(p.a)+" vs "+mName(p.b))+"</option>"; }).join("")
-      : '<option value="">'+(w?"Week "+w+" isn’t paired yet":"Pick a week")+"</option>";
+      : '<option value="">'+(w?"Week "+w+"’s matchups arrive with the next refresh":"Pick a week")+"</option>";
     sel.value=state.draftSubject?state.draftSubject+"|"+state.draftOpp:"";
     return;
   }
