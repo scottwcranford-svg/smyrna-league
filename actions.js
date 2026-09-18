@@ -185,6 +185,8 @@ const CHANGES = {
   dTeam:function(t){ state.draftTeam=t.value; F.refilter(); },
   dPos:function(t){ state.draftPos=t.value; F.refilter(); },
   // a league result bet: whose team, and what happens to it - the sides follow
+  // the weekly matchup's own week box mirrors the form's week; a new week, a new list of pairings
+  dLeagueWeek:function(t){ document.getElementById("bWeek").value=t.value; state.draft.forEach(function(e){ e.side=""; }); F.drawScope(); F.drawEntries(); },
   // (a matchup's value is "a|b", the two managers of the week's pairing)
   dSubject:function(t){ var v=String(t.value||"").split("|"); state.draftSubject=v[0]||""; state.draftOpp=v[1]||""; state.draft.forEach(function(e){ e.side=""; }); F.drawEntries(); },
   dOutcome:function(t){ state.draftOutcome=t.value||""; state.draft.forEach(function(e){ e.side=""; }); F.drawScope(); F.drawEntries(); },

@@ -2154,9 +2154,12 @@ test("league matchup: pick the week's Sleeper pairing, take a team; the ticket s
     state.me = "a"; state.local = false; F.openBetDlg(); state.local = true;
     document.querySelector('#bScope .chip[data-scope="league"]').click();
     document.querySelector('#bPeriod .chip[data-period="week"]').click();
-    const wk = document.getElementById("bWeek"); res.weekShown = !document.getElementById("bWeekRow").hidden;
+    // the week box sits with the matchup, regular season only, mirroring the form's week
+    const wk = document.getElementById("bLeagueWk"); res.weekBox = !document.getElementById("bLeagueWeek").hidden; res.topWeek = !document.getElementById("bWeekRow").hidden;
+    res.weeks = [...wk.options].map(o => o.value);
     wk.value = "5"; wk.dispatchEvent(new Event("change", { bubbles: true }));
-    res.label = document.querySelector("#bLeagueWeek span").textContent; res.seasonBox = !document.getElementById("bLeagueSeason").hidden;
+    res.mirrored = document.getElementById("bWeek").value;
+    res.label = document.getElementById("bMatchup").parentNode.querySelector("span").textContent; res.seasonBox = !document.getElementById("bLeagueSeason").hidden;
     res.pairings = [...document.getElementById("bMatchup").options].map(o => o.textContent);
     res.noPick = document.querySelector("#bEntries .entry-row .hint").textContent;
     const who = document.getElementById("bMatchup"); who.value = "a|b"; who.dispatchEvent(new Event("change", { bubbles: true }));
@@ -2179,6 +2182,18 @@ test("league matchup: pick the week's Sleeper pairing, take a team; the ticket s
     res.live = line();
     // no board for the week at all
     const keep = state.scores; state.scores = null; V.render(); res.noBoard = t().querySelector(".matchline .gl-state").textContent; state.scores = keep;
+    // the lock follows the starters: Alice starts Maye (NE), whose week-5 game is the fixture's; before that the week's first game stood in
+    res.lockWeek = Number(t().querySelector(".lock-when").getAttribute("data-lock"));
+    state.squads = { byRoster: { "1": "Alice", "2": "Bob" }, rosters: {}, starters: { "1": ["3"], "2": ["1"] } }; V.render();
+    res.lockStarter = Number(t().querySelector(".lock-when").getAttribute("data-lock"));
+    // that game kicks off: locked on the ticket, and a new bet on the same matchup is refused
+    state.games.games[0].date = new Date(Date.now() - 60e3).toISOString(); V.render();
+    res.lockedTag = (t().querySelector(".status.locked") || {}).textContent || "";
+    state.draftScope = "league"; state.draftOutcome = "matchup"; state.draftSubject = "a"; state.draftOpp = "b"; state.editId = null;
+    document.getElementById("bWeek").value = "5";
+    state.draft = [{ memberId: "a", pick: "", picks: [], side: "a" }, { memberId: null, pick: "", picks: [], side: "" }];
+    const before = state.bets.length; F.submitBet(); res.refused = state.bets.length === before;
+    state.games.games[0].date = "2026-10-11T17:00:00Z"; state.squads = null;
     // the week goes final: the bet settles itself on the next draw
     b.status = "active"; b.entries[1].memberId = "c"; state.scores.weeks["5"].final = true;
     const { settleFinished } = await import("./book.js?v=dev"); settleFinished(); V.render();
@@ -2186,7 +2201,9 @@ test("league matchup: pick the week's Sleeper pairing, take a team; the ticket s
     document.getElementById("betDlg").close();
     return res;
   });
-  assert.equal(out.weekShown, true, "the weekly outcome brings the week back");
+  assert.equal(out.weekBox, true, "the weekly matchup has its own week box"); assert.equal(out.topWeek, false, "and the form's week row stays hidden");
+  assert.ok(out.weeks.includes("5") && !out.weeks.includes("0") && !out.weeks.includes("15"), "regular-season weeks only, no season-long");
+  assert.equal(out.mirrored, "5");
   assert.equal(out.label, "Which matchup"); assert.equal(out.seasonBox, false, "the season's controls step aside");
   assert.deepEqual(out.pairings, ["Pick a matchup…", "Alice vs Bob"], "only pairings with both managers in the book");
   assert.equal(out.noPick, "Pick a matchup above");
@@ -2199,6 +2216,9 @@ test("league matchup: pick the week's Sleeper pairing, take a team; the ticket s
   assert.deepEqual(out.pre, { teams: [["ALAlice0proj 118.5", false], ["BOBob0proj 104.2", false]], state: "Week 5 · Yet to play", ahead: [["Bob", false], ["Alice", false]] }, "nothing played: nobody leads");
   assert.deepEqual(out.live, { teams: [["ALAlice88.6proj 118.5", false], ["BOBob131proj 104.2", true]], state: "Week 5 · In progress", ahead: [["Bob", true], ["Alice", false]] }, "Bob leads, and the side holding him is marked");
   assert.equal(out.noBoard, "Week 5 · board arrives with the refresh");
+  assert.equal(out.lockWeek, Date.parse("2036-10-09T00:15:00Z") - 300e3, "no starters known: the week's first game, as the fixture sets it");
+  assert.equal(out.lockStarter, Date.parse("2026-10-11T17:00:00Z") - 300e3, "Maye's Sunday game is the first kickoff in the matchup");
+  assert.equal(out.lockedTag, "Locked", "once it kicks off the ticket says so"); assert.equal(out.refused, true, "and a new bet on it is refused");
   assert.deepEqual(out.settled, { status: "settled", winner: "a", note: "Week 5 final · Alice 88.6, Bob 131", chip: "Alice wins" }, "final: Alice, holding Bob, collects");
   assert.deepEqual(errors, []);
   await p.close();

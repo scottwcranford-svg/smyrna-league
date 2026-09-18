@@ -124,11 +124,13 @@ function standingsSig(rec){
   if(!rec) return "";
   var PO=rec.playoffs||{};
   return [rec.teams,rec.playoffStart,rec.seedType,rec.over?1:0,(rec.rows||[]).map(function(r){ return [r.rid,r.id,r.name,r.w,r.l,r.t,r.pf,r.pa].join(":"); }).join("|"),
-    (PO.rids||[]).join(","),(PO.field||[]).join(","),PO.seeded?1:0,PO.complete?1:0,PO.champion||""].join("/");
+    (PO.rids||[]).join(","),(PO.field||[]).join(","),PO.seeded?1:0,PO.complete?1:0,PO.champion||"",
+    Object.keys(rec.pairings||{}).sort().map(function(w){ return w+":"+(rec.pairings[w]||[]).map(function(p){ return p.a+"-"+p.b; }).join(","); }).join("|")].join("/");
 }
 // The table and the playoff field, hourly: league/standings = { updatedAt, bySeason: {
-// <season>: { at, leagueId, teams, playoffStart, seedType, over, rows, playoffs: { rids, field,
-// seeded, complete, champion } } }. `field` is the seeded teams as member ids. Sleeper seeds the bracket from the live
+// <season>: { at, leagueId, teams, playoffStart, seedType, over, rows, pairings: { <week>: [{ a, b }] },
+// playoffs: { rids, field, seeded, complete, champion } } }. `pairings` is the regular season's
+// schedule as member ids, for the weekly matchup bets. `field` is the seeded teams as member ids. Sleeper seeds the bracket from the live
 // standings all season long - week 2 already shows six teams in it - so `seeded` is only
 // "as it stands", with Sleeper's own tiebreakers applied; `complete` is the seeding once the
 // regular season is over in the book's own schedule, and that is what a "makes the
@@ -142,22 +144,38 @@ export function standingsTick(db,ctx){
   if(!lid) return Promise.resolve();
   var memByName={}; (cfg.members||[]).forEach(function(m){ memByName[String(m.name).toLowerCase()]=m.id; });
   var L=(ctx.sleeper&&ctx.sleeper.league)||{};
+  var start=Number(L.playoffStart)||(cur&&Number(cur.playoffStart))||Clock.PLAYOFF_START;
+  // The rest of the regular season's pairings, for the weekly matchup bets: Sleeper fixes
+  // the schedule up front, so each week is fetched once and kept.
+  var have=(cur&&cur.pairings)||{}, wantW=[];
+  for(var w=Math.max(1,Math.min(start-1,Clock.currentWeek(cfg,ctx.games)));w<=start-1;w++) if(!have[String(w)]) wantW.push(w);
   return Promise.all([
     sj(SLEEPER+"/v1/league/"+lid+"/rosters"),
     sj(SLEEPER+"/v1/league/"+lid+"/users"),
-    sj(SLEEPER+"/v1/league/"+lid+"/winners_bracket").catch(function(){ return []; })
+    sj(SLEEPER+"/v1/league/"+lid+"/winners_bracket").catch(function(){ return []; }),
+    Promise.all(wantW.map(function(w){ return sj(SLEEPER+"/v1/league/"+lid+"/matchups/"+w).then(function(ms){ return [w,ms]; }).catch(function(){ return [w,null]; }); }))
   ]).then(function(all){
     var rows=standingsRows(all[0],all[1],memByName);
     if(!rows.length) return;
     var teams=Number(L.playoffTeams)||(cur&&Number(cur.teams))||6;
-    var start=Number(L.playoffStart)||(cur&&Number(cur.playoffStart))||Clock.PLAYOFF_START;
     var rids=bracketField(all[2]), byRid={}; rows.forEach(function(r){ byRid[r.rid]=r; });
+    var pairings=Object.assign({},have);
+    (all[3]||[]).forEach(function(pr){
+      var ms=pr[1]; if(!ms||!ms.length) return;
+      var byMid={}, list=[];
+      ms.forEach(function(m){
+        if(m.matchup_id==null) return;
+        var r=byRid[Number(m.roster_id)], id=(r&&r.id)||null;
+        if(byMid[m.matchup_id]!==undefined){ if(id&&byMid[m.matchup_id]) list.push({ a:byMid[m.matchup_id], b:id }); } else byMid[m.matchup_id]=id;
+      });
+      if(list.length) pairings[String(pr[0])]=list;
+    });
     var field=rids.map(function(rid){ return byRid[rid]?byRid[rid].id:null; }).filter(Boolean);
     var seeded=rids.length>0&&rids.length>=teams;
     var over=Clock.finalWeeks(ctx.games).indexOf(start-1)>=0;   // the last regular-season week is final
     // the final (p: 1) names its winner once played; that is the champion
     var champ=null; (all[2]||[]).forEach(function(m){ if(m&&Number(m.p)===1&&typeof m.w==="number"&&byRid[m.w]) champ=byRid[m.w].id||null; });
-    var next={ at:isoNow(), leagueId:lid, teams:teams, playoffStart:start, seedType:Number(L.seedType)||0, over:over, rows:rows,
+    var next={ at:isoNow(), leagueId:lid, teams:teams, playoffStart:start, seedType:Number(L.seedType)||0, over:over, rows:rows, pairings:pairings,
                playoffs:{ rids:rids, field:field, seeded:seeded, complete:seeded&&over, champion:champ } };
     if(cur&&standingsSig(cur)===standingsSig(next)) return;   // nothing moved
     var out=Object.assign({},(ctx.standings&&ctx.standings.bySeason)||{});

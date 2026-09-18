@@ -3,7 +3,8 @@
 
 import { entriesOf, shortName } from "./fmt.js?v=dev";
 import { LAST_WEEK, PLAYOFF_START, allGames } from "./clock.js?v=dev";
-import { mName } from "./identity.js?v=dev";
+import { mName, member } from "./identity.js?v=dev";
+import { rosterFind } from "./roster.js?v=dev";
 
 /* ---- league result bets ----
    A bet on what a manager's own team does in the Smyrna League, settled by Sleeper rather
@@ -49,15 +50,32 @@ export function leagueSideText(side,key,members){
 export function leagueName(subject,key,members,week,opp){ var o=leagueOutcome(key); return o?o.name(mName(subject,members),opp?mName(opp,members):"",week):""; }
 export function leagueTerms(key){ var o=leagueOutcome(key); return o?o.terms:""; }
 
-// A week's Sleeper pairings, from league/scores: [{ a, b }] of member ids, both known to
-// the book. Empty until the book has that week's board (the week being played arrives
-// with the hourly refresh), so a matchup bet is on a week Sleeper has paired.
-export function leaguePairings(week,scores){
-  var wk=scores&&scores.weeks&&scores.weeks[String(Number(week)||0)];
-  if(!wk||!Array.isArray(wk.rows)) return [];
-  var byMid={}, out=[];
-  wk.rows.forEach(function(r){ if(r.mid==null||!r.id) return; if(byMid[r.mid]){ out.push({ a:byMid[r.mid].id, b:r.id }); } else byMid[r.mid]=r; });
-  return out;
+// A week's Sleeper pairings: [{ a, b }] of member ids, both known to the book. From the
+// week's board in league/scores when the book has it, else from league/standings, which
+// carries the rest of the regular season's schedule (Sleeper fixes it up front).
+export function leaguePairings(week,scores,standings){
+  var w=String(Number(week)||0), wk=scores&&scores.weeks&&scores.weeks[w];
+  if(wk&&Array.isArray(wk.rows)){
+    var byMid={}, out=[];
+    wk.rows.forEach(function(r){ if(r.mid==null||!r.id) return; if(byMid[r.mid]){ out.push({ a:byMid[r.mid].id, b:r.id }); } else byMid[r.mid]=r; });
+    if(out.length) return out;
+  }
+  var sched=standings&&standings.pairings&&standings.pairings[w];
+  return Array.isArray(sched)?sched.filter(function(p){ return p&&p.a&&p.b; }).map(function(p){ return { a:p.a, b:p.b }; }):[];
+}
+// The NFL teams of both sides' starters in a matchup bet, from league/squads and the
+// player roster - the kickoffs a weekly matchup locks on (clock.js betLock). Null when the
+// bet isn't a matchup or the book can't say who starts, and the week's first game stands in.
+export function matchupTeams(b,squads,roster,members){
+  if(!b||!b.league||!b.league.opp||!squads||!squads.starters) return null;
+  var byName={}; Object.keys(squads.byRoster||{}).forEach(function(rid){ byName[String(squads.byRoster[rid]).toLowerCase()]=rid; });
+  var out=[];
+  [b.league.subject,b.league.opp].forEach(function(id){
+    var m=member(id,members), rid=m?byName[String(m.name).toLowerCase()]:null;
+    if(rid==null) return;
+    (squads.starters[rid]||[]).forEach(function(pid){ var r=rosterFind(pid,roster); if(r&&r[3]&&out.indexOf(r[3])<0) out.push(r[3]); });
+  });
+  return out.length?out:null;
 }
 // The bet's matchup as the board has it: both rows, and whether the week is final. Null
 // until the book has that week's board with both teams on it.

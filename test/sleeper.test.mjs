@@ -101,7 +101,7 @@ test("runRefresh: projections for this week, next, and live weekly bets; rewritt
   };
   const roster = { updatedAt: N.isoNow(), players: [["2", "Ja'Marr Chase", "WR", "CIN"], ["3", "Drake Maye", "QB", "NE"]] };
   const bets = [{ id: "b1", week: 7, status: "open", stats: { stat: "rec_yd", rows: [{ key: "2", entry: 0 }] } }, { id: "g", week: 5, status: "active", game: { id: "x" }, stats: null }];
-  await N.runRefresh(db, "m1", true, { config: { ...config, scheduleUpdatedAt: N.isoNow() }, refresh: {}, bets, roster, holder: "m1", mobile: true });
+  await N.runRefresh(db, "m1", true, { config: { ...config, scheduleUpdatedAt: N.isoNow() }, refresh: {}, bets, roster, holder: "m1", mobile: true, standings: { bySeason: { "2026": { at: N.isoNow() } } } });
   assert.deepEqual(projUrls.map((u) => u.split("/").pop()).sort(), ["2026", "3", "4", "7"], "the season, this week, next, and the open week-7 bet; not the game bet's week");
   const w = db.writes.find((x) => x[1] === "league/proj");
   assert.ok(w, "projections written");
@@ -109,7 +109,7 @@ test("runRefresh: projections for this week, next, and live weekly bets; rewritt
   assert.deepEqual(JSON.parse(w[2].weeks["7"]), { "2": { rec_yd: 82.5, rec: 5.2 }, "3": { pass_yd: 241.3 } }, "trimmed to the roster, one decimal");
   // same data again: nothing to write
   const db2 = fakeDb();
-  await N.runRefresh(db2, "m1", true, { config: { ...config, scheduleUpdatedAt: N.isoNow() }, refresh: {}, bets, roster, holder: "m1", mobile: true, proj: w[2] });
+  await N.runRefresh(db2, "m1", true, { config: { ...config, scheduleUpdatedAt: N.isoNow() }, refresh: {}, bets, roster, holder: "m1", mobile: true, standings: { bySeason: { "2026": { at: N.isoNow() } } }, proj: w[2] });
   assert.equal(db2.writes.some((x) => x[1] === "league/proj"), false, "unchanged projections are not rewritten");
 });
 
@@ -128,7 +128,7 @@ test("runRefresh: weekly high / low from the league's matchups, for finished wee
   };
   const games = { games: [{ week: 1, status: "final" }, { week: 1, status: "final" }, { week: 2, status: "final" }, { week: 3, status: "live" }] };
   const cfg = { ...config, sleeperLeagueId: "L1", scheduleUpdatedAt: N.isoNow(), members: [{ id: "m0", name: "hobnailboot" }, { id: "m1", name: "testbot" }] };
-  const base = { config: cfg, refresh: {}, bets: [], roster: { updatedAt: N.isoNow() }, holder: "m0", mobile: true, games, sleeper: { updatedAt: N.isoNow(), leagueId: "L1", byId: { m0: {}, m1: {} } } };
+  const base = { standings: { bySeason: { "2026": { at: N.isoNow() } } }, config: cfg, refresh: {}, bets: [], roster: { updatedAt: N.isoNow() }, holder: "m0", mobile: true, games, sleeper: { updatedAt: N.isoNow(), leagueId: "L1", byId: { m0: {}, m1: {} } } };
   await N.runRefresh(db, "m0", true, base);
   const w = db.writes.find((x) => x[1] === "league/highlow");
   // the weeks now sit under their season, so another year can never land on top of them
@@ -176,26 +176,26 @@ test("runRefresh: the Sleeper league's team names and avatars, one call for ever
     return { ok: true, json: async () => j, text: async () => "" };
   };
   const cfg = { ...config, sleeperLeagueId: "L1", scheduleUpdatedAt: N.isoNow(), members: [{ id: "m0", name: "hobnailboot", team: "Old Name" }, { id: "m1", name: "testbot" }] };
-  await N.runRefresh(db, "m0", true, { config: cfg, refresh: {}, bets: [], roster: { updatedAt: N.isoNow() }, holder: "m0", mobile: true });
+  await N.runRefresh(db, "m0", true, { config: cfg, refresh: {}, bets: [], roster: { updatedAt: N.isoNow() }, holder: "m0", mobile: true, standings: { bySeason: { "2026": { at: N.isoNow() } } } });
   const w = db.writes.find((x) => x[1] === "league/sleeper");
   assert.equal(w[2].leagueId, "L1");
   assert.deepEqual(w[2].byId, { m0: { avatar: "6dcbee5f", team: "Cheat 2 Win" }, m1: { avatar: "t3st", team: "" } }, "league members get team names; others their public avatar");
   assert.deepEqual(w[2].league, { name: "Smyrna League", season: "2026", teams: 10, keeper: true, dynasty: false, sf: true, scoring: "PPR", avatar: "", playoffTeams: 0, playoffStart: 0, seedType: 0 }, "and the league's own settings ride along (this league says nothing about its playoffs)");
   // the identity block asks for everyone at once rather than per member; the board block
-  // asks again for the week being played, which is one extra pair on the hourly refresh;
-  // the standings block adds the bracket. The week being played is the real clock's.
+  // asks again for the week being played, which is one extra pair on the hourly refresh
+  // (the standings are fresh here, so that block is quiet). The week being played is the real clock's.
   assert.deepEqual([...new Set(hits.filter((h) => /^league\/L1/.test(h)))].sort(),
-    ["league/L1", "league/L1/drafts", "league/L1/matchups/" + Clock.currentWeek(cfg), "league/L1/rosters", "league/L1/users", "league/L1/winners_bracket"],
-    "the league's users and settings once each, plus the live week's board, a look for the draft, and the bracket");
+    ["league/L1", "league/L1/drafts", "league/L1/matchups/" + Clock.currentWeek(cfg), "league/L1/rosters", "league/L1/users"],
+    "the league's users and settings once each, plus the live week's board and a look for the draft");
   assert.equal(hits.filter((h) => h === "league/L1").length, 1, "the settings are not fetched per manager");
   // all known, fresh, league cached: no identity lookups (the live board still refreshes)
   hits.length = 0; const db2 = fakeDb();
-  await N.runRefresh(db2, "m0", true, { config: cfg, refresh: {}, bets: [], roster: { updatedAt: N.isoNow() }, holder: "m0", mobile: true, sleeper: { updatedAt: N.isoNow(), leagueId: "L1", byId: w[2].byId, league: w[2].league } });
+  await N.runRefresh(db2, "m0", true, { config: cfg, refresh: {}, bets: [], roster: { updatedAt: N.isoNow() }, holder: "m0", mobile: true, standings: { bySeason: { "2026": { at: N.isoNow() } } }, sleeper: { updatedAt: N.isoNow(), leagueId: "L1", byId: w[2].byId, league: w[2].league } });
   assert.equal(hits.some((h) => /^user\//.test(h) || h === "league/L1"), false, "nobody is looked up again once the league is cached");
   assert.equal(db2.writes.some((x) => x[1] === "league/sleeper"), false);
   // a new manager: sync again
   hits.length = 0; const db3 = fakeDb();
-  await N.runRefresh(db3, "m0", true, { config: { ...cfg, members: cfg.members.concat([{ id: "m2", name: "newguy" }]) }, refresh: {}, bets: [], roster: { updatedAt: N.isoNow() }, holder: "m0", mobile: true, sleeper: { updatedAt: N.isoNow(), leagueId: "L1", byId: w[2].byId, league: w[2].league } });
+  await N.runRefresh(db3, "m0", true, { config: { ...cfg, members: cfg.members.concat([{ id: "m2", name: "newguy" }]) }, refresh: {}, bets: [], roster: { updatedAt: N.isoNow() }, holder: "m0", mobile: true, standings: { bySeason: { "2026": { at: N.isoNow() } } }, sleeper: { updatedAt: N.isoNow(), leagueId: "L1", byId: w[2].byId, league: w[2].league } });
   assert.equal(db3.writes.some((x) => x[1] === "league/sleeper"), true);
   assert.equal(hits.some((h) => /leagues\/nfl/.test(h)), false, "league id was cached");
 });
@@ -206,7 +206,7 @@ test("runRefresh honours the hourly rule, then writes stats, games and the refre
   const T = fx("totals-2025.json");
   globalThis.fetch = async (u) => ({ ok: true, json: async () => (/state\/nfl/.test(u) ? { week: 1 } : /stats\/nfl\/regular\/2026\/1$/.test(u) ? { HOU: T.HOU } : /stats\/nfl\/regular\/2026$/.test(u) ? T : fx("scores-w1.json")), text: async () => "" });
   const bets = [{ id: "b1", stats: { stat: "sack", rows: [{ key: "HOU", entry: 0 }] } }, { id: "b2" }];
-  const r = await N.runRefresh(db, "m1", true, { config: { ...config, scheduleUpdatedAt: N.isoNow() }, refresh: {}, bets, roster: { updatedAt: N.isoNow() }, holder: "m1", mobile: true });
+  const r = await N.runRefresh(db, "m1", true, { config: { ...config, scheduleUpdatedAt: N.isoNow() }, refresh: {}, bets, roster: { updatedAt: N.isoNow() }, holder: "m1", mobile: true, standings: { bySeason: { "2026": { at: N.isoNow() } } } });
   assert.equal(r.ok, true); assert.equal(r.bets, 1); assert.equal(r.through, "Through week 1");
   const paths = db.writes.map((w) => w[0] + " " + w[1]);
   assert.equal(paths.includes("update bets/b1"), true); assert.equal(paths.includes("update bets/b2"), false);
@@ -563,18 +563,25 @@ test("standingsTick: the table and the field hourly, written only when something
   let bracket = [], hits = [];
   globalThis.fetch = async (u) => {
     hits.push(u.replace(/^.*\/v1\//, ""));
-    const j = /rosters$/.test(u) ? rosters : /users$/.test(u) ? users : /winners_bracket$/.test(u) ? bracket : [];
+    const j = /rosters$/.test(u) ? rosters : /users$/.test(u) ? users : /winners_bracket$/.test(u) ? bracket
+      : /matchups\/\d+$/.test(u) ? [{ roster_id: 1, matchup_id: 1 }, { roster_id: 2, matchup_id: 1 }, { roster_id: 3, matchup_id: 2 }] : [];
     return { ok: true, json: async () => j };
   };
   // before the daily league read has said how many make it: six, and the table still lands
   let db = fakeDb();
   await N.standingsTick(db, { config: cfg, holder: "m0" });
   assert.equal(db.writes[0][2].bySeason["2026"].teams, 6, "six spots until the league says otherwise");
+  // the rest of the regular season's pairings come along, fetched once, as member ids
+  const liveW = Clock.currentWeek(cfg), weeksLeft = Array.from({ length: 14 - liveW + 1 }, (_, i) => String(liveW + i));
+  const pr = db.writes[0][2].bySeason["2026"].pairings;
+  assert.deepEqual(Object.keys(pr).sort((a, b) => a - b), weeksLeft, "every week from the one being played to week 14");
+  assert.deepEqual(pr[String(liveW)], [{ a: "m1", b: "m0" }], "roster 3 has nobody to pair with; the pair is JPorch and hobnailboot");
+  assert.equal(hits.filter((h) => /matchups/.test(h)).length, weeksLeft.length);
   // the league settings come from league/sleeper, never a second league read
   const sleeper = { league: { playoffTeams: 2, playoffStart: 15 } };
   hits = []; db = fakeDb();
   await N.standingsTick(db, { config: cfg, holder: "m0", sleeper });
-  assert.deepEqual(hits.sort(), ["league/L1/rosters", "league/L1/users", "league/L1/winners_bracket"], "three calls");
+  assert.deepEqual(hits.filter((h) => !/matchups/.test(h)).sort(), ["league/L1/rosters", "league/L1/users", "league/L1/winners_bracket"], "three calls, plus the schedule");
   const w = db.writes.find((x) => x[1] === "league/standings");
   assert.ok(w, "written");
   const rec = w[2].bySeason["2026"];
@@ -587,7 +594,7 @@ test("standingsTick: the table and the field hourly, written only when something
   hits = []; db = fakeDb();
   const stale = { ...rec, at: new Date(Date.now() - 61 * 60000).toISOString() };
   await N.standingsTick(db, { config: cfg, holder: "m0", sleeper, standings: { bySeason: { "2026": stale } } });
-  assert.equal(hits.length, 3, "it looked");
+  assert.equal(hits.length, 3, "it looked, and the schedule it already had was not fetched again");
   assert.equal(db.writes.length, 0, "and left the book alone");
   // fresh: it doesn't even look
   hits = []; db = fakeDb();

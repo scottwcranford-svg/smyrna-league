@@ -267,3 +267,19 @@ test("league standing: the line moves with the outcome - the field, 1st, top 3, 
   assert.deepEqual([Bets.leagueStanding(at("champ"), over).decided, Bets.leagueStanding(at("champ"), { ...over, playoffs: { ...over.playoffs, champion: "m1" } }).inField], [false, true], "the champion is decided by the final alone");
   assert.equal(Bets.leagueStanding(at("matchup"), ST), null, "a matchup has no table");
 });
+
+test("matchupTeams: the NFL teams both sides' starters play for, by Sleeper roster; pairings fall back to the schedule in the standings", () => {
+  const squads = { byRoster: { "1": "JPorch", "2": "hobnailboot", "3": "RTownsend" }, rosters: {}, starters: { "1": ["p1", "p2", "0"], "2": ["p3"], "3": ["p9"] } };
+  const roster = { players: [["p1", "A", "QB", "KC"], ["p2", "B", "WR", "KC"], ["p3", "C", "RB", "CIN"], ["p9", "D", "TE", "SEA"]] };
+  const members = [{ id: "m0", name: "gmelan1" }, { id: "m1", name: "JPorch" }, { id: "m2", name: "RTownsend" }, { id: "m4", name: "hobnailboot" }];
+  const b = { league: { subject: "m1", opp: "m4", outcome: "matchup" }, week: 3 };
+  assert.deepEqual(Bets.matchupTeams(b, squads, roster, members), ["KC", "CIN"], "each team once, both sides");
+  assert.equal(Bets.matchupTeams({ league: { subject: "m1", outcome: "playoffs" } }, squads, roster, members), null, "a season bet has no starters to lock on");
+  assert.equal(Bets.matchupTeams(b, null, roster, members), null, "no squads yet");
+  assert.equal(Bets.matchupTeams({ ...b, league: { subject: "m0", opp: "mX", outcome: "matchup" } }, squads, roster, members), null, "managers the squads don't have");
+  const standings = { pairings: { "6": [{ a: "m1", b: "m2" }, { a: "m0", b: null }] } };
+  assert.deepEqual(Bets.leaguePairings(6, null, standings), [{ a: "m1", b: "m2" }], "the schedule from the standings, pairs with both managers only");
+  const scores = { weeks: { "6": { rows: [{ id: "m4", mid: 1 }, { id: "m0", mid: 1 }] } } };
+  assert.deepEqual(Bets.leaguePairings(6, scores, standings), [{ a: "m4", b: "m0" }], "the week's board wins once the book has it");
+  assert.deepEqual(Bets.leaguePairings(7, scores, standings), []);
+});

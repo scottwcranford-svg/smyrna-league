@@ -18,7 +18,10 @@ const STATS=Stats.STATS, LAST_WEEK=Clock.LAST_WEEK, PLAYOFF_START=Clock.PLAYOFF_
 const esc=Fmt.esc, money=Fmt.money, uid=Fmt.uid, clone=Fmt.clone, entriesOf=Fmt.entriesOf, fmtWhen=Fmt.fmtWhen,
       shortName=Fmt.shortName, picksText=Fmt.picksText, statsKey=Stats.statsKey, autoName=Bets.autoName;
 const mName=function(id){ return Id.mName(id,members()); };
-const isLocked=function(b){ return Clock.isLocked(b,seasonCfg(),state.games); };
+// a weekly league matchup locks on its starters' first kickoff; everything else on its own rule
+const teamsOf=function(b){ return Bets.matchupTeams(b,state.squads,state.roster,members()); };
+const betLockOf=function(b){ return Clock.betLock(b,seasonCfg(),state.games,teamsOf(b)); };
+const isLocked=function(b){ return Clock.isLocked(b,seasonCfg(),state.games,teamsOf(b)); };
 const weekLocked=function(w){ return Clock.weekLocked(w,seasonCfg()); };
 const currentWeek=function(){ return Clock.currentWeek(seasonCfg(),state.games); };
 const allGames=function(){ return Clock.allGames(state.games); };
@@ -71,7 +74,13 @@ function drawLeagueBox(){
   document.getElementById("bLeagueSeason").hidden=weekly;
   document.getElementById("bLeagueWeek").hidden=!weekly;
   if(weekly){
-    var sel=document.getElementById("bMatchup"), w=Number(document.getElementById("bWeek").value)||0, pairs=Bets.leaguePairings(w,state.scores);
+    // the week, from the form's own list (weeks still open), regular season only - the
+    // matchups are the schedule's; playoff weeks are the bracket's business
+    var wkSel=document.getElementById("bWeek"), w=Number(wkSel.value)||0, wkBox=document.getElementById("bLeagueWk");
+    wkBox.innerHTML=Array.prototype.filter.call(wkSel.options,function(o){ var n=Number(o.value); return n>0&&n<PLAYOFF_START; })
+      .map(function(o){ return '<option value="'+esc(o.value)+'"'+(Number(o.value)===w?" selected":"")+">"+esc(o.textContent)+"</option>"; }).join("");
+    if(!wkBox.value&&wkBox.options[0]){ wkBox.value=wkBox.options[0].value; wkSel.value=wkBox.value; w=Number(wkBox.value)||0; }
+    var sel=document.getElementById("bMatchup"), pairs=Bets.leaguePairings(w,state.scores,state.standings);
     if(!pairs.some(function(p){ return p.a===state.draftSubject&&p.b===state.draftOpp; })){ state.draftSubject=""; state.draftOpp=""; }
     sel.innerHTML=pairs.length
       ? '<option value="">Pick a matchup…</option>'+pairs.map(function(p){
@@ -102,9 +111,10 @@ export function drawGameBox(){
   // league result bet: it is always two sides, on the season, named after its subject.
   var isGame=scope==="game", isLeague=scope==="league", twoSided=isGame||isLeague;
   ["bNameRow","bKindRow","bWeekRow","bAddSide","bJoinRow"].forEach(function(id){ document.getElementById(id).hidden=twoSided; });
-  // the weekly matchup is the one league result bet with a week to pick, and it needs a real one
+  // the weekly matchup is the one league result bet with a week to pick (its own box mirrors
+  // the form's week select, which stays hidden), and it needs a real one
   if(isLeague&&leagueWeekly()){
-    var lwk=document.getElementById("bWeek"); lwk.parentNode.hidden=false;
+    var lwk=document.getElementById("bWeek");
     if(!(Number(lwk.value)>0)){ var firstW=Array.prototype.filter.call(lwk.options,function(o){ return Number(o.value)>0; })[0]; if(firstW) lwk.value=firstW.value; }
   }
   drawLeagueBox();
@@ -200,7 +210,7 @@ export function drawScope(){
   if(scope==="league"){
     box.hidden=true;
     hint.textContent=leagueWeekly()
-      ? "One of the week's Sleeper matchups. Take a team; whoever you're betting gets the other. Most points wins, a tie is a push. Locks at the week's first kickoff."
+      ? "One of the week's Sleeper matchups. Take a team; whoever you're betting gets the other. Most points wins, a tie is a push. Locks when the first player in it kicks off."
       : leagueClosed()&&!state.editId
       ? "Season bets are closed for the year. Weekly matchups are still on."
       : "A manager's team and what happens to it. Take Yes or No; whoever you're betting gets the other side. Sleeper settles it. Season bets lock "+fmtWhen(Clock.betLock({ league:{ subject:"" }, week:0, season:shownSeason() },seasonCfg(),state.games))+".";
@@ -532,8 +542,11 @@ export function submitBet(){
     if(weekly){
       // one of the week's Sleeper pairings, and a team from it
       if(!leagueWeek) return toast("Pick a week");
-      if(!Bets.leaguePairings(leagueWeek,state.scores).some(function(p){ return p.a===state.draftSubject&&p.b===state.draftOpp; })) return toast("Pick one of Week "+leagueWeek+"'s matchups");
+      if(!Bets.leaguePairings(leagueWeek,state.scores,state.standings).some(function(p){ return p.a===state.draftSubject&&p.b===state.draftOpp; })) return toast("Pick one of Week "+leagueWeek+"'s matchups");
       if(side0!==state.draftSubject&&side0!==state.draftOpp) return toast("Take a team");
+      // locked once a player in it has kicked off (the week's first game if the book can't say who starts)
+      if(!(state.editId&&state.admin)&&Date.now()>=betLockOf({ league:{ subject:state.draftSubject, opp:state.draftOpp, outcome:"matchup" }, week:leagueWeek, season:shownSeason() }))
+        return toast("That matchup has kicked off — pick another");
     } else {
       if(!state.draftSubject||!Id.member(state.draftSubject,members())) return toast("Pick whose team it's about");
       if(side0!=="yes"&&side0!=="no") return toast("Take "+oc.yes+" or "+oc.no);
@@ -567,7 +580,7 @@ export function submitBet(){
   // long, the week's first game is the line (and that is where such a bet locks). A
   // season league result bet has its own cutoff, checked above; a weekly one is its week.
   var adminEdit=!!(state.editId&&state.admin);
-  if(!isGame&&!(isLeague&&!weekly)&&!adminEdit){
+  if(!isGame&&!isLeague&&!adminEdit){
     if(wkPick&&statScope&&rosterRows().length&&allGames().some(function(g){ return g.week===wkPick; })){ if(!openGames(wkPick).length) return toast("Week "+wkPick+"'s games have all kicked off — pick a later week"); }
     else if(weekLocked(wkPick)) return toast(wkPick?"Week "+wkPick+" has kicked off — pick a later week":"The season's underway — season-long bets are locked");
   }

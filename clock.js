@@ -40,11 +40,18 @@ export function leagueLockWeek(b){ return LEAGUE_LOCK_WEEK[String((b&&b.season)|
 // picks plays in, so it stays open through the week while nobody on it has started —
 // and nobody joins knowing how a pick already on it did. Without the schedule (or a
 // pick's game in it) it falls back to the week's first game. Season bets: the opener,
-// except a league result bet in a season that had a later cutoff (leagueLockWeek).
-export function betLock(b,config,games){
+// except a league result bet in a season that had a later cutoff (leagueLockWeek). A
+// weekly league matchup locks when the first player in it kicks off: `teams` is the NFL
+// teams of both sides' starters (bets.js matchupTeams); without them, the week's first game.
+export function betLock(b,config,games,teams){
   if(b&&b.game&&b.game.date){ var t=Date.parse(b.game.date); if(!isNaN(t)) return t-LOCK_LEAD; }
   var week=b?Number(b.week)||0:0;
   if(b&&b.league&&!week) return lockTime(leagueLockWeek(b),config);
+  if(b&&b.league&&week&&games&&teams&&teams.length){
+    var soonest=Infinity;
+    teams.forEach(function(tm){ var k=kickoffOf(tm,week,games); if(!isNaN(k)&&k<soonest) soonest=k; });
+    if(soonest<Infinity) return soonest-LOCK_LEAD;
+  }
   if(week&&games){
     var first=Infinity, found=true, any=false;
     (Array.isArray(b.entries)?b.entries:[]).forEach(function(e){ (e.picks||[]).forEach(function(p){
@@ -59,7 +66,7 @@ export function betLock(b,config,games){
 
 export function weekLocked(week,config){ return Date.now()>=lockTime(week,config); }
 
-export function isLocked(b,config,games){ return (b.status==="open"||b.status==="active")&&Date.now()>=betLock(b,config,games); }
+export function isLocked(b,config,games,teams){ return (b.status==="open"||b.status==="active")&&Date.now()>=betLock(b,config,games,teams); }
 
 // When a team's game in a week kicks off, or NaN if the schedule doesn't have one.
 function kickoffOf(team,week,games){

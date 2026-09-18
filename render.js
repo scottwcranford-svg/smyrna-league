@@ -28,8 +28,10 @@ const esc=Fmt.esc, money=Fmt.money, signed=Fmt.signed, initials=Fmt.initials, we
 const member=function(id){ return Id.member(id,members()); };
 const mName=function(id){ return Id.mName(id,members()); };
 const mColor=function(id){ return Id.mColor(id,members()); };
-const betLock=function(b){ return Clock.betLock(b,seasonCfg(),state.games); };
-const isLocked=function(b){ return Clock.isLocked(b,seasonCfg(),state.games); };
+// a weekly league matchup locks on its starters' first kickoff; everything else on its own rule
+const teamsOf=function(b){ return Bets.matchupTeams(b,state.squads,state.roster,members()); };
+const betLock=function(b){ return Clock.betLock(b,seasonCfg(),state.games,teamsOf(b)); };
+const isLocked=function(b){ return Clock.isLocked(b,seasonCfg(),state.games,teamsOf(b)); };
 const gameOf=function(b){ return Bets.gameOf(b,state.games); };
 const currentWeek=function(){ return Clock.currentWeek(seasonCfg(),state.games); };
 const computeLedger=function(){ return Ledger.computeLedger(seasonCfg(),state.bets); };

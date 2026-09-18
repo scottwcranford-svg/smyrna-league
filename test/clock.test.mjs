@@ -105,3 +105,16 @@ test("a season-long league result bet locks at the opener, except 2026's, which 
   assert.equal(Clock.betLock({ ...b, season: "2027" }, config), Clock.lockTime(0, config), "any other season: the opener");
   assert.equal(Clock.betLock({ ...b, week: 5 }, config), Clock.lockTime(5, config), "a weekly one, if there ever is one, locks on its week");
 });
+
+test("a weekly league matchup locks when the first of its starters kicks off; without starters, the week's first game", () => {
+  const games = { games: [
+    { id: "thu", week: 2, away: "BUF", home: "MIA", date: "2026-09-18T00:15:00Z" },
+    { id: "sun", week: 2, away: "CIN", home: "NE", date: "2026-09-20T17:00:00Z" },
+    { id: "mon", week: 2, away: "KC", home: "DEN", date: "2026-09-22T00:15:00Z" } ] };
+  const b = { league: { subject: "m0", opp: "m1", outcome: "matchup" }, week: 2, status: "open", entries: [] };
+  assert.equal(Clock.betLock(b, config, games, ["KC"]), Date.parse("2026-09-22T00:15:00Z") - 300e3, "only Monday-night starters: Monday");
+  assert.equal(Clock.betLock(b, config, games, ["KC", "CIN", "SEA"]), Date.parse("2026-09-20T17:00:00Z") - 300e3, "the earliest starter decides; a bye team is skipped");
+  assert.equal(Clock.betLock(b, config, games, null), Clock.lockTime(2, config), "no starters known: the week");
+  assert.equal(Clock.betLock(b, config, games, ["SEA"]), Clock.lockTime(2, config), "starters all on bye: the week");
+  assert.equal(Clock.isLocked({ ...b, week: 2 }, config, games, ["KC"]), Date.now() >= Date.parse("2026-09-22T00:15:00Z") - 300e3);
+});
