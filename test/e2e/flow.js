@@ -176,7 +176,7 @@ let browser; const errors = [], checks = {};
     && /Book/.test(checks.tabOn) && checks.panelsShown.join() === "book" && /bets running/.test(checks.glance) && /side bets/.test(checks.leagueLine)
     && checks.ledgerTab.board === true && checks.ledgerTab.book === true && checks.ledgerTab.saved === "ledger" && checks.seeking <= checks.unlocked && (checks.seeking === 0 || checks.seekingGlow === true)
     && checks.rosterRows >= 1 && checks.rosterReadOnly === true && /Last in/.test(checks.seenSelf) && checks.onBoard === !checks.selfIsTest
-    && checks.title === "Propose a bet" && checks.scopeChips === 4 && checks.statChips >= 10 && checks.entryRows === 1 && checks.rowOneLocked === true && checks.twoStats === 2
+    && checks.title === "Propose a bet" && checks.scopeChips === 5 && checks.statChips >= 10 && checks.entryRows === 1 && checks.rowOneLocked === true && checks.twoStats === 2
     && /Chase/.test(checks.pickChip) && checks.gameOptions >= 1 && checks.sideTaken === 1 && errors.length === 0;
   console.log(JSON.stringify({ ...checks, errors }, null, 0));
   console.log(ok ? "E2E OK — screenshot " + shot : "E2E FAILED");
