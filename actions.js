@@ -55,6 +55,13 @@ export const ACTIONS = {
     if(state.draftScope==="game"||state.draftScope==="league"){ state.draft=state.draft.slice(0,2); while(state.draft.length<2) state.draft.push({memberId:null,pick:"",picks:[],side:""}); }
     F.drawScope(); F.drawEntries();
   },
+  // season or weekly: the weekly is the matchup; the season remembers what was last picked
+  dPeriod:function(t){
+    var week=attr(t,"data-period")==="week";
+    if(week){ state.draftSeasonOutcome=state.draftOutcome; state.draftOutcome="matchup"; }
+    else state.draftOutcome=(state.draftSeasonOutcome&&state.draftSeasonOutcome!=="matchup")?state.draftSeasonOutcome:"playoffs";
+    state.draft.forEach(function(e){ e.side=""; }); F.drawScope(); F.drawEntries();
+  },
   dMarket:function(t){
     var m=attr(t,"data-market");
     state.draftMarket=(m==="total"||m==="spread")?m:"ml";

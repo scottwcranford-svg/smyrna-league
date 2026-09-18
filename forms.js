@@ -53,33 +53,41 @@ export function prefillLine(){
 // of the week's Sleeper pairings. Every manager in the season is offered, yourself
 // included - a bet on your own team is the usual one. After the season's cutoff only the
 // weekly outcome is on offer.
+// Season or weekly is the first choice, so it is a pair of chips; the season chip greys out
+// once the season's bets have closed and the form opens on the weekly matchup instead.
 function drawLeagueBox(){
   var box=document.getElementById("bLeagueBox"), isLeague=state.draftScope==="league";
   box.hidden=!isLeague;
   if(!isLeague) return;
-  var who=document.getElementById("bSubject"), what=document.getElementById("bOutcome"), lbl=document.getElementById("bSubjectLbl");
   var closed=leagueClosed()&&!state.editId, oc=Bets.leagueOutcome(state.draftOutcome);
   if(!oc||(closed&&oc.period==="season")){ state.draftOutcome=closed?"matchup":Bets.LEAGUE_OUTCOMES[0].key; oc=Bets.leagueOutcome(state.draftOutcome); }
-  what.innerHTML=Bets.LEAGUE_OUTCOMES.map(function(o){
-    var off=closed&&o.period==="season";
-    return '<option value="'+esc(o.key)+'"'+(o.key===state.draftOutcome?" selected":"")+(off?" disabled":"")+">"+esc(o.label)+(off?" · closed for the season":o.period==="week"?" · weekly":"")+"</option>"; }).join("");
-  what.value=state.draftOutcome;
-  if(oc.period==="week"){
-    lbl.textContent="Which matchup";
-    var w=Number(document.getElementById("bWeek").value)||0, pairs=Bets.leaguePairings(w,state.scores);
+  var weekly=oc.period==="week";
+  document.querySelectorAll("#bPeriod .chip").forEach(function(c){
+    var season=c.getAttribute("data-period")==="season";
+    c.setAttribute("aria-pressed",String(season!==weekly));
+    c.disabled=season&&closed;
+    c.textContent=season?(closed?"Season · closed":"Season"):"Weekly matchup";
+  });
+  document.getElementById("bLeagueSeason").hidden=weekly;
+  document.getElementById("bLeagueWeek").hidden=!weekly;
+  if(weekly){
+    var sel=document.getElementById("bMatchup"), w=Number(document.getElementById("bWeek").value)||0, pairs=Bets.leaguePairings(w,state.scores);
     if(!pairs.some(function(p){ return p.a===state.draftSubject&&p.b===state.draftOpp; })){ state.draftSubject=""; state.draftOpp=""; }
-    who.innerHTML=pairs.length
+    sel.innerHTML=pairs.length
       ? '<option value="">Pick a matchup…</option>'+pairs.map(function(p){
           var v=p.a+"|"+p.b, on=p.a===state.draftSubject&&p.b===state.draftOpp;
           return '<option value="'+esc(v)+'"'+(on?" selected":"")+">"+esc(mName(p.a)+" vs "+mName(p.b))+"</option>"; }).join("")
       : '<option value="">'+(w?"Week "+w+" isn’t paired yet":"Pick a week")+"</option>";
-    who.value=state.draftSubject?state.draftSubject+"|"+state.draftOpp:"";
-  } else {
-    lbl.textContent="Whose team";
-    who.innerHTML='<option value="">Whose team…</option>'+realMembers().map(function(m){
-      return '<option value="'+esc(m.id)+'"'+(m.id===state.draftSubject?" selected":"")+">"+esc(m.name)+(m.id===state.me?" (you)":"")+"</option>"; }).join("");
-    who.value=state.draftSubject||"";
+    sel.value=state.draftSubject?state.draftSubject+"|"+state.draftOpp:"";
+    return;
   }
+  var who=document.getElementById("bSubject"), what=document.getElementById("bOutcome");
+  what.innerHTML=Bets.LEAGUE_OUTCOMES.filter(function(o){ return o.period==="season"; }).map(function(o){
+    return '<option value="'+esc(o.key)+'"'+(o.key===state.draftOutcome?" selected":"")+">"+esc(o.label)+"</option>"; }).join("");
+  what.value=state.draftOutcome;
+  who.innerHTML='<option value="">Whose team…</option>'+realMembers().map(function(m){
+    return '<option value="'+esc(m.id)+'"'+(m.id===state.draftSubject?" selected":"")+">"+esc(m.name)+(m.id===state.me?" (you)":"")+"</option>"; }).join("");
+  who.value=state.draftSubject||"";
 }
 // Season-long league result bets close for the year at their lock (clock.js leagueLockWeek).
 export function leagueClosed(){
@@ -192,10 +200,10 @@ export function drawScope(){
   if(scope==="league"){
     box.hidden=true;
     hint.textContent=leagueWeekly()
-      ? "Pick the week and one of its Sleeper matchups, take a team, say who you're betting, set the stake. The other manager gets the other team. Most points wins; a tie is a push. Locks five minutes before that week's first game."
+      ? "One of the week's Sleeper matchups. Take a team; whoever you're betting gets the other. Most points wins, a tie is a push. Locks at the week's first kickoff."
       : leagueClosed()&&!state.editId
-      ? "Season league result bets are closed for the year — the weekly matchup is still on."
-      : "Pick whose team and what happens, take a side, say who you're betting, set the stake. The other manager gets the other side. Sleeper settles it. Season bets lock "+fmtWhen(Clock.betLock({ league:{ subject:"" }, week:0, season:shownSeason() },seasonCfg(),state.games))+".";
+      ? "Season bets are closed for the year. Weekly matchups are still on."
+      : "A manager's team and what happens to it. Take Yes or No; whoever you're betting gets the other side. Sleeper settles it. Season bets lock "+fmtWhen(Clock.betLock({ league:{ subject:"" }, week:0, season:shownSeason() },seasonCfg(),state.games))+".";
     return;
   }
   box.hidden=!scope;

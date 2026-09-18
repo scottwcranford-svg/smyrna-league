@@ -168,10 +168,15 @@
       </div>
     </div>
     <div id="bLeagueBox" hidden>
-      <div class="grid c2" style="margin-top:8px">
-        <label class="f"><span>What happens</span><select class="field" id="bOutcome" data-act="dOutcome" aria-label="What happens"></select></label>
-        <label class="f"><span id="bSubjectLbl">Whose team</span><select class="field" id="bSubject" data-act="dSubject" aria-label="Whose team"></select></label>
+      <div class="filters" id="bPeriod" style="margin-top:8px">
+        <button type="button" class="chip" data-act="dPeriod" data-period="season" aria-pressed="true">Season</button>
+        <button type="button" class="chip" data-act="dPeriod" data-period="week" aria-pressed="false">Weekly matchup</button>
       </div>
+      <div class="grid c2" id="bLeagueSeason" style="margin-top:8px">
+        <label class="f"><span>What happens</span><select class="field" id="bOutcome" data-act="dOutcome" aria-label="What happens"></select></label>
+        <label class="f"><span>Whose team</span><select class="field" id="bSubject" data-act="dSubject" aria-label="Whose team"></select></label>
+      </div>
+      <label class="f" id="bLeagueWeek" style="margin-top:8px" hidden><span>Which matchup</span><select class="field" id="bMatchup" data-act="dSubject" aria-label="Which matchup"></select></label>
     </div>
     <div id="bGameBox" hidden>
       <select class="field" id="bGame" aria-label="Which game" style="margin-top:8px"></select>

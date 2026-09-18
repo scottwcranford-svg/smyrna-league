@@ -2045,7 +2045,8 @@ test("league result: a bet on a manager's own team - the form, the ticket's tabl
     res.rows = { league: hidden("bLeagueBox"), week: hidden("bWeekRow"), name: hidden("bNameRow"), kind: hidden("bKindRow"), join: hidden("bJoinRow"), add: hidden("bAddSide"), stats: hidden("bStats") };
     res.subjects = [...document.getElementById("bSubject").options].map(o => o.textContent);
     res.subject = document.getElementById("bSubject").value;
-    res.outcomes = [...document.getElementById("bOutcome").options].map(o => o.textContent + (o.disabled ? " (off)" : ""));
+    res.outcomes = [...document.getElementById("bOutcome").options].map(o => o.textContent);
+    res.period = [...document.querySelectorAll("#bPeriod .chip")].map(c => [c.textContent, c.getAttribute("aria-pressed"), c.disabled]);
     res.chips = [...document.querySelectorAll('#bEntries [data-act="dSide"]')].map(c => c.textContent);
     res.otherSide = document.querySelectorAll("#bEntries .entry-row")[1].querySelector(".hint").textContent;
     res.hint = document.getElementById("bScopeHint").textContent;
@@ -2097,8 +2098,9 @@ test("league result: a bet on a manager's own team - the form, the ticket's tabl
     state.config.weekStarts = { "3": "2020-09-25T00:15:00Z" };
     state.local = false; F.openBetDlg(); state.local = true;
     document.querySelector('#bScope .chip[data-scope="league"]').click();
-    res.after = { chip: document.querySelector('#bScope .chip[data-scope="league"]').hidden, outcome: document.getElementById("bOutcome").value,
-      off: [...document.getElementById("bOutcome").options].filter(o => o.disabled).map(o => o.value), hint: document.getElementById("bScopeHint").textContent };
+    res.after = { chip: document.querySelector('#bScope .chip[data-scope="league"]').hidden, outcome: state.draftOutcome,
+      period: [...document.querySelectorAll("#bPeriod .chip")].map(c => [c.textContent, c.getAttribute("aria-pressed"), c.disabled]),
+      weekBox: !document.getElementById("bLeagueWeek").hidden, seasonBox: !document.getElementById("bLeagueSeason").hidden, hint: document.getElementById("bScopeHint").textContent };
     state.draftScope = "league"; state.draftSubject = "b"; state.draftOpp = ""; state.draftOutcome = "playoffs"; state.editId = null;
     state.draft = [{ memberId: "a", pick: "", picks: [], side: "yes" }, { memberId: null, pick: "", picks: [], side: "" }];
     document.getElementById("bAmt").value = "20"; F.submitBet();
@@ -2108,9 +2110,10 @@ test("league result: a bet on a manager's own team - the form, the ticket's tabl
   });
   assert.deepEqual(out.rows, { league: false, week: true, name: true, kind: true, join: true, add: true, stats: true }, "what happens and whose team; no week, name, type, joiners or extra sides");
   assert.deepEqual(out.subjects, ["Whose team…", "Alice (you)", "Bob", "Cara"]); assert.equal(out.subject, "a", "opens on your own team");
-  assert.deepEqual(out.outcomes, ["Makes the playoffs", "Finishes 1st in the regular season", "Finishes top 3 in the regular season", "Finishes last in the regular season", "Wins the championship", "Wins their matchup · weekly"]);
+  assert.deepEqual(out.outcomes, ["Makes the playoffs", "Finishes 1st in the regular season", "Finishes top 3 in the regular season", "Finishes last in the regular season", "Wins the championship"], "the season outcomes; the weekly matchup is the other chip");
+  assert.deepEqual(out.period, [["Season", "true", false], ["Weekly matchup", "false", false]], "season or weekly is the first choice, as chips");
   assert.deepEqual(out.chips, ["Makes it", "Misses"]); assert.equal(out.otherSide, "gets the other side");
-  assert.match(out.hint, /^Pick whose team and what happens, take a side.*Season bets lock /);
+  assert.match(out.hint, /^A manager's team and what happens to it\..*Season bets lock /);
   assert.match(out.scoring, /If the team is in Sleeper's playoff field when the regular season ends after Week 14, Makes it wins; otherwise Misses does\./);
   assert.deepEqual(out.saved, { kind: "league", week: 0, league: { subject: "b", outcome: "playoffs" }, joinable: false, name: "Bob makes the playoffs",
     terms: "Makes it vs Misses — Sleeper's playoff bracket decides it once the regular season is over.", status: "open", amount: 20,
@@ -2130,8 +2133,9 @@ test("league result: a bet on a manager's own team - the form, the ticket's tabl
   assert.equal(out.decided, "In the playoffs", "and once the regular season is over it is decided");
   assert.deepEqual(out.last, { state: "Not last", table: [false, false, false, "cut: Last place", true] }, "last place draws its line above the bottom row");
   assert.deepEqual(out.first, { state: "1st", cut: "1st place" });
-  assert.deepEqual(out.after, { chip: false, outcome: "matchup", off: ["playoffs", "reg1", "top3", "last", "champ"], hint: out.after.hint }, "after the cutoff only the weekly matchup is on");
-  assert.match(out.after.hint, /^Pick the week and one of its Sleeper matchups/);
+  assert.deepEqual(out.after, { chip: false, outcome: "matchup", period: [["Season · closed", "false", true], ["Weekly matchup", "true", false]], weekBox: true, seasonBox: false, hint: out.after.hint },
+    "after the cutoff the season chip is greyed and says so, and the form opens on the weekly matchup");
+  assert.match(out.after.hint, /^One of the week's Sleeper matchups\./);
   assert.equal(out.betsAfter, 1, "and a season post is refused");
   assert.deepEqual(errors, []);
   await p.close();
@@ -2149,13 +2153,13 @@ test("league matchup: pick the week's Sleeper pairing, take a team; the ticket s
     const res = {};
     state.me = "a"; state.local = false; F.openBetDlg(); state.local = true;
     document.querySelector('#bScope .chip[data-scope="league"]').click();
-    const oc = document.getElementById("bOutcome"); oc.value = "matchup"; oc.dispatchEvent(new Event("change", { bubbles: true }));
+    document.querySelector('#bPeriod .chip[data-period="week"]').click();
     const wk = document.getElementById("bWeek"); res.weekShown = !document.getElementById("bWeekRow").hidden;
     wk.value = "5"; wk.dispatchEvent(new Event("change", { bubbles: true }));
-    res.label = document.getElementById("bSubjectLbl").textContent;
-    res.pairings = [...document.getElementById("bSubject").options].map(o => o.textContent);
+    res.label = document.querySelector("#bLeagueWeek span").textContent; res.seasonBox = !document.getElementById("bLeagueSeason").hidden;
+    res.pairings = [...document.getElementById("bMatchup").options].map(o => o.textContent);
     res.noPick = document.querySelector("#bEntries .entry-row .hint").textContent;
-    const who = document.getElementById("bSubject"); who.value = "a|b"; who.dispatchEvent(new Event("change", { bubbles: true }));
+    const who = document.getElementById("bMatchup"); who.value = "a|b"; who.dispatchEvent(new Event("change", { bubbles: true }));
     res.chips = [...document.querySelectorAll('#bEntries [data-act="dSide"]')].map(c => [c.dataset.side, c.textContent]);
     document.querySelector('#bEntries [data-act="dSide"][data-side="b"]').click();
     res.otherSide = document.querySelectorAll("#bEntries .entry-row")[1].querySelector(".hint").textContent;
@@ -2183,7 +2187,7 @@ test("league matchup: pick the week's Sleeper pairing, take a team; the ticket s
     return res;
   });
   assert.equal(out.weekShown, true, "the weekly outcome brings the week back");
-  assert.equal(out.label, "Which matchup");
+  assert.equal(out.label, "Which matchup"); assert.equal(out.seasonBox, false, "the season's controls step aside");
   assert.deepEqual(out.pairings, ["Pick a matchup…", "Alice vs Bob"], "only pairings with both managers in the book");
   assert.equal(out.noPick, "Pick a matchup above");
   assert.deepEqual(out.chips, [["a", "Alice"], ["b", "Bob"]], "the two teams are the sides");
