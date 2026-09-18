@@ -2157,6 +2157,8 @@ test("league matchup: pick the week's Sleeper pairing, take a team; the ticket s
     // the week box sits with the matchup, regular season only, mirroring the form's week
     const wk = document.getElementById("bLeagueWk"); res.weekBox = !document.getElementById("bLeagueWeek").hidden; res.topWeek = !document.getElementById("bWeekRow").hidden;
     res.weeks = [...wk.options].map(o => o.value);
+    wk.value = "15"; wk.dispatchEvent(new Event("change", { bubbles: true }));
+    res.playoffMsg = document.getElementById("bMatchup").options[0].textContent;
     wk.value = "5"; wk.dispatchEvent(new Event("change", { bubbles: true }));
     res.mirrored = document.getElementById("bWeek").value;
     res.label = document.getElementById("bMatchup").parentNode.querySelector("span").textContent; res.seasonBox = !document.getElementById("bLeagueSeason").hidden;
@@ -2202,7 +2204,8 @@ test("league matchup: pick the week's Sleeper pairing, take a team; the ticket s
     return res;
   });
   assert.equal(out.weekBox, true, "the weekly matchup has its own week box"); assert.equal(out.topWeek, false, "and the form's week row stays hidden");
-  assert.ok(out.weeks.includes("5") && !out.weeks.includes("0") && !out.weeks.includes("15"), "regular-season weeks only, no season-long");
+  assert.ok(out.weeks.includes("5") && !out.weeks.includes("0") && out.weeks.includes("15"), "every week still open, playoffs included, no season-long");
+  assert.equal(out.playoffMsg, "Week 15 isn’t paired until the bracket is set", "a playoff week says what it's waiting on");
   assert.equal(out.mirrored, "5");
   assert.equal(out.label, "Which matchup"); assert.equal(out.seasonBox, false, "the season's controls step aside");
   assert.deepEqual(out.pairings, ["Pick a matchup…", "Alice vs Bob"], "only pairings with both managers in the book");

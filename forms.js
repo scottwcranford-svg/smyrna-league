@@ -74,10 +74,11 @@ function drawLeagueBox(){
   document.getElementById("bLeagueSeason").hidden=weekly;
   document.getElementById("bLeagueWeek").hidden=!weekly;
   if(weekly){
-    // the week, from the form's own list (weeks still open), regular season only - the
-    // matchups are the schedule's; playoff weeks are the bracket's business
+    // the week, from the form's own list (weeks still open). The regular season's matchups
+    // are the schedule's, fetched up front; a playoff week's are the bracket's, and arrive
+    // with that week's board once Sleeper has set them.
     var wkSel=document.getElementById("bWeek"), w=Number(wkSel.value)||0, wkBox=document.getElementById("bLeagueWk");
-    wkBox.innerHTML=Array.prototype.filter.call(wkSel.options,function(o){ var n=Number(o.value); return n>0&&n<PLAYOFF_START; })
+    wkBox.innerHTML=Array.prototype.filter.call(wkSel.options,function(o){ return Number(o.value)>0; })
       .map(function(o){ return '<option value="'+esc(o.value)+'"'+(Number(o.value)===w?" selected":"")+">"+esc(o.textContent)+"</option>"; }).join("");
     if(!wkBox.value&&wkBox.options[0]){ wkBox.value=wkBox.options[0].value; wkSel.value=wkBox.value; w=Number(wkBox.value)||0; }
     var sel=document.getElementById("bMatchup"), pairs=Bets.leaguePairings(w,state.scores,state.standings);
@@ -86,7 +87,7 @@ function drawLeagueBox(){
       ? '<option value="">Pick a matchup…</option>'+pairs.map(function(p){
           var v=p.a+"|"+p.b, on=p.a===state.draftSubject&&p.b===state.draftOpp;
           return '<option value="'+esc(v)+'"'+(on?" selected":"")+">"+esc(mName(p.a)+" vs "+mName(p.b))+"</option>"; }).join("")
-      : '<option value="">'+(w?"Week "+w+"’s matchups arrive with the next refresh":"Pick a week")+"</option>";
+      : '<option value="">'+(!w?"Pick a week":w>=PLAYOFF_START?"Week "+w+" isn’t paired until the bracket is set":"Week "+w+"’s matchups arrive with the next refresh")+"</option>";
     sel.value=state.draftSubject?state.draftSubject+"|"+state.draftOpp:"";
     return;
   }
