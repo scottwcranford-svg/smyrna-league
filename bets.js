@@ -50,6 +50,18 @@ export function leagueSideText(side,key,members){
 export function leagueName(subject,key,members,week,opp){ var o=leagueOutcome(key); return o?o.name(mName(subject,members),opp?mName(opp,members):"",week):""; }
 export function leagueTerms(key){ var o=leagueOutcome(key); return o?o.terms:""; }
 
+// Nobody holds a side that pays when their own team fails: on a season outcome about your
+// team you take the yes side (or, on "finishes last", the no side); in a matchup you are in
+// you take yourself. Anyone else can take either side of a bet about you.
+export function againstSelf(b,memberId,side){
+  if(!b||!b.league||!memberId||!side) return false;
+  var L=b.league, o=leagueOutcome(L.outcome);
+  if(!o) return false;
+  if(o.key==="matchup") return (memberId===L.subject||memberId===L.opp)&&side!==memberId;
+  if(memberId!==L.subject) return false;
+  return o.key==="last"?side==="yes":side==="no";
+}
+
 // A week's Sleeper pairings: [{ a, b }] of member ids, both known to the book. From the
 // week's board in league/scores when the book has it, else from league/standings, which
 // carries the rest of the regular season's schedule (Sleeper fixes it up front).

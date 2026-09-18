@@ -2151,7 +2151,7 @@ test("league matchup: pick the week's Sleeper pairing, take a team; the ticket s
       { id: "a", name: "Alice", pts: 0, proj: 118.5, mid: 1 }, { id: "b", name: "Bob", pts: 0, proj: 104.2, mid: 1 },
       { id: "c", name: "Cara", pts: 0, proj: 99.4, mid: 2 }, { id: null, name: "ghost", pts: 0, proj: null, mid: 2 } ] } } };
     const res = {};
-    state.me = "a"; state.local = false; F.openBetDlg(); state.local = true;
+    state.me = "c"; state.local = false; F.openBetDlg(); state.local = true;
     document.querySelector('#bScope .chip[data-scope="league"]').click();
     document.querySelector('#bPeriod .chip[data-period="week"]').click();
     // the week box sits with the matchup, regular season only, mirroring the form's week
@@ -2197,7 +2197,7 @@ test("league matchup: pick the week's Sleeper pairing, take a team; the ticket s
     const before = state.bets.length; F.submitBet(); res.refused = state.bets.length === before;
     state.games.games[0].date = "2026-10-11T17:00:00Z"; state.squads = null;
     // the week goes final: the bet settles itself on the next draw
-    b.status = "active"; b.entries[1].memberId = "c"; state.scores.weeks["5"].final = true;
+    b.status = "active"; b.entries[1].memberId = "a"; state.scores.weeks["5"].final = true;
     const { settleFinished } = await import("./book.js?v=dev"); settleFinished(); V.render();
     res.settled = { status: b.status, winner: b.winner, note: b.settledNote, chip: t().querySelector(".status").textContent };
     document.getElementById("betDlg").close();
@@ -2214,7 +2214,7 @@ test("league matchup: pick the week's Sleeper pairing, take a team; the ticket s
   assert.equal(out.otherSide, "takes Alice");
   assert.match(out.scoring, /Whoever scores more in the Week 5 Sleeper matchup wins\. A tie is a push\./);
   assert.deepEqual(out.saved, { kind: "league", week: 5, league: { subject: "a", outcome: "matchup", opp: "b" }, joinable: false, name: "Alice vs Bob · Week 5",
-    terms: "Whoever scores more in the Sleeper matchup takes it. A tie is a push.", status: "open", entries: [["a", "b", "Bob"], [null, "a", "Alice"]] }, "Alice took Bob's team; the open seat gets Alice's");
+    terms: "Whoever scores more in the Sleeper matchup takes it. A tie is a push.", status: "open", entries: [["c", "b", "Bob"], [null, "a", "Alice"]] }, "Cara took Bob's team; the open seat gets Alice's");
   assert.equal(out.wk, "WK 5");
   assert.deepEqual(out.pre, { teams: [["ALAlice0proj 118.5", false], ["BOBob0proj 104.2", false]], state: "Week 5 · Yet to play", ahead: [["Bob", false], ["Alice", false]] }, "nothing played: nobody leads");
   assert.deepEqual(out.live, { teams: [["ALAlice88.6proj 118.5", false], ["BOBob131proj 104.2", true]], state: "Week 5 · In progress", ahead: [["Bob", true], ["Alice", false]] }, "Bob leads, and the side holding him is marked");
@@ -2222,7 +2222,49 @@ test("league matchup: pick the week's Sleeper pairing, take a team; the ticket s
   assert.equal(out.lockWeek, Date.parse("2036-10-09T00:15:00Z") - 300e3, "no starters known: the week's first game, as the fixture sets it");
   assert.equal(out.lockStarter, Date.parse("2026-10-11T17:00:00Z") - 300e3, "Maye's Sunday game is the first kickoff in the matchup");
   assert.equal(out.lockedTag, "Locked", "once it kicks off the ticket says so"); assert.equal(out.refused, true, "and a new bet on it is refused");
-  assert.deepEqual(out.settled, { status: "settled", winner: "a", note: "Week 5 final · Alice 88.6, Bob 131", chip: "Alice wins" }, "final: Alice, holding Bob, collects");
+  assert.deepEqual(out.settled, { status: "settled", winner: "c", note: "Week 5 final · Alice 88.6, Bob 131", chip: "Cara wins" }, "final: Cara, holding Bob, collects");
+  assert.deepEqual(errors, []);
+  await p.close();
+});
+
+test("nobody bets against their own team: refused at the form, no Take it on the seat, refused at the seat", { skip }, async () => {
+  const { p, errors } = await page();
+  const out = await p.evaluate(async () => {
+    const { state, setBets } = await import("./state.js?v=dev"); const V = await import("./render.js?v=dev"); const F = await import("./forms.js?v=dev"); const B = await import("./book.js?v=dev");
+    state.config.weekStarts = { "3": "2036-09-25T00:15:00Z" };
+    const res = {};
+    // Alice posts on her own team and takes Misses: refused; Makes it: fine
+    state.me = "a"; state.local = false; F.openBetDlg(); state.local = true;
+    document.querySelector('#bScope .chip[data-scope="league"]').click();
+    document.querySelector('#bEntries [data-act="dSide"][data-side="no"]').click();
+    document.getElementById("bAmt").value = "10"; F.submitBet(); res.selfNo = state.bets.length;
+    document.querySelector('#bEntries [data-act="dSide"][data-side="yes"]').click(); F.submitBet(); res.selfYes = state.bets.length;
+    // Bob posts "Alice misses" with the Misses side open: Alice sees no Take it, and can't take it
+    setBets([]); state.me = "b"; state.local = false; F.openBetDlg(); state.local = true;
+    document.querySelector('#bScope .chip[data-scope="league"]').click();
+    const who = document.getElementById("bSubject"); who.value = "a"; who.dispatchEvent(new Event("change", { bubbles: true }));
+    document.querySelector('#bEntries [data-act="dSide"][data-side="yes"]').click();
+    document.getElementById("bAmt").value = "10"; F.submitBet(); const b = state.bets[0];
+    res.posted = b && b.entries.map(e => [e.memberId, e.side]);
+    state.me = "a"; V.render();
+    res.aliceTake = document.querySelectorAll('[data-act="take"]').length;
+    state.local = false; B.takeSeat(b.id, 1); state.local = true; res.aliceSeat = b.entries[1].memberId;
+    state.me = "c"; V.render(); res.caraTake = document.querySelectorAll('[data-act="take"]').length;
+    // and Bob can't invite Alice to the Misses seat either
+    setBets([]); state.me = "b"; state.local = false; F.openBetDlg(); state.local = true;
+    document.querySelector('#bScope .chip[data-scope="league"]').click();
+    who.value = "a"; who.dispatchEvent(new Event("change", { bubbles: true }));
+    document.querySelector('#bEntries [data-act="dSide"][data-side="yes"]').click();
+    const inv = document.querySelectorAll('#bEntries [data-act="dMem"]')[1]; inv.value = "a"; inv.dispatchEvent(new Event("change", { bubbles: true }));
+    document.getElementById("bAmt").value = "10"; F.submitBet(); res.invited = state.bets.length;
+    document.getElementById("betDlg").close();
+    return res;
+  });
+  assert.equal(out.selfNo, 0, "Misses on your own team is refused"); assert.equal(out.selfYes, 1, "Makes it goes through");
+  assert.deepEqual(out.posted, [["b", "yes"], [null, "no"]]);
+  assert.equal(out.aliceTake, 0, "Alice gets no Take it on the seat against her own team"); assert.equal(out.aliceSeat, null, "and taking it is refused");
+  assert.equal(out.caraTake, 1, "anyone else can take it");
+  assert.equal(out.invited, 0, "inviting the subject to the side against herself is refused");
   assert.deepEqual(errors, []);
   await p.close();
 });

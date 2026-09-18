@@ -283,3 +283,19 @@ test("matchupTeams: the NFL teams both sides' starters play for, by Sleeper rost
   assert.deepEqual(Bets.leaguePairings(6, scores, standings), [{ a: "m4", b: "m0" }], "the week's board wins once the book has it");
   assert.deepEqual(Bets.leaguePairings(7, scores, standings), []);
 });
+
+test("againstSelf: nobody holds the side that pays when their own team fails", () => {
+  const season = (outcome) => ({ league: { subject: "m1", outcome } });
+  assert.equal(Bets.againstSelf(season("playoffs"), "m1", "no"), true, "Misses on your own team");
+  assert.equal(Bets.againstSelf(season("playoffs"), "m1", "yes"), false, "Makes it on your own team is fine");
+  assert.equal(Bets.againstSelf(season("playoffs"), "m2", "no"), false, "anyone else can take either side");
+  assert.equal(Bets.againstSelf(season("champ"), "m1", "no"), true);
+  assert.equal(Bets.againstSelf(season("last"), "m1", "yes"), true, "Last on your own team pays when you lose");
+  assert.equal(Bets.againstSelf(season("last"), "m1", "no"), false, "Not last is backing yourself");
+  const m = { league: { subject: "m1", opp: "m2", outcome: "matchup" }, week: 3 };
+  assert.equal(Bets.againstSelf(m, "m1", "m2"), true, "taking your opponent in your own matchup");
+  assert.equal(Bets.againstSelf(m, "m2", "m1"), true);
+  assert.equal(Bets.againstSelf(m, "m1", "m1"), false); assert.equal(Bets.againstSelf(m, "m0", "m2"), false, "a third manager takes whoever");
+  assert.equal(Bets.againstSelf({ game: { id: "g" } }, "m1", "NE"), false, "not a league bet");
+  assert.equal(Bets.againstSelf(m, null, "m2"), false);
+});

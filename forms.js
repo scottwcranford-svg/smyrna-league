@@ -557,6 +557,13 @@ export function submitBet(){
     state.draft=state.draft.slice(0,2);
     if(state.draft.length<2) state.draft.push({memberId:null,pick:"",picks:[],side:""});
     state.draft[1].side=weekly?(side0===state.draftSubject?state.draftOpp:state.draftSubject):(side0==="yes"?"no":"yes");
+    // nobody bets against their own team - not the proposer, and not whoever is being seated or invited across from them
+    if(!(state.editId&&state.admin)){
+      var probeBet={ league:{ subject:state.draftSubject, opp:weekly?state.draftOpp:undefined, outcome:oc.key } };
+      var clash=null;
+      state.draft.forEach(function(d){ var who=d.memberId||d.invite; if(!clash&&who&&Bets.againstSelf(probeBet,who,d.side)) clash=who; });
+      if(clash) return toast(clash===state.me?"You can't bet against your own team":mName(clash)+" can't bet against their own team");
+    }
     if(!name) name=Bets.leagueName(state.draftSubject,oc.key,members(),leagueWeek,state.draftOpp);
     if(!terms) terms=Bets.leagueTerms(oc.key);
   }

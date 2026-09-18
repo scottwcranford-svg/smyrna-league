@@ -150,6 +150,7 @@ export function takeSeat(id,i){
   if(entriesOf(bet).some(function(e){ return e.memberId===state.me; })) return toast("You’re already in this one");
   var seat=entriesOf(bet)[i]||{};
   if(seat.invite&&!seat.declined&&seat.invite!==state.me) return toast("That seat is held for "+mName(seat.invite));
+  if(Bets.againstSelf(bet,state.me,seat.side)) return toast("You can't bet against your own team");
 
   var ref=state.db?state.db.doc("bets/"+id):null;
   if(!ref){

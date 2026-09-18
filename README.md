@@ -199,7 +199,10 @@ does not exist — so replace an account by deleting it and using **Add user**.
   Smyrna League itself: a manager's own fantasy team and what happens to it (makes the
   playoffs, finishes 1st / top 3 / last in the regular season, wins the championship), yes
   and no as its two sides — or one of the week's Sleeper matchups, each side a team, like
-  a game bet. Name and terms write themselves.
+  a game bet. Nobody holds the side that pays when their own team fails: on your own team
+  you take the yes side (Not last, on "finishes last"), and in your own matchup you take
+  yourself; anyone else can take either side of a bet about you. Name and terms write
+  themselves.
   The proposer sets the stake (props default to the league stake; games have no default).
 - **You can only put yourself on a bet.** Other sides are open seats anyone can take, or
   invitations the named manager accepts or passes from the ticket. Pot-style bets let

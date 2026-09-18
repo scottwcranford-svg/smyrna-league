@@ -954,7 +954,7 @@ function sideHtml(e,i,b){
   // Invitations are accepted from the ticket's action row; open seats are taken here.
   // Not by someone already on the bet — the proposer sees the seat, not a button.
   var onIt=state.me&&entriesOf(b).some(function(x){ return x.memberId===state.me; });
-  var canTake=vacant&&state.me&&!isLocked(b)&&!invited&&!onIt;
+  var canTake=vacant&&state.me&&!isLocked(b)&&!invited&&!onIt&&!Bets.againstSelf(b,state.me,e.side);   // nobody bets against their own team
   return '<div class="'+cls+(invited?" invited":"")+'">'+
     (vacant?(invited?'<span class="avatar-wait">'+avatarHtml(invited,28)+"</span>":openAvatarHtml(28)):avatarHtml(e.memberId,28))+'<div>'+
     '<div class="side-pick">'+(b.game?logoHtml(e.side,18):"")+esc(pick)+"</div>"+
