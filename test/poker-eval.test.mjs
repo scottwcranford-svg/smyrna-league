@@ -63,3 +63,40 @@ test("the best five of seven: a straight on the board, a flush in the hole, a fu
 test("fewer than five cards is refused", () => {
   assert.throws(() => E.rank7(h("Ah Kh")));
 });
+
+// A second evaluator written another way - straight from the counts of the seven cards,
+// never trying five-card subsets - must agree with rank7 on who wins every deal.
+test("twenty thousand random deals: the same winner, or the same tie, as an evaluator written a different way", () => {
+  const val = c => "23456789TJQKA".indexOf(c[0]) + 2;
+  function indep(cards){
+    const vs = cards.map(val), bySuit = {}; cards.forEach(c => (bySuit[c[1]] = bySuit[c[1]] || []).push(val(c)));
+    const straightHigh = set => { const u = [...new Set(set)]; if (u.includes(14)) u.push(1); for (let h = 14; h >= 5; h--) if ([0, 1, 2, 3, 4].every(k => u.includes(h - k))) return h; return 0; };
+    const cnt = {}; vs.forEach(v => { cnt[v] = (cnt[v] || 0) + 1; });
+    const ranksWith = test => Object.keys(cnt).map(Number).filter(v => test(cnt[v])).sort((a, b) => b - a);
+    const kick = (excl, n) => [...new Set(vs)].filter(v => !excl.includes(v)).sort((a, b) => b - a).slice(0, n);
+    const fl = Object.values(bySuit).find(a => a.length >= 5), quads = ranksWith(n => n === 4), trips = ranksWith(n => n >= 3), pairs = ranksWith(n => n === 2);
+    if (fl && straightHigh(fl)) return [8, straightHigh(fl)];
+    if (quads.length) return [7, quads[0], kick([quads[0]], 1)[0]];
+    const under = ranksWith(n => n >= 2).filter(v => v !== trips[0]);
+    if (trips.length && under.length) return [6, trips[0], under[0]];
+    if (fl) return [5].concat(fl.sort((a, b) => b - a).slice(0, 5));
+    if (straightHigh(vs)) return [4, straightHigh(vs)];
+    if (trips.length) return [3, trips[0]].concat(kick([trips[0]], 2));
+    if (pairs.length >= 2) return [2, pairs[0], pairs[1], kick([pairs[0], pairs[1]], 1)[0]];
+    if (pairs.length) return [1, pairs[0]].concat(kick([pairs[0]], 3));
+    return [0].concat(kick([], 5));
+  }
+  const cmp = (a, b) => { for (let i = 0; i < 6; i++) { const d = (a[i] || 0) - (b[i] || 0); if (d) return Math.sign(d); } return 0; };
+  const pack = []; for (const su of "shdc") for (const r of "23456789TJQKA") pack.push(r + su);
+  let seed = 20260921; const rnd = n => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed % n; };
+  let ties = 0;
+  for (let i = 0; i < 20000; i++) {
+    const d = pack.slice(); for (let k = d.length - 1; k > 0; k--) { const j = rnd(k + 1); const t = d[k]; d[k] = d[j]; d[j] = t; }
+    const board = d.slice(4, 9), h1 = d.slice(0, 2).concat(board), h2 = d.slice(2, 4).concat(board);
+    const r1 = E.rank7(h1), r2 = E.rank7(h2);
+    assert.equal(r1.category, indep(h1)[0], h1.join(" "));
+    assert.equal(Math.sign(r1.score - r2.score), cmp(indep(h1), indep(h2)), h1.join(" ") + " against " + h2.join(" "));
+    if (r1.score === r2.score) ties++;
+  }
+  assert.ok(ties > 400 && ties < 1200, "about one deal in twenty-five is a genuine tie: " + ties);
+});

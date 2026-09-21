@@ -119,12 +119,86 @@ test("side pots: the short stack can only win what everyone matched; the odd cen
   assert.equal(sum(S), 0);
 });
 
+// a has $5 and aces, b and c have $100 each with kings and queens, and the board helps nobody.
+const SHORT = () => table([["a", 0, 500], ["b", 1, 10000], ["c", 2, 10000]], { deck: deck("Ah", "Ad", "Kh", "Kd", "Qh", "Qd", "2c", "7s", "9d", "3c", "4s") });
+const potsOf = S => S.table.pots.map(p => [p.amount, p.eligible]);
+
+test("a short all-in with two callers who play on: the side pot is theirs, the main pot is a showdown for all three", () => {
+  let S = SHORT();
+  S = act(S, "a", "allin");
+  assert.deepEqual(potsOf(S), [[800, [0, 1, 2]]], "the blinds haven't answered yet: one pot, no side pot made of a bet on its way round");
+  S = act(S, "b", "call"); S = act(S, "c", "call");
+  assert.equal(S.table.street, "flop"); assert.equal(S.table.toAct, 1, "a is all in: only b and c are asked");
+  assert.deepEqual(potsOf(S), [[1500, [0, 1, 2]]]);
+  S = act(S, "b", "bet", 1000);
+  assert.deepEqual(potsOf(S), [[1500, [0, 1, 2]], [1000, [1, 2]]], "c may yet call, so the bet is the side pot's, not a pot of b's own");
+  S = act(S, "c", "call");
+  S = act(S, "b", "check"); S = act(S, "c", "bet", 2000); S = act(S, "b", "call");
+  assert.deepEqual(potsOf(S), [[1500, [0, 1, 2]], [6000, [1, 2]]]);
+  S = act(S, "b", "check"); S = act(S, "c", "check");
+  assert.deepEqual(S.table.lastHand.winners.map(w => [w.memberId, w.amount]), [["a", 1500], ["b", 6000]]);
+  assert.equal(S.table.lastText, "a wins the $15 main pot with a pair of aces · b wins the $60 side pot with a pair of kings", "two pots, two winners: not a split");
+  assert.deepEqual([0, 1, 2].map(i => seat(S, i).stack), [1500, 12500, 6500]); assert.equal(sum(S), 0);
+});
+
+test("the side pot folded away: the hand still runs out for the all-in player, and the unmatched bet goes back", () => {
+  let S = SHORT();
+  S = act(S, "a", "allin"); S = act(S, "b", "call"); S = act(S, "c", "call");
+  S = act(S, "b", "bet", 1000); S = act(S, "c", "call");
+  S = act(S, "b", "bet", 3000); S = act(S, "c", "fold");
+  assert.equal(S.table.status, "between"); assert.equal(S.table.lastHand.board.length, 5, "c folding doesn't end it: a's aces are still owed a showdown");
+  assert.deepEqual(S.table.lastHand.shown, { 0: ["Ah", "Ad"], 1: ["Kh", "Kd"] });
+  assert.deepEqual(S.table.lastHand.winners.map(w => [w.memberId, w.amount]), [["a", 1500], ["b", 2000]], "b's $30 was never matched, so it isn't winnings");
+  assert.equal(S.table.lastHand.pot, 3500);
+  assert.equal(S.table.lastText, "a wins the $15 main pot with a pair of aces · b wins the $20 side pot with a pair of kings");
+  assert.deepEqual([0, 1, 2].map(i => seat(S, i).stack), [1500, 10500, 8500]); assert.equal(sum(S), 0);
+});
+
+test("split pots beside side pots: a tie for the main pot, a tie for the side pot, and a board that plays for three uneven stacks", () => {
+  const playOn = [["a", "allin"], ["b", "call"], ["c", "call"], ["b", "bet", 1000], ["c", "call"], ["b", "check"], ["c", "check"], ["b", "check"], ["c", "check"]];
+  const run = (S, moves) => moves.reduce((s, m) => act(s, m[0], m[1], m[2]), S);
+  const paidInFull = S => assert.equal(S.table.lastHand.winners.reduce((n, w) => n + w.amount, 0), S.table.lastHand.pot, "every cent of the pot is paid");
+  // a and b both hold an ace and the board's K Q J play as kickers; c has nothing
+  let S = run(table([["a", 0, 500], ["b", 1, 10000], ["c", 2, 10000]], { deck: deck("Ah", "2c", "Ad", "3c", "7h", "8h", "As", "Kd", "Qc", "Jh", "4s") }), playOn);
+  assert.deepEqual(S.table.lastHand.winners.map(w => [w.memberId, w.amount]), [["a", 750], ["b", 2750]], "half the main pot each, and the side pot to the one who was in it");
+  assert.equal(S.table.lastText, "b and a split the $15 main pot with a pair of aces · b wins the $20 side pot with a pair of aces");
+  paidInFull(S); assert.equal(sum(S), 0);
+  // a's aces take the main pot; b and c both hold a king with the same kickers
+  S = run(table([["a", 0, 500], ["b", 1, 10000], ["c", 2, 10000]], { deck: deck("Ah", "Ad", "Kh", "2c", "Kd", "3c", "Ks", "Qc", "Jh", "9s", "4d") }), playOn);
+  assert.deepEqual(S.table.lastHand.winners.map(w => [w.memberId, w.amount]), [["a", 1500], ["b", 1000], ["c", 1000]]);
+  assert.equal(S.table.lastText, "a wins the $15 main pot with a pair of aces · b and c split the $20 side pot with a pair of kings");
+  paidInFull(S); assert.equal(sum(S), 0);
+  // $5, $10 and $20 all in and a royal flush on the board: everyone gets their own money back
+  S = run(table([["a", 0, 500], ["b", 1, 1000], ["c", 2, 2000]], { deck: deck("2c", "3d", "4c", "5d", "6c", "7d", "As", "Ks", "Qs", "Js", "Ts") }), [["a", "allin"], ["b", "allin"], ["c", "call"]]);
+  assert.deepEqual([0, 1, 2].map(i => seat(S, i).stack), [500, 1000, 2000]);
+  assert.equal(S.table.lastText, "b, c and a split the $15 main pot with a royal flush · b and c split the $10 side pot with a royal flush");
+  paidInFull(S); assert.equal(sum(S), 0);
+  // four-handed, the small blind folds a dollar in: $7 three ways, the odd cent to the first winner left of the button
+  S = table([["a", 0, 10000], ["b", 1, 10000], ["c", 2, 10000], ["d", 3, 10000]], { deck: deck("2c", "3d", "4c", "5d", "6c", "7d", "8c", "9d", "As", "Ks", "Qs", "Js", "Ts") });
+  S = run(S, [["d", "call"], ["a", "call"], ["b", "fold"], ["c", "check"]].concat(...[1, 2, 3].map(() => [["c", "check"], ["d", "check"], ["a", "check"]])));
+  assert.deepEqual(S.table.lastHand.winners.map(w => [w.memberId, w.amount]), [["a", 233], ["c", 234], ["d", 233]]);
+  assert.equal(S.table.lastText, "a $2.33, c $2.34, d $2.33 split it"); assert.deepEqual(Object.keys(S.table.lastHand.shown), ["0", "2", "3"], "the folded hand is never shown");
+  paidInFull(S); assert.equal(sum(S), 0);
+});
+
+test("a shove nobody can cover: the difference comes back, and there is no side pot of one", () => {
+  let S = table([["a", 0, 20000], ["b", 1, 5000]], { deck: deck("2c", "7d", "Ah", "Ad", "Ks", "Qs", "9h", "4c", "3d") });
+  S = act(S, "a", "allin");
+  assert.deepEqual(potsOf(S), [[20200, [0, 1]]], "b hasn't answered");
+  S = act(S, "b", "call");
+  assert.equal(S.table.status, "between");
+  assert.deepEqual(S.table.lastHand.winners.map(w => [w.memberId, w.amount]), [["b", 10000]]); assert.equal(S.table.lastHand.pot, 10000, "$50 each; a's other $150 was never in it");
+  assert.equal(S.table.lastText, "b wins $100 with a pair of aces");
+  assert.equal(seat(S, 0).stack, 15000); assert.equal(seat(S, 1).stack, 10000); assert.ok(!seat(S, 0).busted, "a is not broke: $150 never left"); assert.equal(sum(S), 0);
+});
+
 test("everyone folds to one player: the pot without a reveal", () => {
   let S = table([["a", 0, 10000], ["b", 1, 10000], ["c", 2, 10000]]);
   S = act(S, "a", "raise", 600); S = act(S, "b", "fold"); S = act(S, "c", "fold");
   assert.equal(S.table.status, "between");
   assert.deepEqual(S.table.lastHand.shown, {}); assert.equal(S.table.lastHand.winners[0].text, null);
-  assert.equal(S.table.lastText, "a takes $9");
+  assert.equal(S.table.lastText, "a takes $5", "the blinds and the $2 of a's raise they could have matched; the other $4 came straight back");
+  assert.equal(S.table.lastHand.pot, 500);
   assert.equal(seat(S, 0).stack, 10300); assert.equal(seat(S, 1).stack, 9900); assert.equal(seat(S, 2).stack, 9800);
 });
 
@@ -134,7 +208,7 @@ test("the clock: a timeout checks or folds; two in a row sits you out; ten minut
   assert.equal(E.due(S.table, S.now + E.CLOCK), true);
   S = op(S, null, { op: "tick" }, E.CLOCK);
   assert.equal(seat(S, 0).timeouts, 1); assert.equal(seat(S, 0).lastAction.op, "fold", "folded for them");
-  assert.equal(S.table.status, "between"); assert.equal(seat(S, 1).stack, 10100); assert.equal(S.table.lastText, "b takes $3");
+  assert.equal(S.table.status, "between"); assert.equal(seat(S, 1).stack, 10100); assert.equal(S.table.lastText, "b takes $2", "a's blind and the dollar of b's that covered it");
   S = op(S, null, { op: "tick" }, E.BETWEEN);   // hand 2: b is the button and acts first
   assert.equal(S.table.button, 1); assert.equal(S.table.toAct, 1);
   S = act(S, "b", "call");
@@ -216,4 +290,7 @@ test("pots: layers by what each player put in, folded money in the lowest pots",
   assert.deepEqual(E.pots([s(0, "allin", 500), s(1, "in", 1000), s(2, "in", 1000), s(3, "folded", 300)]),
     [{ amount: 1800, eligible: [0, 1, 2] }, { amount: 1000, eligible: [1, 2] }]);
   assert.deepEqual(E.pots([s(0, "in", 500), s(1, "folded", 1000)]), [{ amount: 1500, eligible: [0] }], "a fold above the top live level still goes in");
+  assert.deepEqual(E.pots([s(0, "allin", 500), s(1, "in", 3000), s(2, "in", 1000), s(3, "allin", 2000)]),
+    [{ amount: 2000, eligible: [0, 1, 2, 3] }, { amount: 3500, eligible: [1, 2, 3] }, { amount: 1000, eligible: [1, 2] }], "only an all-in makes a layer, and a player with a bet to answer still counts for the pots above them");
+  assert.deepEqual(E.pots([s(0, "in", 100), s(1, "in", 200), s(2, "in", 600)]), [{ amount: 900, eligible: [0, 1, 2] }], "nobody all in: one pot, however uneven the street so far");
 });

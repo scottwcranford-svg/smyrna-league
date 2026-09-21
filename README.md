@@ -290,8 +290,10 @@ House takes nothing: the full pot goes to the winner, zero-sum.
   them: nothing goes to Settle up, and the money changes hands between you when the
   table closes. Button to the next seated player; heads-up the button posts the small
   blind and acts first before the flop; minimum raise is the last full raise; a short
-  all-in doesn't reopen betting; side pots by what each player put in; odd cents to the
-  first winner left of the button; everyone folding to one player pays without a reveal.
+  all-in doesn't reopen betting; side pots by what each all-in player put in, and the
+  players who covered them play on for the side pot; a bet nobody matched goes back to
+  the bettor and is never a pot or winnings; the result names the main pot and the side
+  pot when they went different ways; odd cents to the first winner left of the button; everyone folding to one player pays without a reveal.
   The dealer is a Cloud Function (see *Notifications*); no page can see another's cards.
 
 ## Data

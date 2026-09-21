@@ -62,25 +62,43 @@ function nextSeat(t, from, pred){
 const money = c => { const v = Math.abs(c) / 100; return "$" + (Number.isInteger(v) ? v : v.toFixed(2)); };
 
 /* ---- the pots ----
-   Layered from what each player has put in this hand. Each all-in level makes a pot that
-   only players who reached it can win; anything a folded player put in above the top
-   live level goes into the last pot. */
+   Layered from what each player has put in this hand. Only an all-in makes a layer: what
+   everyone put in up to that player's all is a pot they can win, and what the others put
+   in above it is the next. A player who still has a bet to answer counts for every pot
+   until they fold - a bet on its way round the table is not a side pot of its own. By a
+   showdown everyone still able to bet has matched the top, so who can win what is exact.
+   Anything a folded player put in above the top live level goes into the last pot. */
 function pots(seats){
   const all = seats.filter(s => s && s.totalIn > 0);
   const liveSeats = all.filter(s => s.status === "in" || s.status === "allin");
-  const levels = [...new Set(liveSeats.map(s => s.totalIn))].sort((a, b) => a - b);
+  const top = liveSeats.reduce((n, s) => Math.max(n, s.totalIn), 0);
+  const levels = [...new Set(liveSeats.filter(s => s.status === "allin").map(s => s.totalIn).concat(top ? [top] : []))].sort((a, b) => a - b);
   const out = [];
   let prev = 0, dealt = 0;
   for (const L of levels) {
     let amount = 0;
     all.forEach(s => { amount += Math.max(0, Math.min(s.totalIn, L) - prev); });
-    out.push({ amount, eligible: liveSeats.filter(s => s.totalIn >= L).map(s => s.seat) });
+    out.push({ amount, eligible: liveSeats.filter(s => s.totalIn >= L || s.status === "in").map(s => s.seat) });
     dealt += amount; prev = L;
   }
   const total = all.reduce((n, s) => n + s.totalIn, 0);
   if (out.length && total > dealt) out[out.length - 1].amount += total - dealt;
   if (!out.length && total) out.push({ amount: total, eligible: liveSeats.map(s => s.seat) });
   return out;
+}
+
+// A bet nobody matched goes back to whoever made it, before the pots are made: what the
+// biggest stack put in above the next biggest was never at risk. Folded money counts as
+// matching, up to what it was; a bettor who then folded (by leaving) gets nothing back.
+function returnUncalled(S){
+  const t = S.table;
+  const byIn = seated(t).filter(s => s.totalIn > 0).sort((a, b) => b.totalIn - a.totalIn);
+  if (!byIn.length) return;
+  const s = byIn[0], over = s.totalIn - (byIn[1] ? byIn[1].totalIn : 0);
+  if (over <= 0 || (s.status !== "in" && s.status !== "allin")) return;
+  s.totalIn -= over; s.stack += over; s.bet = Math.max(0, s.bet - over);
+  if (s.status === "allin") s.status = "in";
+  S.secret.actions.push({ seat: s.seat, op: "return", amount: over });
 }
 
 /* ---- the session's money ---- */
@@ -251,6 +269,7 @@ function afterAction(S, ctx, from){
 function endStreet(S, ctx){
   const t = S.table;
   if (t.street === "river") return endHand(S, ctx);
+  returnUncalled(S);
   seated(t).forEach(s => { s.bet = 0; });
   t.currentBet = 0; t.minRaise = t.blinds.bb; t.acted = []; t.capped = [];
   dealStreet(S);
@@ -320,9 +339,10 @@ function startHand(S, ctx){
 
 function endHand(S, ctx){
   const t = S.table, at = iso(ctx.now);
+  returnUncalled(S);
   const players = live(t);
   const total = seated(t).reduce((n, s) => n + s.totalIn, 0);
-  const won = {}, shown = {}, hands = {};
+  const won = {}, shown = {}, hands = {}, potsWon = [];
   if (players.length === 1) {
     won[players[0].seat] = total;
   } else {
@@ -334,15 +354,14 @@ function endHand(S, ctx){
       const ordered = []; for (let k = 1; k <= SEATS; k++) { const i = (t.button + k) % SEATS; if (winners.indexOf(i) >= 0) ordered.push(i); }
       const share = Math.floor(p.amount / ordered.length); let rest = p.amount - share * ordered.length;
       ordered.forEach(i => { won[i] = (won[i] || 0) + share + (rest > 0 ? 1 : 0); if (rest > 0) rest--; });
+      potsWon.push({ amount: p.amount, seats: ordered });
     });
   }
   const winners = Object.keys(won).map(Number).filter(i => won[i] > 0).map(i => { const s = t.seats[i]; s.stack += won[i];
     return { seat: i, memberId: s.memberId, name: s.name, amount: won[i], cat: hands[i] ? hands[i].category : null, text: hands[i] ? hands[i].text : null }; });
   t.lastHand = { no: t.handNo, at, board: t.board.slice(), pot: total, winners, shown };
   S.effects.history.push({ no: t.handNo, at, board: t.board.slice(), pot: total, winners, shown, actions: S.secret.actions.slice() });
-  t.lastText = winners.length === 1
-    ? winners[0].name + (winners[0].text ? " wins " + money(winners[0].amount) + " with " + winners[0].text : " takes " + money(winners[0].amount))
-    : winners.map(w => w.name + " " + money(w.amount)).join(", ") + " split it";
+  t.lastText = resultText(t, winners, potsWon);
   S.session.hands += 1;
   S.secret.hole = {}; S.secret.actions = [];
   t.street = "done"; t.toAct = null; t.deadline = null; t.acted = []; t.capped = []; t.currentBet = 0; t.pots = [];
@@ -356,6 +375,28 @@ function endHand(S, ctx){
   if (t.closing) return closeTable(S, ctx);
   afterSeatsChange(S, ctx);
   if (t.status === "between") t.deadline = iso(ctx.now + BETWEEN);
+}
+
+// The hand in a line. One winner takes it; one pot shared is a split; and when an all-in
+// made side pots that went different ways, each is named - the main pot to one hand, the
+// side pot to another - with pots that went to the same players counted together.
+function resultText(t, winners, potsWon){
+  if (winners.length === 1) return winners[0].name + (winners[0].text ? " wins " + money(winners[0].amount) + " with " + winners[0].text : " takes " + money(winners[0].amount));
+  const groups = [];
+  potsWon.forEach((p, i) => {
+    const key = p.seats.join(",");
+    let g = groups.find(x => x.key === key);
+    if (!g) groups.push(g = { key, seats: p.seats, amount: 0, n: 0, main: false });
+    g.amount += p.amount; g.n += 1; if (i === 0) g.main = true;
+  });
+  if (groups.length <= 1) return winners.map(w => w.name + " " + money(w.amount)).join(", ") + " split it";
+  const textOf = i => (winners.find(w => w.seat === i) || {}).text;
+  return groups.map(g => {
+    const what = "the " + money(g.amount) + " " + (g.main ? (g.n > 1 ? "main and side pots" : "main pot") : (g.n > 1 ? "side pots" : "side pot"));
+    const names = g.seats.map(i => t.seats[i].name), hand = textOf(g.seats[0]) ? " with " + textOf(g.seats[0]) : "";   // a tie is one hand, held twice
+    if (names.length > 1) return names.slice(0, -1).join(", ") + " and " + names[names.length - 1] + " split " + what + hand;
+    return names[0] + " wins " + what + hand;
+  }).join(" · ");
 }
 
 function cashOut(S, i, ctx, why){
