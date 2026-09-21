@@ -258,13 +258,27 @@ export function matchLabel(b){
 }
 
 /* ---- settling without a button ----
-   A game bet settles from the final score. A stat bet settles once every game of
-   its period is final and the standings were refreshed after the last one ended;
-   the leader on the tracked stat wins, a tie is a push, and a bet tracking several
-   stats goes to whoever leads the most of them. Season bets run through LAST_WEEK.
-   Returns null while there's nothing to decide yet. */
+   A game bet settles from the final score. A weekly stat bet settles once every game
+   its picks play in is final and the stats were refreshed after the last one ended -
+   not the whole week's slate, so a Thursday-and-Sunday bet doesn't wait on Monday
+   night. The whole slate is the fallback when a pick has no team or no game that
+   week. The leader on the tracked stat wins, a tie is a push, and a bet tracking
+   several stats goes to whoever leads the most of them. Season bets run through
+   LAST_WEEK, every game of it. Returns null while there's nothing to decide yet. */
 
 export const SETTLE_LAG=4*3600000;   // a game is over this long after kickoff; stats after that count
+
+// The week's games the bet's picks play in, or null when that can't be said for every
+// pick (a pick without a team, a team the slate has no game for): then the whole week.
+export function ownGames(b,slate){
+  var teams={}, any=false, missing=false;
+  entriesOf(b).forEach(function(e){ (e.picks||[]).forEach(function(p){ any=true; if(p&&p.team) teams[p.team]=true; else missing=true; }); });
+  if(!any||missing) return null;
+  var own=[], seen={};
+  (slate||[]).forEach(function(g){ if(teams[g.away]||teams[g.home]){ own.push(g); seen[g.away]=true; seen[g.home]=true; } });
+  if(Object.keys(teams).some(function(t){ return !seen[t]; })) return null;
+  return own;
+}
 
 export function ordinal(n){ n=Number(n)||0; var s=["th","st","nd","rd"], v=n%100; return n+(s[(v-20)%10]||s[v]||s[0]); }
 
@@ -321,7 +335,9 @@ export function autoResult(b,games,now,league){
   var S=b.stats; if(!S||!Array.isArray(S.rows)||S.rows.length<2) return null;
   var w=Number(b.week)||0, through=w||LAST_WEEK;
   var slate=allGames(games).filter(function(x){ return x.week===through; });
-  if(!slate.length||slate.some(function(x){ return x.status!=="final"; })) return null;
+  var notFinal=function(x){ return x.status!=="final"; }, weekDone=slate.length>0&&!slate.some(notFinal);
+  if(w){ var own=ownGames(b,slate); if(own) slate=own; }
+  if(!slate.length||slate.some(notFinal)) return null;
   var lastKick=0; slate.forEach(function(x){ var t=Date.parse(x.date); if(t>lastKick) lastKick=t; });
   var fresh=Date.parse(S.updatedAt||"");
   if(isNaN(fresh)||fresh<lastKick+SETTLE_LAG||(now||Date.now())<lastKick+SETTLE_LAG) return null;
@@ -339,13 +355,13 @@ export function autoResult(b,games,now,league){
   });
   var top=0, tops=[];
   Object.keys(wins).forEach(function(id){ if(wins[id]>top){ top=wins[id]; tops=[id]; } else if(wins[id]===top) tops.push(id); });
-  var period=w?"Week "+w:"Season";
+  var period=(w?"Week "+w:"Season")+(weekDone?" complete":" · its games final");
   // A bet posted with the tiebreaker (every stat bet since it existed): when the stats won
   // are level, the first stat decides it - if its leader is one of those level.
   if(tops.length>1&&b.tiebreak&&tracks.length>1&&firstLeaders&&firstLeaders.length===1&&tops.indexOf(firstLeaders[0])>=0)
-    return { winner:firstLeaders[0], note:period+" complete · level on stats, "+String(tracks[0].metric||tracks[0].stat||"the first stat").replace(/ · (combined|best of each side)$/,"")+" decided it" };
-  if(tops.length!==1) return { winner:"push", note:period+" complete · tied" };
-  return { winner:tops[0], note:period+" complete · "+(S.through||"") };
+    return { winner:firstLeaders[0], note:period+" · level on stats, "+String(tracks[0].metric||tracks[0].stat||"the first stat").replace(/ · (combined|best of each side)$/,"")+" decided it" };
+  if(tops.length!==1) return { winner:"push", note:period+" · tied" };
+  return { winner:tops[0], note:period+" · "+(S.through||"") };
 }
 
 /* ---- how a bet is scored, in plain words ----
@@ -401,7 +417,7 @@ export function scoringText(b){
     out="Each stat is its own contest "+period+": "+names.slice(0,-1).join(", ")+" and "+names[names.length-1]+". Whoever wins more of them takes it. "+side+pot+
       "A stat that ends tied counts for nobody. "+(b.tiebreak?"If the stats won are level, the first one listed ("+lower1(statName(tracks[0]))+") decides it; if that's tied too, it's a push.":"If the stats won are level, it's a push.");
   }
-  return out+" Settles once every game "+(w?"that week":"through Week "+LAST_WEEK)+" is final.";
+  return out+" Settles once every game "+(w?"its picks play in":"through Week "+LAST_WEEK)+" is final.";
 }
 
 /* ---- auto-written names and terms ---- */

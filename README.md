@@ -225,10 +225,12 @@ does not exist — so replace an account by deleting it and using **Add user**.
   game bet shows score, quarter, clock and possession and tags the side that's ahead.
   A scores ticker runs under the header.
 - **Bets settle themselves.** A game bet settles from the final score (winner, or the
-  total against the line; a tie on the line is a push). A stat bet settles once every
-  game of its period is final and the standings have refreshed after the last one
-  ended: the leader on the stat wins, a tie is a push, and a bet tracking several stats
-  goes to whoever leads the most of them. Season bets run through week 17. A league
+  total against the line; a tie on the line is a push). A weekly stat bet settles once
+  every game its picks play in is final and the stats have refreshed after the last one
+  ended, so a Thursday-and-Sunday bet doesn't wait on Monday night (the whole week when a
+  pick has no team or no game that week): the leader on the stat wins, a tie is a push,
+  and a bet tracking several stats goes to whoever leads the most of them. Season bets
+  run through week 17, every game of it. A league
   result bet settles from Sleeper: the playoff field from its winners bracket once the
   regular season is over (Sleeper seeds it from the live table all season, with its own
   tiebreakers, so until then the ticket says "as it stands"); the regular-season places

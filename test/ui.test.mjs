@@ -690,7 +690,7 @@ test("how it's scored: on every ticket, live in the propose form, and in the Joi
     return res;
   });
   assert.deepEqual(out.tickets, ["How it’s scored Both teams' final points are added together. Over 44.5 wins if the total is higher, Under if it's lower. Exactly 44.5 is a push.",
-    "How it’s scored Each stat is its own contest in Week 5: receiving yards and receptions. Whoever wins more of them takes it. However many join, the one leader takes every stake. A stat that ends tied counts for nobody. If the stats won are level, the first one listed (receiving yards) decides it; if that's tied too, it's a push. Settles once every game that week is final."]);
+    "How it’s scored Each stat is its own contest in Week 5: receiving yards and receptions. Whoever wins more of them takes it. However many join, the one leader takes every stake. A stat that ends tied counts for nobody. If the stats won are level, the first one listed (receiving yards) decides it; if that's tied too, it's a push. Settles once every game its picks play in is final."]);
   assert.equal(out.ticketStyle, true);
   assert.match(out.oneStat, /Most receiving yards in Week 6 wins\./);
   assert.match(out.twoStats, /Each stat is its own contest in Week 6: receptions and receiving yards\..*the first one listed \(receptions\) decides it/, "adding a stat rewrites it, in the order the ticket lists them");
