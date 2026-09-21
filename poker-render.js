@@ -110,7 +110,9 @@ function tableHtml(T,me,mine){
   var board=(T.board||[]).map(function(c){ return cardHtml(c); }).join("");
   for(var i=(T.board||[]).length;i<5;i++) board+=slotHtml();
   var pots=(T.pots||[]);
-  var potText=T.status==="hand"?(pots.length?money(pots[0].amount)+" pot"+(pots.length>1?" · side "+pots.slice(1).map(function(p){ return money(p.amount); }).join(", "):""):money(Poker.potTotal(T))+" pot"):(T.lastHand?money(T.lastHand.pot)+" pot":"");
+  // one number while everyone can still bet; the layers only once somebody is all in
+  var anyAllIn=Poker.seats(T).some(function(s){ return s.status==="allin"; });
+  var potText=T.status==="hand"?(pots.length>1&&anyAllIn?money(pots[0].amount)+" pot · side "+pots.slice(1).map(function(p){ return money(p.amount); }).join(", "):money(Poker.potTotal(T))+" pot"):(T.lastHand?money(T.lastHand.pot)+" pot":"");
   return '<div class="pk-table" data-status="'+esc(T.status)+'">'
     +'<div class="pk-center"><span class="pk-street lbl">'+street+'</span><div class="pk-board">'+board+'</div><span class="pk-pot num">'+potText+'</span><span class="pk-last">'+esc(T.lastText||"")+"</span></div>"
     +'<div class="pk-seats">'+seatsHtml+"</div></div>";

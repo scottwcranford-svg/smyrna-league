@@ -99,7 +99,7 @@ test("acting: wrong player, the engine's refusals, then a hand to the end and it
   const T = R.table();
   assert.equal(T.status, "between"); assert.equal(T.lastHand.winners[0].memberId, "b");
   const hist = R.db.docs.get("books/k1/pokerHistory/" + T.sessionId);
-  assert.equal(hist.hands.length, 1); assert.equal(hist.hands[0].no, 1); assert.deepEqual(hist.hands[0].actions, [[0, "fold", 0]]);
+  assert.equal(hist.hands.length, 1); assert.equal(hist.hands[0].no, 1); assert.deepEqual(hist.hands[0].actions, [{ seat: 0, op: "fold", amount: 0 }], "objects, not nested arrays, which Firestore refuses");
   r = await R.stamped("tb", { op: "leave" }); assert.equal(r.status, 200);
   assert.equal(R.db.docs.has("books/k1/pokerHole/u_b"), false, "gone with the seat");
   assert.ok(R.db.docs.has("books/k1/pokerHole/u_a"));

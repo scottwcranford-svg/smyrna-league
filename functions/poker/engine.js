@@ -147,7 +147,7 @@ function leave(S, ev, ctx){
   const s = seatOf(S.table, ctx.me.id); if (!s) refuse("not_seated", "You're not at the table");
   if (inHand(s) && S.table.status === "hand") {
     s.leaving = true;
-    if (s.status === "in") { s.status = "folded"; s.lastAction = { op: "fold", amount: 0, at: iso(ctx.now) }; S.secret.actions.push([s.seat, "fold", 0]); }
+    if (s.status === "in") { s.status = "folded"; s.lastAction = { op: "fold", amount: 0, at: iso(ctx.now) }; S.secret.actions.push({ seat: s.seat, op: "fold", amount: 0 }); }
     S.table.lastText = ctx.me.name + " is leaving after this hand";
     if (S.table.toAct === s.seat || live(S.table).length <= 1) afterAction(S, ctx, s.seat);
     return;
@@ -161,7 +161,7 @@ function sitOut(S, ev, ctx){
   if (s.satOutAt) return;
   s.satOutAt = iso(ctx.now);
   if (S.table.status === "hand" && s.status === "in") {
-    s.status = "folded"; s.lastAction = { op: "fold", amount: 0, at: iso(ctx.now) }; S.secret.actions.push([s.seat, "fold", 0]);
+    s.status = "folded"; s.lastAction = { op: "fold", amount: 0, at: iso(ctx.now) }; S.secret.actions.push({ seat: s.seat, op: "fold", amount: 0 });
     S.table.lastText = ctx.me.name + " sits out";
     if (S.table.toAct === s.seat || live(S.table).length <= 1) afterAction(S, ctx, s.seat);
     return;
@@ -227,7 +227,7 @@ function doAction(S, s, action, amount, ctx, timedOut){
   if (t.acted.indexOf(s.seat) < 0) t.acted.push(s.seat);
   s.lastAction = { op: action, amount, at };
   if (timedOut) { s.timeouts += 1; text += " (time)"; } else s.timeouts = 0;
-  S.secret.actions.push([s.seat, action, amount]);
+  S.secret.actions.push({ seat: s.seat, op: action, amount });
   t.lastText = text;
   if (timedOut && s.timeouts >= TIMEOUTS_OUT && !s.satOutAt) { s.satOutAt = iso(ctx.now); S.effects.notices.push({ kind: "autoOut", memberId: s.memberId }); }
   afterAction(S, ctx, s.seat);
