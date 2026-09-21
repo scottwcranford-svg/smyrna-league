@@ -68,11 +68,28 @@ export function seatOrder(t,me){
   return out;
 }
 // Where seat `off` sits on the oval, as percentages: you at the bottom, the rest round.
-export function seatXY(off,n){
+function ovalXY(off,n,rx,ry){
   n=n||SEATS;
   var a=(90+off*360/n)*Math.PI/180;
-  return { x:Math.round((50+44*Math.cos(a))*10)/10, y:Math.round((50+42*Math.sin(a))*10)/10 };
+  return { x:Math.round((50+rx*Math.cos(a))*10)/10, y:Math.round((50+ry*Math.sin(a))*10)/10 };
 }
+export function seatXY(off,n){ return ovalXY(off,n,44,42); }
+// A seat's bet, on the felt between it and the board.
+export function betXY(off,n){ return ovalXY(off,n,28,27); }
+
+// Who posted the blinds, read off the button the way the dealer does it (engine.js
+// startHand): the dealt-in seats clockwise from the button, small then big; heads-up the
+// button is the small blind. Nobody leaves a seat mid-hand, so this holds to the hand's end.
+export function blindSeats(t){
+  var none={ sb:null, bb:null };
+  if(!t||t.status!=="hand"||t.button==null) return none;
+  var order=[];
+  for(var k=1;k<=SEATS;k++){ var i=(t.button+k)%SEATS; if(inHand(t.seats&&t.seats[i])) order.push(i); }
+  if(order.length<2) return none;
+  return order.length===2?{ sb:t.button, bb:order[0] }:{ sb:order[0], bb:order[1] };
+}
+// What's already been swept into the middle: the pot less the bets still in front of seats.
+export function streetBets(t){ return seats(t).reduce(function(n,s){ return n+(Number(s.bet)||0); },0); }
 
 // The session tally: in, out, on the table and net per manager, best night first.
 export function sessionRows(session){

@@ -283,7 +283,8 @@ House takes nothing: the full pot goes to the winner, zero-sum.
   hand. Thirty seconds to act; a timeout checks or folds, two in a row sits you out, ten
   minutes sat out cashes you out. Sit out, add chips (at the next deal), leave (cashed out
   at your stack; mid-hand you fold first). The table shows the seats round an oval (a
-  list on a phone), the board and pots, your own cards, the last hand with every hand
+  list on a phone), the dealer button and the blinds as discs on their seats, each bet as
+  chips on the felt in front of its seat, the board and pots, your own cards, the last hand with every hand
   shown at a showdown, and the session tally — what each manager put in, took out and
   is up or down — with a suggested settle-up. Chips are dollars, but the app only counts
   them: nothing goes to Settle up, and the money changes hands between you when the

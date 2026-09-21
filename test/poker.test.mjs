@@ -63,6 +63,23 @@ test("seats run clockwise from the one after yours and end with you; you sit at 
   assert.ok(P.seatXY(2).x < 50 && P.seatXY(8).x > 50, "left round the bottom, right round the top");
 });
 
+test("the blinds are read off the button as the dealer posts them; a bet sits on the felt inside its seat", () => {
+  const t = table();   // button on seat 2 (folded, but dealt in); 0 and 1 follow it
+  assert.deepEqual(P.blindSeats(t), { sb: 0, bb: 1 });
+  const four = table({ button: 0 }); four.seats[5] = seat(5, { status: "waiting" }); four.seats[7] = seat(7, { status: "out" });
+  assert.deepEqual(P.blindSeats(four), { sb: 1, bb: 2 }, "a seat waiting for the next hand or sitting out posted nothing");
+  const hu = table({ button: 1 }); hu.seats[2] = null;
+  assert.deepEqual(P.blindSeats(hu), { sb: 1, bb: 0 }, "heads-up the button is the small blind");
+  assert.deepEqual(P.blindSeats(table({ status: "between" })), { sb: null, bb: null });
+  assert.deepEqual(P.blindSeats(null), { sb: null, bb: null });
+  assert.equal(P.streetBets(t), 1200); assert.equal(P.potTotal(t) - P.streetBets(t), 400, "what's been swept into the middle");
+  assert.deepEqual(P.betXY(0), { x: 50, y: 77 }); assert.deepEqual(P.betXY(5), { x: 50, y: 23 });
+  for (let off = 0; off < 10; off++) {
+    const s = P.seatXY(off), b = P.betXY(off), d = p => Math.hypot(p.x - 50, p.y - 50);
+    assert.ok(d(b) < d(s) - 10, "well inside its seat");
+  }
+});
+
 test("the session tally: net as it stands, best night first, and the nets ledger.js can pair up", () => {
   const session = { byId: { a: { in: 20000, out: 0, onTable: 18600 }, b: { in: 20000, out: 0, onTable: 23000 }, c: { in: 10000, out: 1900, onTable: 0 }, d: { in: 10000, out: 0, onTable: 16500 } } };
   assert.deepEqual(P.sessionRows(session).map(r => [r.id, r.net]), [["d", 6500], ["b", 3000], ["a", -1400], ["c", -8100]]);

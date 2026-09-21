@@ -2288,6 +2288,7 @@ test("the poker table: seats round the oval, the actor and dealer marked, my car
   const { p, errors } = await page();
   const out = await p.evaluate(async (DOC, SESSION) => {
     const { state } = await import("./state.js?v=dev"); const V = await import("./render.js?v=dev"); const PR = await import("./poker-render.js?v=dev");
+    document.getElementById("login").hidden = true; document.getElementById("app").hidden = false;   // rects need the app on screen
     state.tab = "poker"; PR.pokerSnapshot(DOC); state.pokerSession = SESSION; state.hole = { handNo: 14, seat: 0, cards: ["Ks", "Qd"] };
     V.render(); PR.pokerView();
     const res = {}, wait = () => new Promise(r => setTimeout(r, 40));
@@ -2301,6 +2302,18 @@ test("the poker table: seats round the oval, the actor and dealer marked, my car
     res.board = [...document.querySelectorAll("#poker .pk-board .pk-card")].map(c => c.classList.contains("slot") ? "_" : c.querySelector("b").textContent + c.querySelector("i").textContent);
     res.pot = document.querySelector("#poker .pk-pot").textContent;
     res.backs = document.querySelectorAll("#poker .pk-seat .pk-card.back").length;
+    // on the felt: the button and the blinds as discs, Bob's bet as chips, a pile in the middle
+    res.marks = [...document.querySelectorAll("#poker .pk-marks")].map(m => [m.dataset.for, m.textContent]);
+    res.chips = [...document.querySelectorAll("#poker .pk-chips")].map(c => [c.dataset.for, c.textContent]);
+    res.pile = !!document.querySelector("#poker .pk-pot .pk-chip.pile"); res.subBet = !!document.querySelector("#poker .pk-seat .pk-bet");
+    const rc = e => e.getBoundingClientRect(), mid = r => [r.left + r.width / 2, r.top + r.height / 2];
+    const hits = (a, b) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+    const felt = [...document.querySelectorAll("#poker .pk-marks, #poker .pk-chips")], solid = [...document.querySelectorAll("#poker .pk-seat:not(.empty), #poker .pk-board")];
+    res.feltClear = felt.every((f, i) => solid.every(s => s === f.parentNode || !hits(rc(f), rc(s))) && felt.every((g, j) => i === j || !hits(rc(f), rc(g))));
+    res.marksOn = [...document.querySelectorAll("#poker .pk-marks")].every(m => m.parentNode.dataset.seat === m.dataset.for && hits(rc(m), rc(m.parentNode)));
+    const tc = mid(rc(document.querySelector("#poker .pk-table"))), far = e => Math.hypot(mid(rc(e))[0] - tc[0], mid(rc(e))[1] - tc[1]);
+    res.betInside = far(document.querySelector('#poker .pk-chips[data-for="1"]')) < far(document.querySelector('#poker .pk-seat[data-seat="1"]'));
+    res.discD = getComputedStyle(document.querySelector("#poker .pk-disc.d")).backgroundColor;
     res.buttons = [...document.querySelectorAll("#pkActions .pk-row .btn")].map(b => b.textContent);
     const sl = document.getElementById("pkRaiseSlider"); res.slider = [sl.min, sl.max, sl.step, sl.value];
     res.note = document.getElementById("pokerNote").textContent;
@@ -2333,6 +2346,11 @@ test("the poker table: seats round the oval, the actor and dealer marked, my car
   assert.deepEqual(out.mine, [["K", false], ["Q", true]]); assert.equal(out.redDiffers, true, "a red suit is really red");
   assert.deepEqual(out.board, ["K♥", "9♦", "4♠", "_", "_"]);
   assert.equal(out.pot, "$16 pot"); assert.equal(out.backs, 2, "Bob's cards face down; Cara folded");
+  assert.deepEqual(out.marks, [["1", "D"], ["2", "SB"], ["0", "BB"]], "Bob's button, so Cara posted the small blind and I the big");
+  assert.deepEqual(out.chips, [["1", "$10"]], "only Bob has chips in front of him"); assert.equal(out.subBet, false, "and his seat doesn't say it twice");
+  assert.equal(out.pile, true, "$6 of the $16 is already in the middle");
+  assert.equal(out.feltClear, true, "discs and chips stand clear of the other seats, the board and each other"); assert.equal(out.marksOn, true, "a disc rides its own seat's corner, so there's no doubt whose it is");
+  assert.equal(out.betInside, true, "a bet sits between its seat and the board"); assert.equal(out.discD, "rgb(255, 255, 255)", "the dealer button is white in either theme");
   assert.deepEqual(out.buttons, ["Fold", "Call $10", "Raise to $18", "All in $186"], "the bet, the last raise on top of it, all in");
   assert.deepEqual(out.slider, ["18", "186", "1", "18"], "dollars, a dollar a step");
   assert.equal(out.note, "Blinds $1/$2 · buy in $40 to $200 · 3 seated · hand #14");
@@ -2406,6 +2424,7 @@ test("phone: the poker table is a list ending with me, the board above it, the a
   const { p, errors } = await page(null, PHONE);
   const out = await p.evaluate(async (DOC, SESSION) => {
     const { state } = await import("./state.js?v=dev"); const V = await import("./render.js?v=dev"); const PR = await import("./poker-render.js?v=dev");
+    document.getElementById("login").hidden = true; document.getElementById("app").hidden = false;   // rects need the app on screen
     state.tab = "poker"; PR.pokerSnapshot(DOC); state.pokerSession = SESSION; state.hole = { handNo: 14, seat: 0, cards: ["Ks", "Qd"] };
     V.render(); PR.pokerView();
     const cs = (e) => getComputedStyle(e);
@@ -2415,13 +2434,19 @@ test("phone: the poker table is a list ending with me, the board above it, the a
       oneColumn: new Set(seats.map(s => Math.round(s.getBoundingClientRect().left))).size === 1,
       boardAbove: center.getBoundingClientRect().bottom <= firstSeat.getBoundingClientRect().top + 1,
       meLast: seats[seats.length - 1].classList.contains("me"),
+      ringOnRow: (() => { const r = document.querySelector("#poker .pk-seat.actor .pk-ring").getBoundingClientRect(), s = document.querySelector("#poker .pk-seat.actor").getBoundingClientRect(); return Math.abs(r.bottom - s.bottom) <= 2 && r.left >= s.left && r.right <= s.right; })(),
+      discs: [...document.querySelectorAll("#poker .pk-name .pk-disc")].map(d => d.textContent), onFelt: document.querySelectorAll("#poker .pk-marks, #poker .pk-chips").length,
+      bobBet: (document.querySelector('#poker .pk-seat[data-seat="1"] .pk-bet') || {}).textContent || "", bobChip: !!document.querySelector('#poker .pk-seat[data-seat="1"] .pk-bet .pk-chip'),
       fits: [...document.querySelectorAll("#pkActions .btn, #poker .pk-seat, #poker .pk-mine")].every(e => e.getBoundingClientRect().right <= innerWidth + 1),
       sticky: cs(document.getElementById("pkActions")).position,
       noBodyScroll: document.documentElement.scrollWidth <= innerWidth,
       tabs: document.querySelectorAll("#tabs .tab").length };
   }, pokerTable(), pokerSession());
-  assert.equal(out.tablePos, "static", "no oval on a phone"); assert.equal(out.seatPos, "static");
+  assert.equal(out.tablePos, "static", "no oval on a phone"); assert.equal(out.seatPos, "relative", "a row in the list, and the anchor for its own clock bar");
+  assert.equal(out.ringOnRow, true, "the clock bar runs along the bottom of the row to act, wherever the page is scrolled");
   assert.equal(out.oneColumn, true); assert.equal(out.boardAbove, true); assert.equal(out.meLast, true);
+  assert.deepEqual(out.discs, ["D", "SB", "BB"], "no felt on a phone: the button and the blinds ride with the names"); assert.equal(out.onFelt, 0);
+  assert.equal(out.bobBet, "bet $10"); assert.equal(out.bobChip, true, "and the bet keeps its chip in the row");
   assert.equal(out.fits, true); assert.equal(out.sticky, "sticky"); assert.equal(out.noBodyScroll, true); assert.equal(out.tabs, 5);
   assert.deepEqual(errors, []);
   await p.close();

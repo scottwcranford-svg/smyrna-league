@@ -856,7 +856,21 @@ button.bal-ln{cursor:pointer} button.bal-ln:hover{color:var(--ink-2)}
 .pk-info{display:flex;flex-direction:column;min-width:0;line-height:1.25;flex:1 1 auto}
 .pk-name{font-size:12px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .pk-name small{font-size:9.5px;font-weight:600;color:var(--ink-3)}
-.pk-btn{display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;border-radius:50%;background:var(--gold);color:#1A1204;font-size:9px;font-weight:800;font-style:normal;vertical-align:1px;margin-left:3px}
+/* A seat's bet is a chip and a number on the felt in front of it; the dealer button and
+   the blinds are discs on the seat's edge, clear of that bet. The button is white with fixed ink,
+   as a button is. */
+.pk-chip{display:inline-block;flex:none;width:14px;height:14px;box-sizing:border-box;border-radius:50%;background:var(--gold);border:2px dashed var(--surface);box-shadow:0 0 0 1px var(--gold);vertical-align:-2px;margin-right:5px}
+.pk-chip.pile{margin-bottom:6px;margin-right:7px;box-shadow:0 0 0 1px var(--gold),0 3px 0 1px var(--surface),0 4px 0 1px var(--gold),0 7px 0 1px var(--surface),0 8px 0 1px var(--gold);vertical-align:2px}
+.pk-chips{position:absolute;transform:translate(-50%,-50%);z-index:1;display:inline-flex;align-items:center;white-space:nowrap;font-size:12px;font-weight:800;color:var(--ink);background:var(--surface);border-radius:99px;padding:3px 9px 3px 5px;box-shadow:var(--shadow)}
+.pk-marks{position:absolute;z-index:1;display:inline-flex;gap:3px}
+.pk-marks.tl{top:-12px;left:-9px} .pk-marks.tr{top:-12px;right:-9px;flex-direction:row-reverse}
+.pk-marks.bl{bottom:-12px;left:-9px} .pk-marks.br{bottom:-12px;right:-9px;flex-direction:row-reverse}
+.pk-disc{display:inline-flex;align-items:center;justify-content:center;flex:none;width:22px;height:22px;border-radius:50%;font-size:9px;font-weight:800;font-style:normal;letter-spacing:0;box-shadow:0 1px 2px rgba(0,0,0,.35)}
+.pk-disc.d{background:#FFFFFF;color:#12141B;border:1px solid rgba(0,0,0,.2);box-sizing:border-box;font-size:11px}
+.pk-disc.sb{background:var(--accent);color:var(--accent-ink)}
+.pk-disc.bb{background:var(--gold);color:#1A1204}
+.pk-name .pk-disc{width:17px;height:17px;font-size:7.5px;vertical-align:1px;box-shadow:none}
+.pk-name .pk-disc.d{font-size:9px}
 .pk-stack{font-size:12px;color:var(--ink-2)}
 .pk-stack small{font-size:10px;color:var(--win)}
 .pk-sub{font-size:10.5px;color:var(--ink-3)}
@@ -912,8 +926,9 @@ button.bal-ln{cursor:pointer} button.bal-ln:hover{color:var(--ink-2)}
   .pk-board{order:-1}
   .pk-last{flex-basis:100%}
   .pk-seats{position:static;display:flex;flex-direction:column;gap:6px}
-  .pk-seat{position:static;transform:none;width:auto;display:grid;grid-template-columns:26px minmax(0,1fr) auto;padding:6px 10px;border-radius:10px}
+  .pk-seat{position:relative;left:auto!important;top:auto!important;transform:none;width:auto;display:grid;grid-template-columns:26px minmax(0,1fr) auto;padding:6px 10px;border-radius:10px}
   .pk-seat.empty{width:auto;height:auto;border-radius:10px;justify-content:flex-start;padding:4px 10px;min-height:34px}
+  .pk-marks,.pk-chips{display:none}
   .pk-mine{position:sticky;bottom:calc(126px + env(safe-area-inset-bottom));z-index:3}
   .pk-mine .pk-card.big{width:56px;height:78px;font-size:20px}
   .pk-actions{position:sticky;bottom:calc(64px + env(safe-area-inset-bottom));z-index:4}

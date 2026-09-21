@@ -73,8 +73,20 @@ function bannerHtml(T,mine){
   return "";
 }
 
-function seatHtml(T,me,o,onPhone){
-  var s=o.seat, pos=onPhone?"":' style="left:'+Poker.seatXY(o.off).x+'%;top:'+Poker.seatXY(o.off).y+'%"';
+// The dealer button and the blinds, as discs. On a desktop they ride the seat's edge
+// that faces the board, at its outer end: the inner corner is where the seat's bet lies.
+// On a phone they follow the name.
+function marksHtml(T,s,B){
+  if(T.status!=="hand") return "";
+  return (T.button===s.seat?'<i class="pk-disc d" data-tip="Dealer button">D</i>':"")
+    +(B.sb===s.seat?'<i class="pk-disc sb" data-tip="Small blind">SB</i>':"")
+    +(B.bb===s.seat?'<i class="pk-disc bb" data-tip="Big blind">BB</i>':"");
+}
+const chipHtml='<i class="pk-chip" aria-hidden="true"></i>';
+const at=function(p){ return ' style="left:'+p.x+'%;top:'+p.y+'%"'; };
+
+function seatHtml(T,me,o,onPhone,B){
+  var s=o.seat, pos=onPhone?"":at(Poker.seatXY(o.off));
   if(!s){
     var canSit=!Poker.seated(T,me)&&T.status!=="closed";
     return '<div class="pk-seat empty" data-seat="'+o.i+'"'+pos+">"+(canSit?'<button type="button" class="btn" data-act="pkSit" data-seat="'+o.i+'">Sit</button>':'<span class="pk-open">open</span>')+"</div>";
@@ -87,23 +99,30 @@ function seatHtml(T,me,o,onPhone){
   else if(s.status==="allin") sub="all in";
   else if(s.status==="out") sub=s.busted?"out of chips":"sitting out";
   else if(s.status==="waiting"&&T.status==="hand") sub="next hand";
-  else if(s.bet>0) sub='<span class="pk-bet">bet '+money(s.bet)+"</span>";
-  else sub=s.lastAction&&T.status==="hand"?esc(s.lastAction.op==="check"?"checked":s.lastAction.op==="call"?"called":s.lastAction.op):"";
+  else if(s.bet>0&&onPhone) sub='<span class="pk-bet">'+chipHtml+"bet "+money(s.bet)+"</span>";   // on the oval the chips are on the felt
+  else sub=s.lastAction&&T.status==="hand"?esc({ check:"checked", call:"called", raise:"raised" }[s.lastAction.op]||s.lastAction.op):"";
   var cards="";
   if(T.status==="hand"&&(s.status==="in"||s.status==="allin")&&!isMe) cards=backHtml()+backHtml();
   else if(T.status!=="hand"&&T.lastHand&&T.lastHand.shown&&T.lastHand.shown[s.seat]) cards=T.lastHand.shown[s.seat].map(function(c){ return cardHtml(c,"small"); }).join("");
+  var marks=marksHtml(T,s,B), felt="";
+  if(!onPhone){
+    var xy=Poker.seatXY(o.off);
+    if(marks) marks='<span class="pk-marks '+(xy.y>50?"t":"b")+(xy.x>50?"r":"l")+'" data-for="'+s.seat+'">'+marks+"</span>";
+    if(s.bet>0) felt+='<span class="pk-chips num" data-for="'+s.seat+'"'+at(Poker.betXY(o.off))+">"+chipHtml+money(s.bet)+"</span>";
+  }
   return '<div class="'+cls+'" data-seat="'+s.seat+'"'+pos+'>'+(actor?'<span class="pk-ring" aria-hidden="true"></span>':"")
     +avatarHtml(s.memberId,onPhone?26:30)
-    +'<div class="pk-info"><span class="pk-name">'+esc(mName(s.memberId))+(isMe?' <small>you</small>':"")+(dealer?' <i class="pk-btn" data-tip="Dealer">D</i>':"")+'</span>'
+    +'<div class="pk-info"><span class="pk-name">'+esc(mName(s.memberId))+(isMe?' <small>you</small>':"")+(onPhone&&marks?" "+marks:"")+'</span>'
     +'<span class="pk-stack num">'+money(s.stack)+(s.pendingAdd?" <small>+"+money(s.pendingAdd)+"</small>":"")+"</span>"
     +'<span class="pk-sub">'+sub+"</span></div>"
-    +(cards?'<span class="pk-cards">'+cards+"</span>":"")+"</div>";
+    +(cards?'<span class="pk-cards">'+cards+"</span>":"")+(onPhone?"":marks)+"</div>"+felt;
 }
 
 function tableHtml(T,me,mine){
   var onPhone=phone();
   var order=Poker.seatOrder(T,me);
-  var seatsHtml=order.map(function(o){ return seatHtml(T,me,o,onPhone); }).join("");
+  var B=Poker.blindSeats(T);
+  var seatsHtml=order.map(function(o){ return seatHtml(T,me,o,onPhone,B); }).join("");
   var street=T.status==="hand"?({preflop:"Pre-flop",flop:"Flop",turn:"Turn",river:"River"}[T.street]||T.street)+" · hand #"+T.handNo
     :T.status==="between"?"Next hand in <span class=\"pk-clock\">"+Poker.secondsLeft(T.deadline,Date.now(),state.pokerOffset)+"s</span>"
     :Poker.seats(T).filter(function(s){ return !s.satOutAt&&s.stack+s.pendingAdd>0; }).length<2?"Waiting for a second player":"Waiting";
@@ -113,8 +132,10 @@ function tableHtml(T,me,mine){
   // one number while everyone can still bet; the layers only once somebody is all in
   var anyAllIn=Poker.seats(T).some(function(s){ return s.status==="allin"; });
   var potText=T.status==="hand"?(pots.length>1&&anyAllIn?money(pots[0].amount)+" pot · side "+pots.slice(1).map(function(p){ return money(p.amount); }).join(", "):money(Poker.potTotal(T))+" pot"):(T.lastHand?money(T.lastHand.pot)+" pot":"");
+  // a pile in the middle once a street's bets have been swept in; before that the chips are in front of the seats
+  var pile=T.status==="hand"&&Poker.potTotal(T)-Poker.streetBets(T)>0?'<i class="pk-chip pile" aria-hidden="true"></i>':"";
   return '<div class="pk-table" data-status="'+esc(T.status)+'">'
-    +'<div class="pk-center"><span class="pk-street lbl">'+street+'</span><div class="pk-board">'+board+'</div><span class="pk-pot num">'+potText+'</span><span class="pk-last">'+esc(T.lastText||"")+"</span></div>"
+    +'<div class="pk-center"><span class="pk-street lbl">'+street+'</span><div class="pk-board">'+board+'</div><span class="pk-pot num">'+pile+potText+'</span><span class="pk-last">'+esc(T.lastText||"")+"</span></div>"
     +'<div class="pk-seats">'+seatsHtml+"</div></div>";
 }
 
