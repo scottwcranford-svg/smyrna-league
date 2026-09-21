@@ -27,6 +27,10 @@ rules.js          PURE: stat catalog, locks, ledger math, auto names/terms, cove
 store.js          Firestore shim, leases, the passcode (the only Firestore caller)
 auth.js           Firebase Auth: sign in/out, who-am-I, admin flag, passwords
 sleeper.js        Sleeper feeds + refresh loops (the only other network caller)
+poker.js          PURE: the poker table as the page reads it (turns, calls, raise bounds, the clock, the tally)
+poker-render.js   draws the poker table; the buy-in sheet; sends the dealer a tick when a clock runs out
+dealer.js         the one call to the poker dealer function (the third network caller)
+functions/poker/  the dealer: hand ranking, the engine (dealing, betting, pots, money), the HTTPS handler
 firebase-config.js    the Firebase project's public web config (not a secret)
 vendor/               the Firebase compat SDK, served with the page so browsers'
                       tracking-prevention doesn't block a third-party script
@@ -36,9 +40,10 @@ migrate-to-firebase.py  one-time copy of data/book.json into Firestore
 server.js, Dockerfile, docker-compose.yml   self-hosted alternative (see below)
 ```
 
-Module rules: `rules.js` imports nothing and touches no DOM; `render.js`, `forms.js`,
-`dialogs.js` and `actions.js` are the DOM writers; `store.js` and `sleeper.js` are the
-network callers; `app.js` is the only file that knows about all of them.
+Module rules: `rules.js` and `poker.js` import nothing and touch no DOM; `render.js`,
+`forms.js`, `dialogs.js`, `actions.js` and `poker-render.js` are the DOM writers;
+`store.js`, `sleeper.js` and `dealer.js` are the network callers; `app.js` is the only
+file that knows about all of them.
 
 - **The book** lives in Firestore under `books/<passcode>/…`. The security rules admit a
   path only if `SmyrnaLeague/<passcode>` exists, so the passcode is the door: the page
@@ -149,6 +154,33 @@ Setting it up, once:
 4. `firebase deploy --only firestore:rules` publishes `firestore.rules` from git, if
    you'd rather not paste it in the console.
 
+### The poker dealer
+
+Hold'em needs a dealer no player can see into, so the deck and everyone's hole cards
+live on the server: `functions/poker/` is the dealer (`evaluate.js` ranks hands,
+`engine.js` deals, runs the betting, layers the pots and keeps the session's money,
+`handler.js` is the HTTPS request, `notices.js` the pushes), wired up at the end of
+`functions/index.js` as `poker` (HTTPS, called by the page with the player's ID token —
+`dealer.js`) and `pokerSweep` (every minute: any table whose clock ran out with every
+page closed). Every poker document is written by the dealer with the Admin SDK; the rules
+let no client write one, and let a player's own hole cards (`pokerHole/<uid>`, the one
+rule keyed on `request.auth.uid`) be read by that sign-in alone. Whoever owns the Firebase
+project can read `pokerSecret` in the console; the league takes that on trust.
+
+Setting it up, once, after the notifications above:
+
+1. Paste the poker blocks of `firestore.rules` into the console and publish (before the
+   functions, so the page's listeners aren't refused).
+2. `functions/.env`: `POKER_ORIGINS=https://scottwcranford-svg.github.io,http://localhost:8080`
+   (the site's origin; CORS matches origins, not paths).
+3. `firebase deploy --only functions`.
+4. `firebase-config.js` carries the function's URL as `pokerUrl`.
+
+The cost is inside the free quotas: a night's play is a few thousand dealer calls and
+Firestore writes, and the listener reads fan out to every seated page. A cold start
+hits the first action after idle (a second or two); `minInstances: 1` on the one
+function is the fix if it annoys, at a couple of dollars a month.
+
 `manifest.json` and the `icon-*.png` files make the site installable (home screen on
 iPhone and Android, "Install app" on desktop Chrome); `index.html` carries the
 viewport and Apple meta tags for the same reason.
@@ -245,6 +277,22 @@ does not exist — so replace an account by deleting it and using **Add user**.
 
 House takes nothing: the full pot goes to the winner, zero-sum.
 
+- **A poker table.** The Poker tab is a Texas Hold'em cash game for the league, one
+  table at a time. Any current-season manager opens it (blinds, min and max buy-in) and
+  sits down; everyone else gets a push and sits when they like, dealt in at the next
+  hand. Thirty seconds to act; a timeout checks or folds, two in a row sits you out, ten
+  minutes sat out cashes you out. Sit out, add chips (at the next deal), leave (cashed out
+  at your stack; mid-hand you fold first). The table shows the seats round an oval (a
+  list on a phone), the board and pots, your own cards, the last hand with every hand
+  shown at a showdown, and the session tally — what each manager put in, took out and
+  is up or down — with a suggested settle-up. Chips are dollars, but the app only counts
+  them: nothing goes to Settle up, and the money changes hands between you when the
+  table closes. Button to the next seated player; heads-up the button posts the small
+  blind and acts first before the flop; minimum raise is the last full raise; a short
+  all-in doesn't reopen betting; side pots by what each player put in; odd cents to the
+  first winner left of the button; everyone folding to one player pays without a reveal.
+  The dealer is a Cloud Function (see *Notifications*); no page can see another's cards.
+
 ## Data
 
 | Doc | Shape |
@@ -258,6 +306,12 @@ House takes nothing: the full pot goes to the winner, zero-sum.
 | `bets/<id>.stats` | `{scope, tracks:[{stat,metric,lower}], rows:[{key,label,team?,memberId,entry,values:{stat:n}}], through, source, updatedAt}` |
 | `bets/<id>.league` | `{subject: memberId, outcome: playoffs\|reg1\|top3\|last\|champ\|matchup, opp?: memberId}` — a league result bet, `kind` `league`; entries carry `side: yes\|no`, or on a matchup the member id of the team taken |
 | `league/standings` | `{updatedAt, bySeason:{<season>:{at, leagueId, teams, playoffStart, seedType, over, rows:[{rid,id,name,w,l,t,pf,pa}], pairings:{<week>:[{a,b}]}, playoffs:{rids, field:[memberId], seeded, complete, champion}}}}` — every team's record in standing order, hourly, and the regular season's schedule as member ids (Sleeper fixes it up front; each week fetched once). Sleeper seeds its bracket from the live table all season (`seeded`, the line as it stands); `complete` and `over` once the last regular-season week is final, which is what settles a bet; `champion` once the final is played |
+
+| `poker/table` | `{status: open\|hand\|between\|closed, sessionId, openedBy, blinds:{sb,bb}, minBuy, maxBuy, handNo, seq, seats:[10 × null\|{seat, memberId, uid, name, stack, status: in\|folded\|allin\|out\|waiting, bet, totalIn, timeouts, satOutAt, pendingAdd, lastAction, leaving}], button, street, board, pots:[{amount, eligible}], toAct, deadline, currentBet, minRaise, acted, capped, lastText, lastHand:{no, board, pot, winners:[{seat, memberId, amount, cat, text}], shown:{seat:[c,c]}}, updatedAt}` — the public table, integer cents, written only by the dealer; `seq` +1 on every change, which every request names |
+| `poker/session`, `pokerSessions/<id>` | `{id, openedAt, closedAt, blinds, hands, byId:{<memberId>:{in, out, onTable, net, buyIns, cashOuts}}}` — tonight's money, and the archive at close; `in − out − onTable` sums to zero across the table or the dealer refuses the write |
+| `pokerHole/<uid>` | `{handNo, seat, cards:[c,c]}` — a player's own cards, readable by that sign-in alone |
+| `pokerSecret/table` | the deck and every hand; readable by nobody |
+| `pokerHistory/<sessionId>` | `{hands:[{no, at, board, pot, winners, shown, actions}]}` — the newest 150 hands, for a hand-history screen not yet built |
 
 `status`: `open` (a seat unclaimed) · `active` · `settled` · `void` (`cancelled` /
 `autoVoid` say why). `week` 0 = season-long; weeks 15–17 are playoffs.
@@ -325,4 +379,6 @@ the key being reused from another site (for example to hammer sign-in attempts).
    result. Every action is stamped with the signed-in name.
 2. **It's a ledger, not a bank.** It tracks the money; it never holds or moves it, and
    there's no rake. Keep it private and small-stakes; check your state's rule on
-   social betting if in doubt.
+   social betting if in doubt. The poker table is the same: the dealer counts chips and
+   shows who's up and down; nothing is held, moved or added to Settle up, and no
+   correction is ever made to a session's numbers — a dispute is settled at the table.

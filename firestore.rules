@@ -48,5 +48,16 @@ service cloud.firestore {
 
     match /books/{key}/bets/{id} { allow read, write: if member(key); }
     match /books/{key}/leases/{id} { allow read, write: if member(key); }
+
+    // The poker table. Every poker document is written by the dealer (a Cloud Function
+    // with the Admin SDK), never by a client: the table, the session's money and the
+    // archived sessions and hand history are readable by any manager; a player's own
+    // hole cards are readable by that player's sign-in alone (the first rule here keyed
+    // on request.auth.uid); the deck and everyone's cards (pokerSecret) by nobody.
+    match /books/{key}/poker/{doc} { allow read: if member(key); allow write: if false; }
+    match /books/{key}/pokerSessions/{doc} { allow read: if member(key); allow write: if false; }
+    match /books/{key}/pokerHistory/{doc} { allow read: if member(key); allow write: if false; }
+    match /books/{key}/pokerHole/{uid} { allow read: if member(key) && request.auth.uid == uid; allow write: if false; }
+    match /books/{key}/pokerSecret/{doc} { allow read, write: if false; }
   }
 }

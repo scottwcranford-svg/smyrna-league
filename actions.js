@@ -15,6 +15,9 @@ import * as B from "./book.js?v=dev";
 import * as F from "./forms.js?v=dev";
 import * as D from "./dialogs.js?v=dev";
 import * as Nf from "./notify.js?v=dev";
+import * as Dl from "./dealer.js?v=dev";
+import * as P from "./poker-render.js?v=dev";
+import * as Poker from "./poker.js?v=dev";
 
 const COLORS=Fmt.COLORS, uid=Fmt.uid, defaultPw=Id.defaultPw, emailFor=Id.emailFor;
 const member=function(id){ return Id.member(id,members()); };
@@ -152,6 +155,25 @@ export const ACTIONS = {
   // phones: a ticket's Details / Less, and a ledger row's bet names
   fold:function(t,id){ state.unfolded[id]=!state.unfolded[id]; touch(); },
   seat:function(t,id){ state.unfolded["m:"+id]=!state.unfolded["m:"+id]; touch(); },
+
+  // the poker table: every move goes to the dealer (dealer.js), stamped with the hand
+  // and seq on screen; the sheet for opening, sitting and adding chips is poker-render's
+  pkOpen:function(){ P.openPokerBuy("open"); },
+  pkSit:function(t){ P.openPokerBuy("sit",t.hasAttribute("data-seat")?num(t,"data-seat"):null); },
+  pkRebuy:function(){ P.openPokerBuy("rebuy"); },
+  pkBuyPreset:function(t){ P.buyPreset(num(t,"data-amt")); },
+  pkLeave:function(){ state.pokerLeaveAsk=true; touch(); },
+  pkLeaveNo:function(){ state.pokerLeaveAsk=false; touch(); },
+  pkLeaveYes:function(){ state.pokerLeaveAsk=false; Dl.act({ op:"leave" }); },
+  pkSitOut:function(){ Dl.act({ op:"sitOut" }); },
+  pkBack:function(){ Dl.act({ op:"back" }); },
+  pkClose:function(){ Dl.act({ op:"close" }); },
+  pkFold:function(){ Dl.act({ op:"act", action:"fold" }); },
+  pkCheck:function(){ Dl.act({ op:"act", action:"check" }); },
+  pkCall:function(){ Dl.act({ op:"act", action:"call" }); },
+  pkAllIn:function(){ Dl.act({ op:"act", action:"allin" }); },
+  pkRaise:function(){ Dl.act({ op:"act", action:"raise", amount:P.raiseAmount() }); },
+  pkPreset:function(t){ var mine=Poker.mySeat(state.poker,state.me); if(!mine) return; state.pokerRaise=Poker.presetAmount(state.poker,mine,attr(t,"data-preset")); touch(); },
 };
 
 // data-act changes on selects and checkboxes
@@ -298,6 +320,8 @@ export function bindEvents(hooks){
     var t=ev.target, act=t.getAttribute&&attr(t,"data-act");
     if(act==="dPick") state.draft[num(t,"data-i")].pick=t.value;
     else if(act==="dSearch") F.drawSugg(num(t,"data-i"),t.value);
+    else if(act==="pkRaiseAmt") P.raiseInput(t);   // slider and box mirror each other by hand: no redraw mid-drag
+    else if(t.id==="pkSb"||t.id==="pkBb"||t.id==="pkMin"||t.id==="pkMax") P.drawBuyBounds();
     else if(t.id==="bLine"){ state.draftLine=t.value.trim(); if(state.draftMarket==="total") F.drawEntries(); F.drawScoring(); }
   });
   // A picker's list opens when its box is focused (with a filter set there is something
@@ -358,4 +382,7 @@ export function bindEvents(hooks){
   on("rSeasonGo","click",function(e){ e.preventDefault(); startSeason(); });
   on("rSync","click",function(e){ e.preventDefault(); B.requestRosterSync(); });
   on("rSave","click",function(e){ e.preventDefault(); saveLeague(); });
+  on("pkBuyGo","click",function(e){ e.preventDefault(); P.submitPokerBuy(); });
+  on("pkBuyAmt","keydown",function(e){ if(e.key==="Enter"){ e.preventDefault(); P.submitPokerBuy(); } });
+  on("pkBuyDlg","close",function(){ state.pokerDlg=null; });
 }

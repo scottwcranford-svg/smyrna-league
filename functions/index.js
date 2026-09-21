@@ -41,7 +41,7 @@ async function deliver(key, notices){
   for (const n of notices) {
     const tokens = [...new Set(n.to.flatMap(id => tokensOf[id] || []))];
     if (!tokens.length) { logger.info("nobody listening", { title: n.title, to: n.to }); continue; }
-    const link = SITE + (n.bet ? "?bet=" + encodeURIComponent(n.bet) : "");
+    const link = SITE + (n.link ? n.link : n.bet ? "?bet=" + encodeURIComponent(n.bet) : "");
     const res = await getMessaging().sendEachForMulticast({
       tokens,
       notification: { title: n.title, body: n.body },
@@ -195,4 +195,36 @@ exports.rosterSyncRequested = onDocumentWritten("books/{book}/league/rosterSync"
     logger.error("roster sync failed", { key, message: e && e.message });
     await ref.update(Object.assign(stamp, { note: "Sync failed — check the logs" }));
   }
+});
+
+/* ---- the poker table's dealer ---- */
+// Hold'em needs a dealer no player can see into: the deck and everyone's hole cards live
+// in pokerSecret, which the rules let nobody read, and every chip moves only through the
+// engine in poker/engine.js. The app calls this over HTTPS with the player's ID token
+// (there is no callable SDK vendored, and a fetch is all it needs); the rules let no
+// client write a poker document at all. poker/handler.js is the request; this is the
+// wiring. pokerSweep is the fallback clock: a table whose deadline passed with every page
+// closed still folds the absent, deals the next hand, and shuts an empty table.
+//
+// Deploy needs POKER_ORIGINS in functions/.env (the site's origin, comma-separated with
+// http://localhost:8080 for a local run) and the function's URL in firebase-config.js.
+
+const { onRequest } = require("firebase-functions/v2/https");
+const { makeHandler } = require("./poker/handler");
+
+const ORIGINS = String(process.env.POKER_ORIGINS || "https://scottwcranford-svg.github.io").split(",").map(s => s.trim()).filter(Boolean);
+let dealer = null;
+function theDealer(){
+  if (!dealer) dealer = makeHandler({ db: getFirestore(), verify: (t) => getAuth().verifyIdToken(t), deliver, logger });
+  return dealer;
+}
+
+exports.poker = onRequest({ cors: ORIGINS, invoker: "public" }, async (req, res) => {
+  const r = await theDealer().handle({ method: req.method, headers: req.headers, body: req.body });
+  res.status(r.status).json(r.body);
+});
+
+exports.pokerSweep = onSchedule("every 1 minutes", async () => {
+  const done = await theDealer().sweep();
+  if (done.length) logger.info("poker sweep", done);
 });

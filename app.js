@@ -17,6 +17,7 @@ import { showLogin, enforceFreshPassword, drawRoster } from "./dialogs.js?v=dev"
 import { bindEvents } from "./actions.js?v=dev";
 import { bindTips, checkTip } from "./tips.js?v=dev";
 import * as Nf from "./notify.js?v=dev";
+import { pokerView, pokerSnapshot } from "./poker-render.js?v=dev";
 
 const memberForEmail=function(email){ return Id.memberForEmail(email,members()); };
 const mark=function(k){ if(!state.timing[k]) state.timing[k]=Math.round(performance.now()); };
@@ -44,10 +45,12 @@ try{ state.adminMode=localStorage.getItem(ADMIN_LS)==="on"; }catch(e){}
 // "hl" is the old id for what is now the Scores tab; a device that remembered it lands there.
 try{ var savedTab=localStorage.getItem("smyrna.tab");
   if(savedTab==="hl"||savedTab==="scores") savedTab="league";
-  if(["book","ledger","badges","league","rivals","settle"].indexOf(savedTab)>=0) state.tab=savedTab; }catch(e){}
+  if(["book","ledger","badges","league","rivals","settle","poker"].indexOf(savedTab)>=0) state.tab=savedTab; }catch(e){}
 try{ state.rivalHL=localStorage.getItem("smyrna.rivalHL")==="on"; }catch(e){}
-// A tapped notification opens the app at its bet: ?bet=<id>, read before storedKey() tidies the address.
-var openBet=null; try{ openBet=new URLSearchParams(location.search).get("bet"); if(openBet) history.replaceState(null,"",location.pathname); }catch(e){}
+// A tapped notification opens the app at its bet: ?bet=<id>, read before storedKey() tidies
+// the address. ?poker=1 opens it at the table.
+var openBet=null, openPoker=false;
+try{ var q=new URLSearchParams(location.search); openBet=q.get("bet"); openPoker=!!q.get("poker"); if(openBet||openPoker) history.replaceState(null,"",location.pathname); }catch(e){}
 function applyAuth(user){ var w=A.whoAmI(user,state.config); state.me=w.me; state.isAdmin=w.admin; state.admin=w.admin&&state.adminMode; stampSeen(); }
 // Once per visit, note that this manager opened the app. league/seen was { memberId: iso };
 // it is now { memberId: { at, n } } so the book can also say who opens it most. Old string
@@ -245,6 +248,23 @@ function subscribeBook(db){
     touch();   // tickets show projections until something has been played
   },function(){ /* no projections, no harm */ });
 
+  // The poker table: the public table and tonight's money, written only by the dealer
+  // function; and my own hole cards, a document under my sign-in's uid that the rules
+  // let nobody else read.
+  db.doc("poker/table").onSnapshot(function(snap){
+    pokerSnapshot(snap.exists?Fmt.clone(snap.data()):null);
+    touch();
+  },function(){ /* no table until the dealer opens one, or the rules aren't published yet */ });
+  db.doc("poker/session").onSnapshot(function(snap){
+    state.pokerSession=snap.exists?Fmt.clone(snap.data()):null;
+    touch();
+  },function(){ /* the tally waits with the table */ });
+  var u=A.currentUser();
+  if(u&&u.uid) db.doc("pokerHole/"+u.uid).onSnapshot(function(snap){
+    state.hole=snap.exists?snap.data():null;
+    touch();
+  },function(){ /* cards arrive when the dealer deals them */ });
+
   // push, once the book is open: say what arrives while the page is up; refile a rotated token
   var pushStarted=false;
   var startPush=function(){
@@ -266,17 +286,20 @@ function subscribeBook(db){
     touch();
     startPush();
     if(openBet){ var id=openBet; openBet=null; state.tab="book"; touch(); setTimeout(function(){ showBet(id); },300); }
+    if(openPoker){ openPoker=false; state.tab="poker"; touch(); }
   },function(e){ toast(S.dbMsg(e)); });
 }
 
 /* ---- boot ---- */
-onRender(function(){ expireBets(); settleFinished(); syncBadges(); render(); checkTip(); });
+// pokerView draws after render(): render.js must not import the table back (it would be
+// the first import cycle), and this file is the one that knows about both.
+onRender(function(){ expireBets(); settleFinished(); syncBadges(); render(); pokerView(); checkTip(); });
 try{ window.matchMedia("(max-width: 600px)").addEventListener("change",function(){ touch(); }); }catch(e){}
 bindEvents({ enterBook:enterBook, toggleAdmin:toggleAdmin });
 bindTips();
 state.config={ leagueName:"Smyrna League", season:"2026", stake:25, kickoff:Clock.DEFAULT_KICKOFF, members:[] };
 setBets([]);
-render();
+render(); pokerView();
 
 state.ready=true;
 // Any script error while the login card is up gets printed on the card, so a stuck

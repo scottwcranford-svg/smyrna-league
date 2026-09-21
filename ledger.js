@@ -80,7 +80,10 @@ function legacyPayments(bets){
   });
   return out;
 }
-function settleTransfers(byId){
+// Who pays whom to clear a set of nets with the fewest transfers: the biggest debtor
+// pays the biggest creditor, and so on. Exported for the poker table's session tally,
+// where it is a suggestion for settling outside the app, never a ledger entry.
+export function settleTransfers(byId){
   var debt=[], cred=[];
   Object.keys(byId).forEach(function(id){ var n=byId[id].net; if(n<-0.004) debt.push({ id:id, amt:-n }); else if(n>0.004) cred.push({ id:id, amt:n }); });
   debt.sort(function(a,b){ return b.amt-a.amt; }); cred.sort(function(a,b){ return b.amt-a.amt; });

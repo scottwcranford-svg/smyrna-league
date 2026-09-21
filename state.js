@@ -34,6 +34,18 @@ export const state = {
   unfolded:{},   // on a phone, tickets and ledger rows fold; ids opened by a tap live here
   timing:{},     // sign-in stopwatch, ms since navigation: boot, auth, click, key, signed, open — the footer shows it
   tab:"book",     // which panel is open: book, ledger, hl, settle — remembered per device   // league/seen: when each manager last opened the app
+  // the poker table (poker.js, poker-render.js, dealer.js)
+  poker:null,          // poker/table: the public table, redrawn per snapshot
+  pokerSession:null,   // poker/session: what everyone has put in and taken out tonight
+  hole:null,           // pokerHole/<uid>: my two cards for poker.handNo, readable by me alone
+  pokerKey:"",         // handNo:seq of the table on screen; a new one clears the draft below
+  pokerOffset:0,       // the dealer's clock against this device's, ms, from updatedAt
+  pokerRaise:null,     // the raise-to the slider is sitting on
+  pokerBusy:false,     // a dealer call in flight: the action bar is held
+  pokerErr:"",         // what the dealer last refused, shown on the table
+  pokerTimeoutSent:"", // handNo:seq a tick was already sent for when its clock ran out
+  pokerLeaveAsk:false, // Leave tapped once; the second tap does it
+  pokerDlg:null,       // the buy-in sheet: { mode:"open"|"sit"|"rebuy", seat }
   // the propose / join forms' draft
   draftScope:"", draftStats:[], editId:null,
   draftGame:null, draftMarket:"ml", draftLine:"", draftFav:"", joinId:null,

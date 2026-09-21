@@ -11,5 +11,7 @@ self.FIREBASE_CONFIG = {
   storageBucket: "smyrna-league.firebasestorage.app",
   messagingSenderId: "584956957180",
   appId: "1:584956957180:web:c4e1a697d021e41a46e279",
-  vapidKey: "BMIgL6WyGkMZGnaaUOo9kTqWxNzjYM6UrwqcEOuzeosTpOysd2Lb9imXoU_7UqwHkqQ5AMYEtk_KX13asQnUmgY"
+  vapidKey: "BMIgL6WyGkMZGnaaUOo9kTqWxNzjYM6UrwqcEOuzeosTpOysd2Lb9imXoU_7UqwHkqQ5AMYEtk_KX13asQnUmgY",
+  // the poker dealer (functions/index.js `poker`, deployed with the other functions)
+  pokerUrl: "https://us-central1-smyrna-league.cloudfunctions.net/poker"
 };

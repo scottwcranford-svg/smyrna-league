@@ -72,6 +72,7 @@
       <button class="tab" type="button" data-act="tab" data-tab="money" role="tab"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 8v8M9.5 10.2c0-1 1-1.7 2.5-1.7s2.5.7 2.5 1.6c0 2.2-5 1.4-5 3.7 0 .9 1 1.6 2.5 1.6s2.5-.7 2.5-1.7"/></svg><span>Money</span><i class="n" id="tabN-money" hidden></i></button>
       <button class="tab" type="button" data-act="tab" data-tab="rivals" role="tab"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19l5-5M14 10l5-5M5 5l14 14"/><path d="M3 21l3-3M18 6l3-3"/></svg><span>Trash Talk</span><i class="n" id="tabN-rivals" hidden></i></button>
       <button class="tab" type="button" data-act="tab" data-tab="league" role="tab"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 20V8M7 8l-3 3M7 8l3 3M17 4v12M17 16l-3-3M17 16l3-3"/></svg><span>League</span><i class="n" id="tabN-league" hidden></i></button>
+      <button class="tab" type="button" data-act="tab" data-tab="poker" role="tab"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><path d="M12 4v2M12 18v2M4 12h2M18 12h2"/></svg><span>Poker</span><i class="n" id="tabN-poker" hidden></i></button>
     </nav>
     <!-- a top tab holding more than one screen switches between them here, the way League does -->
     <div class="seg sub-tabs" id="subTabs" role="group" aria-label="Which screen" hidden></div>
@@ -137,6 +138,11 @@
     <section data-panel="settle" hidden>
       <div class="sec-head"><span class="note">Net across everything, settled once at the end of the year.</span></div>
       <div id="settle"></div>
+    </section>
+
+    <section data-panel="poker" hidden>
+      <div class="sec-head"><span class="note" id="pokerNote">Texas Hold'em, cash game, the league only. Chips are dollars, settled between yourselves.</span></div>
+      <div id="poker"></div>
     </section>
   </div>
 
@@ -297,6 +303,26 @@
 <dialog id="pushDlg">
   <form method="dialog" class="dlg-head"><h3>Notifications</h3><button class="btn" value="cancel">Close</button></form>
   <div class="dlg-body" id="pushBody"></div>
+</dialog>
+
+<dialog id="pkBuyDlg">
+  <form method="dialog" class="dlg-head"><h3 id="pkBuyTitle">Sit down</h3><button class="btn" value="cancel">Close</button></form>
+  <div class="dlg-body">
+    <p class="bet-desc" id="pkBuyDesc" style="margin:0 0 14px"></p>
+    <div class="grid c2" id="pkOpenRow" hidden style="margin-bottom:13px">
+      <label class="f"><span>Small blind</span><span class="money-in"><span class="sig">$</span><input class="field num" id="pkSb" inputmode="decimal" value="1"></span></label>
+      <label class="f"><span>Big blind</span><span class="money-in"><span class="sig">$</span><input class="field num" id="pkBb" inputmode="decimal" value="2"></span></label>
+      <label class="f"><span>Minimum buy-in</span><span class="money-in"><span class="sig">$</span><input class="field num" id="pkMin" inputmode="decimal" value="40"></span></label>
+      <label class="f"><span>Maximum buy-in</span><span class="money-in"><span class="sig">$</span><input class="field num" id="pkMax" inputmode="decimal" value="200"></span></label>
+    </div>
+    <label class="f"><span id="pkBuyLbl">Buy in for</span>
+      <span class="money-in"><span class="sig">$</span><input class="field num" id="pkBuyAmt" inputmode="decimal" placeholder="how much"></span></label>
+    <div class="filters" id="pkBuyPresets" style="margin-top:8px"></div>
+    <div class="form-foot">
+      <button class="btn pri lg" id="pkBuyGo">Sit down</button>
+      <span class="hint" id="pkBuyHint"></span>
+    </div>
+  </div>
 </dialog>
 
 <dialog id="settleDlg">

@@ -131,3 +131,8 @@ test("drillRows: the side bets row lists weekly and season bets together, no hi/
   const rows = Ledger.drillRows("a", "bets", bets, highlow, 10, members);
   assert.deepEqual(rows.map(r => [r.kind, r.id, r.amount]), [["bet", "w", -10], ["bet", "s", 25]]);
 });
+
+test("settleTransfers is exported for the poker tally: biggest debtor pays biggest creditor, nets cleared", () => {
+  assert.deepEqual(Ledger.settleTransfers({ a: { net: -12 }, b: { net: 40 }, c: { net: -6 }, d: { net: -22 } }),
+    [{ from: "d", to: "b", amount: 22 }, { from: "a", to: "b", amount: 12 }, { from: "c", to: "b", amount: 6 }]);
+});

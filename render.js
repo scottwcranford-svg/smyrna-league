@@ -15,6 +15,7 @@ import * as Sn from "./seasons.js?v=dev";
 import * as Keep from "./keepers.js?v=dev";
 import * as Badges from "./badges.js?v=dev";
 import * as Players from "./players.js?v=dev";
+import * as Poker from "./poker.js?v=dev";
 import { state, members, realMembers, teamOf, touch , seasonCfg } from "./state.js?v=dev";
 import * as Nf from "./notify.js?v=dev";
 
@@ -181,7 +182,7 @@ function head(){
 
 // The top tabs and the screens under them. A tab holding several gets a sub-tab row, the
 // way League switches Scores, Draft and Roster. state.tab is always the screen itself.
-export const TAB_GROUPS={ book:["book"], money:["settle","ledger"], rivals:["rivals","badges"], league:["league"] };
+export const TAB_GROUPS={ book:["book"], money:["settle","ledger"], rivals:["rivals","badges"], league:["league"], poker:["poker"] };
 const SUB_LABEL={ settle:"Settle up", ledger:"Ledger", rivals:"Head to head", badges:"Badges" };
 export function groupOf(panel){ for(var g in TAB_GROUPS){ if(TAB_GROUPS[g].indexOf(panel)>=0) return g; } return "book"; }
 
@@ -197,7 +198,8 @@ function tabs(){
   // Badges badges how many titles you're holding right now
   var mineBadges=0;
   if(state.me) badgeList().forEach(function(b){ if((b.holders||[]).indexOf(state.me)>=0) mineBadges++; });
-  var badge={ book:seats, ledger:0, badges:mineBadges, league:HL.weeks.length, rivals:owed, settle:Bal.transfers.length };
+  // Poker badges your turn at the table
+  var badge={ book:seats, ledger:0, badges:mineBadges, league:HL.weeks.length, rivals:owed, settle:Bal.transfers.length, poker:Poker.myTurn(state.poker,state.me)?1:0 };
   // a top tab carries the sum of its screens' counts, so nothing under it goes unseen
   Object.keys(TAB_GROUPS).forEach(function(g){
     var sum=TAB_GROUPS[g].reduce(function(s,p){ return s+(badge[p]||0); },0);

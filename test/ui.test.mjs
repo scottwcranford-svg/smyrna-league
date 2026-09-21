@@ -564,7 +564,7 @@ test("tabs: Book open by default, the others behind their tabs, badges and the g
   assert.deepEqual(out.duesPart, ["$600 in dues · 1 of 3 paid", "2026 league dues: $200 × 3 managers", true], "the league's total, and the unpaid count stands out");
   assert.equal(out.duesAllPaid, "$600 in dues", "everyone paid: just the total");
   assert.deepEqual(out.shown, ["book"]);
-  assert.deepEqual(out.badges, [["book", true, "1"], ["money", false, "2"], ["rivals", false, "7"], ["league", false, "1"]], "four tabs: a seat open, two transfers to clear, a rivalry you're behind on plus six titles held, a week in");
+  assert.deepEqual(out.badges, [["book", true, "1"], ["money", false, "2"], ["rivals", false, "7"], ["league", false, "1"], ["poker", false, ""]], "five tabs: a seat open, two transfers to clear, a rivalry you're behind on plus six titles held, a week in");
   assert.equal(out.me, "Alice"); assert.equal(out.dropHidden, true);
   assert.deepEqual(out.afterClick, { shown: ["settle"], on: ["money"], saved: "settle" }, "Money opens on Settle up, through the real click wiring, and is remembered");
   assert.equal(out.subHiddenOnBook, true, "the Book has no sub-tabs");
@@ -922,7 +922,7 @@ test("phone: tabs sit in a bar at the bottom, Propose floats, tickets fold and o
     dlg.close();
     return res;
   });
-  assert.deepEqual(out.tabs, { position: "fixed", atBottom: true, fits: true, oneRow: true, count: 4 }, "all four tabs on one fixed row at the bottom");
+  assert.deepEqual(out.tabs, { position: "fixed", atBottom: true, fits: true, oneRow: true, count: 5 }, "all five tabs on one fixed row at the bottom");
   assert.equal(out.fab, "fixed"); assert.equal(out.refresh, "\u21bb"); assert.equal(out.filtersNoWrap, "nowrap");
   assert.deepEqual(out.open, { fold: false, foldBtn: false }, "a ticket still looking for people never folds");
   assert.deepEqual(out.pot, { fold: true, desc: "none", sides: "none", rows: 2, bar: "none", btn: "Details" }, "folded: the stat rows carry the sides and their numbers, no bars, no terms");
@@ -1144,7 +1144,7 @@ test("phone: Rivals stacks the cards, keeps the names column pinned and the grid
   assert.equal(out.sideCols, 1, "bragging rights and Latest stack");
   assert.equal(out.pinned, "sticky", "the names column stays put while the grid scrolls");
   assert.equal(out.noBodyScroll, true, "the page itself never scrolls sideways");
-  assert.equal(out.tabs, 4); assert.equal(out.tabFits, true, "the four tabs fit the bottom bar");
+  assert.equal(out.tabs, 5); assert.equal(out.tabFits, true, "the five tabs fit the bottom bar");
   assert.equal(out.drill, true);
   assert.deepEqual(errors, []);
   await p.close();
@@ -2265,6 +2265,164 @@ test("nobody bets against their own team: refused at the form, no Take it on the
   assert.equal(out.aliceTake, 0, "Alice gets no Take it on the seat against her own team"); assert.equal(out.aliceSeat, null, "and taking it is refused");
   assert.equal(out.caraTake, 1, "anyone else can take it");
   assert.equal(out.invited, 0, "inviting the subject to the side against herself is refused");
+  assert.deepEqual(errors, []);
+  await p.close();
+});
+
+/* ---- the poker table ---- */
+// Alice (me), Bob and Cara at a $1/$2 table, hand 14 on the flop: Bob has the button and
+// bet $10, Cara folded, Alice to act with twenty seconds on the clock. Hand 13 was Cara's.
+const pokerTable = () => {
+  const seats = Array(10).fill(null);
+  const seat = (i, id, o) => Object.assign({ seat: i, memberId: id, uid: "u_" + id, name: id, stack: 18600, status: "in", bet: 0, totalIn: 200, timeouts: 0, satOutAt: null, pendingAdd: 0, lastAction: null, leaving: false }, o);
+  seats[0] = seat(0, "a"); seats[1] = seat(1, "b", { bet: 1000, totalIn: 1200, stack: 22800 }); seats[2] = seat(2, "c", { status: "folded", stack: 9200 });
+  return { status: "hand", sessionId: "s1", openedBy: "b", openedAt: "2026-09-24T23:42:00Z", blinds: { sb: 100, bb: 200 }, minBuy: 4000, maxBuy: 20000, handNo: 14, seq: 77, seats, button: 1,
+    street: "flop", board: ["Kh", "9d", "4s"], pots: [{ amount: 1600, eligible: [0, 1] }], toAct: 0, deadline: new Date(Date.now() + 20000).toISOString(), currentBet: 1000, minRaise: 800, acted: [1], capped: [],
+    lastText: "Bob bets $10", lastHand: { no: 13, at: "2026-09-25T00:10:00Z", board: ["Kh", "9d", "4s", "7c", "2h"], pot: 4600, winners: [{ seat: 2, memberId: "c", name: "c", amount: 4600, cat: 2, text: "two pair, kings and nines" }], shown: { 2: ["Kc", "9s"], 1: ["Ad", "Qd"] } },
+    updatedAt: new Date().toISOString() };
+};
+const pokerSession = () => ({ id: "s1", openedAt: "2026-09-24T23:42:00Z", closedAt: null, blinds: { sb: 100, bb: 200 }, hands: 13,
+  byId: { a: { in: 20000, out: 0, onTable: 18800 }, b: { in: 20000, out: 0, onTable: 24000 }, c: { in: 10000, out: 0, onTable: 9400 } } });
+
+test("the poker table: seats round the oval, the actor and dealer marked, my cards, the action bar, the last hand and the tally", { skip }, async () => {
+  const { p, errors } = await page();
+  const out = await p.evaluate(async (DOC, SESSION) => {
+    const { state } = await import("./state.js?v=dev"); const V = await import("./render.js?v=dev"); const PR = await import("./poker-render.js?v=dev");
+    state.tab = "poker"; PR.pokerSnapshot(DOC); state.pokerSession = SESSION; state.hole = { handNo: 14, seat: 0, cards: ["Ks", "Qd"] };
+    V.render(); PR.pokerView();
+    const res = {}, wait = () => new Promise(r => setTimeout(r, 40));
+    res.panelShown = getComputedStyle(document.querySelector('section[data-panel="poker"]')).display !== "none";
+    res.seats = document.querySelectorAll("#poker .pk-seat").length; res.empty = document.querySelectorAll("#poker .pk-seat.empty").length;
+    res.named = [...document.querySelectorAll("#poker .pk-seat:not(.empty)")].map(s => [s.querySelector(".pk-name").firstChild.textContent.trim(), s.classList.contains("actor"), s.classList.contains("dealer"), s.classList.contains("folded"), s.classList.contains("me")]);
+    res.meLast = [...document.querySelectorAll("#poker .pk-seat")].pop().classList.contains("me");
+    res.clock = document.querySelector("#poker .pk-mine .pk-clock").textContent;
+    res.mine = [...document.querySelectorAll("#poker .pk-mine .pk-card.big")].map(c => [c.querySelector("b").textContent, c.classList.contains("red")]);
+    res.redDiffers = getComputedStyle(document.querySelector(".pk-mine .pk-card.red")).color !== getComputedStyle(document.querySelector(".pk-mine .pk-card:not(.red)")).color;
+    res.board = [...document.querySelectorAll("#poker .pk-board .pk-card")].map(c => c.classList.contains("slot") ? "_" : c.querySelector("b").textContent + c.querySelector("i").textContent);
+    res.pot = document.querySelector("#poker .pk-pot").textContent;
+    res.backs = document.querySelectorAll("#poker .pk-seat .pk-card.back").length;
+    res.buttons = [...document.querySelectorAll("#pkActions .pk-row .btn")].map(b => b.textContent);
+    const sl = document.getElementById("pkRaiseSlider"); res.slider = [sl.min, sl.max, sl.step, sl.value];
+    res.note = document.getElementById("pokerNote").textContent;
+    res.badge = document.querySelector('#tabs .tab[data-tab="poker"] .n').textContent;
+    res.oval = getComputedStyle(document.querySelector("#poker .pk-table")).position; res.seatAbs = getComputedStyle(document.querySelector("#poker .pk-seat")).position;
+    res.ring = document.querySelector("#poker .pk-seat.actor .pk-ring").style.getPropertyValue("--pk-left");
+    document.querySelector('#pkActions [data-preset="pot"]').click(); await wait();
+    res.potRaise = document.getElementById("pkRaiseBtn").textContent;
+    const box = document.getElementById("pkRaiseAmt"); box.value = "25"; box.dispatchEvent(new Event("input", { bubbles: true }));
+    res.typed = [document.getElementById("pkRaiseSlider").value, document.getElementById("pkRaiseBtn").textContent, state.pokerRaise];
+    document.querySelector('[data-act="pkFold"]').click();
+    res.busyNow = state.pokerBusy; await wait(); res.busyAfter = state.pokerBusy;
+    state.pokerBusy = true; PR.pokerView(); res.heldButtons = [...document.querySelectorAll("#pkActions .btn")].every(b => b.disabled); state.pokerBusy = false; PR.pokerView();
+    res.lastHand = document.querySelector("#poker .pk-hands .pk-win").textContent.replace(/\s+/g, " ").trim();
+    res.shown = document.querySelectorAll("#poker .pk-shown").length;
+    res.sessionRows = [...document.querySelectorAll("#poker .pk-sess")].map(r => [r.querySelector(".pk-sess-name").textContent, r.querySelector("b").textContent]);
+    res.transfers = [...document.querySelectorAll("#poker .pk-transfers span")].map(s => s.textContent);
+    res.settleNote = document.querySelector("#poker .pk-note").textContent;
+    // not my turn: no action bar, no badge; Bob's page sees Alice on the clock
+    state.me = "b"; V.render(); PR.pokerView();
+    res.bobBar = !!document.getElementById("pkActions"); res.bobBadge = document.querySelector('#tabs .tab[data-tab="poker"] .n').hidden;
+    res.bobWaits = document.querySelector("#poker .pk-mine") === null;
+    return res;
+  }, pokerTable(), pokerSession());
+  assert.equal(out.panelShown, true);
+  assert.equal(out.seats, 10); assert.equal(out.empty, 7);
+  assert.deepEqual(out.named, [["Bob", false, true, false, false], ["Cara", false, false, true, false], ["Alice", true, false, false, true]], "clockwise from the seat after mine: Bob with the button, Cara folded, me to act");
+  assert.equal(out.meLast, true);
+  assert.match(out.clock, /^(19|20)s$/);
+  assert.deepEqual(out.mine, [["K", false], ["Q", true]]); assert.equal(out.redDiffers, true, "a red suit is really red");
+  assert.deepEqual(out.board, ["K♥", "9♦", "4♠", "_", "_"]);
+  assert.equal(out.pot, "$16 pot"); assert.equal(out.backs, 2, "Bob's cards face down; Cara folded");
+  assert.deepEqual(out.buttons, ["Fold", "Call $10", "Raise to $18", "All in $186"], "the bet, the last raise on top of it, all in");
+  assert.deepEqual(out.slider, ["18", "186", "1", "18"], "dollars, a dollar a step");
+  assert.equal(out.note, "Blinds $1/$2 · buy in $40 to $200 · 3 seated · hand #14");
+  assert.equal(out.badge, "1", "the tab says it's my turn");
+  assert.equal(out.oval, "relative"); assert.equal(out.seatAbs, "absolute", "seats sit on the oval on a desktop");
+  assert.ok(Number(out.ring) > 0.5 && Number(out.ring) <= 0.7, "the clock bar is two thirds full");
+  assert.equal(out.potRaise, "Raise to $36", "pot: the bet, the pot and the call");
+  assert.deepEqual(out.typed, ["25", "Raise to $25", 2500], "typing an amount moves the slider and the button, no redraw");
+  assert.equal(out.busyNow, true, "Fold holds the bar at once"); assert.equal(out.busyAfter, false, "and lets go when the dealer answers");
+  assert.equal(out.heldButtons, true);
+  assert.match(out.lastHand, /Cara \+\$46 two pair, kings and nines/);
+  assert.equal(out.shown, 2);
+  assert.deepEqual(out.sessionRows, [["Bob", "+$40"], ["Cara", "−$6"], ["Alice", "−$12"]], "net as it stands, best night first");
+  assert.deepEqual(out.transfers, ["Alice → Bob $12", "Cara → Bob $6"]);
+  assert.match(out.settleNote, /Nothing here goes to Settle up/);
+  assert.equal(out.bobBar, false); assert.equal(out.bobBadge, true); assert.equal(out.bobWaits, true, "Bob's cards aren't in this page's hole doc");
+  assert.deepEqual(errors, []);
+  await p.close();
+});
+
+test("poker: sitting down through the buy-in sheet, the sat-out banner, no table at all, and the last session", { skip }, async () => {
+  const { p, errors } = await page();
+  const out = await p.evaluate(async (DOC, SESSION) => {
+    const { state } = await import("./state.js?v=dev"); const V = await import("./render.js?v=dev"); const PR = await import("./poker-render.js?v=dev");
+    const wait = () => new Promise(r => setTimeout(r, 40));
+    state.tab = "poker"; DOC.seats[2] = null; PR.pokerSnapshot(DOC); state.pokerSession = SESSION; state.me = "c";
+    V.render(); PR.pokerView();
+    const res = {};
+    res.sitDown = !!document.querySelector('#pkSeatCtl [data-act="pkSit"]'); res.seatSits = document.querySelectorAll('#poker .pk-seat.empty [data-act="pkSit"]').length;
+    document.querySelector('#poker .pk-seat.empty[data-seat="2"] [data-act="pkSit"]').click(); await wait();
+    const dlg = document.getElementById("pkBuyDlg");
+    res.dlg = { open: dlg.open, title: document.getElementById("pkBuyTitle").textContent, desc: document.getElementById("pkBuyDesc").textContent, openRow: document.getElementById("pkOpenRow").hidden,
+      presets: [...document.querySelectorAll("#pkBuyPresets .chip")].map(c => c.textContent), amt: document.getElementById("pkBuyAmt").value };
+    document.getElementById("pkBuyAmt").value = "10"; document.getElementById("pkBuyGo").click(); await wait();
+    res.refused = [dlg.open, document.getElementById("pkBuyHint").textContent];
+    document.querySelector('#pkBuyPresets .chip[data-amt="20000"]').click();
+    res.preset = document.getElementById("pkBuyAmt").value;
+    document.getElementById("pkBuyGo").click(); await wait();
+    res.sat = dlg.open;
+    // sat out: the banner and the way back
+    state.me = "a"; DOC.seats[0].status = "out"; DOC.seats[0].satOutAt = new Date().toISOString(); PR.pokerSnapshot(Object.assign({}, DOC, { seq: 78 })); V.render(); PR.pokerView();
+    res.banner = [document.querySelector("#poker .pk-banner").getAttribute("data-state"), !!document.querySelector('#poker .pk-banner [data-act="pkBack"]'), !!document.querySelector('#pkSeatCtl [data-act="pkBack"]')];
+    // leave asks first
+    DOC.seats[0].status = "in"; DOC.seats[0].satOutAt = null; PR.pokerSnapshot(Object.assign({}, DOC, { seq: 79 })); V.render(); PR.pokerView();
+    document.querySelector('[data-act="pkLeave"]').click(); await wait();
+    res.leaveAsk = [!!document.querySelector('[data-act="pkLeaveYes"]'), (document.querySelector("#poker .pk-ask") || {}).textContent || ""];
+    // no table: the empty card, and the open sheet; a closed table shows the last session
+    PR.pokerSnapshot(null); V.render(); PR.pokerView();
+    res.none = [!!document.querySelector("#poker .pk-empty"), !!document.querySelector('#poker [data-act="pkOpen"]'), document.getElementById("pokerNote").textContent.slice(0, 13)];
+    document.querySelector('[data-act="pkOpen"]').click(); await wait();
+    res.openDlg = [dlg.open, document.getElementById("pkBuyTitle").textContent, document.getElementById("pkOpenRow").hidden, document.getElementById("pkBuyGo").textContent, document.getElementById("pkBuyDesc").textContent];
+    dlg.close();
+    PR.pokerSnapshot(Object.assign({}, DOC, { status: "closed", closedAt: new Date().toISOString() })); state.pokerSession = Object.assign({}, SESSION, { closedAt: new Date().toISOString() }); V.render(); PR.pokerView();
+    res.closed = [!!document.querySelector("#poker .pk-empty"), (document.querySelector("#poker .pk-session .track-title") || {}).textContent || "", document.querySelectorAll("#poker .pk-sess").length];
+    return res;
+  }, pokerTable(), pokerSession());
+  assert.equal(out.sitDown, true); assert.equal(out.seatSits, 8, "every empty seat offers a Sit");
+  assert.deepEqual(out.dlg, { open: true, title: "Sit down · seat 3", desc: "Blinds $1/$2. Buy in $40 to $200. Chips are dollars, settled outside the app.", openRow: true, presets: ["$40 min", "$120", "$200 max"], amt: "" }, "the sheet, with nothing filled in");
+  assert.deepEqual(out.refused, [true, "Between $40 and $200"]);
+  assert.equal(out.preset, "200"); assert.equal(out.sat, false, "accepted and closed");
+  assert.deepEqual(out.banner, ["out", true, true]);
+  assert.deepEqual(out.leaveAsk[0], true); assert.match(out.leaveAsk[1], /cash out \$186/);
+  assert.deepEqual(out.none, [true, true, "Texas Hold'em"]);
+  assert.deepEqual(out.openDlg, [true, "Open a table", false, "Open and sit", "Blinds $1/$2. Buy in $40 to $200. Chips are dollars, settled outside the app."], "the open sheet starts from the defaults");
+  assert.deepEqual(out.closed, [true, "Last session · from " + new Date("2026-09-24T23:42:00Z").toLocaleString(undefined, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) + " · 13 hands", 3]);
+  assert.deepEqual(errors, []);
+  await p.close();
+});
+
+test("phone: the poker table is a list ending with me, the board above it, the action bar within reach", { skip }, async () => {
+  const { p, errors } = await page(null, PHONE);
+  const out = await p.evaluate(async (DOC, SESSION) => {
+    const { state } = await import("./state.js?v=dev"); const V = await import("./render.js?v=dev"); const PR = await import("./poker-render.js?v=dev");
+    state.tab = "poker"; PR.pokerSnapshot(DOC); state.pokerSession = SESSION; state.hole = { handNo: 14, seat: 0, cards: ["Ks", "Qd"] };
+    V.render(); PR.pokerView();
+    const cs = (e) => getComputedStyle(e);
+    const seats = [...document.querySelectorAll("#poker .pk-seat")];
+    const center = document.querySelector("#poker .pk-center"), firstSeat = seats[0];
+    return { tablePos: cs(document.querySelector("#poker .pk-table")).position, seatPos: cs(firstSeat).position,
+      oneColumn: new Set(seats.map(s => Math.round(s.getBoundingClientRect().left))).size === 1,
+      boardAbove: center.getBoundingClientRect().bottom <= firstSeat.getBoundingClientRect().top + 1,
+      meLast: seats[seats.length - 1].classList.contains("me"),
+      fits: [...document.querySelectorAll("#pkActions .btn, #poker .pk-seat, #poker .pk-mine")].every(e => e.getBoundingClientRect().right <= innerWidth + 1),
+      sticky: cs(document.getElementById("pkActions")).position,
+      noBodyScroll: document.documentElement.scrollWidth <= innerWidth,
+      tabs: document.querySelectorAll("#tabs .tab").length };
+  }, pokerTable(), pokerSession());
+  assert.equal(out.tablePos, "static", "no oval on a phone"); assert.equal(out.seatPos, "static");
+  assert.equal(out.oneColumn, true); assert.equal(out.boardAbove, true); assert.equal(out.meLast, true);
+  assert.equal(out.fits, true); assert.equal(out.sticky, "sticky"); assert.equal(out.noBodyScroll, true); assert.equal(out.tabs, 5);
   assert.deepEqual(errors, []);
   await p.close();
 });

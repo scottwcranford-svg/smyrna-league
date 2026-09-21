@@ -162,6 +162,10 @@ let browser; const errors = [], checks = {};
   await page.click('#subTabs [data-tab="ledger"]');
   await page.waitForFunction(() => getComputedStyle(document.getElementById("board")).display !== "none");
   checks.ledgerTab = await page.evaluate(() => ({ board: getComputedStyle(document.getElementById("board")).display !== "none", book: getComputedStyle(document.querySelector('section[data-panel="book"]')).display === "none", saved: localStorage.getItem("smyrna.tab") }));
+  // the Poker tab draws the table, or the "no table" card, without calling the dealer
+  await page.click('#tabs .tab[data-tab="poker"]');
+  await page.waitForFunction(() => getComputedStyle(document.querySelector('section[data-panel="poker"]')).display !== "none");
+  checks.poker = await page.evaluate(() => !!document.querySelector("#poker .pk-empty, #poker .pk-table"));
   await page.click('#tabs .tab[data-tab="book"]');
   await page.click("#meBtn"); await page.waitForFunction(() => !document.getElementById("meDrop").hidden);
   await page.click("#pwBtn");
@@ -177,7 +181,7 @@ let browser; const errors = [], checks = {};
     && checks.ledgerTab.board === true && checks.ledgerTab.book === true && checks.ledgerTab.saved === "ledger" && checks.seeking <= checks.unlocked && (checks.seeking === 0 || checks.seekingGlow === true)
     && checks.rosterRows >= 1 && checks.rosterReadOnly === true && /Last in/.test(checks.seenSelf) && checks.onBoard === !checks.selfIsTest
     && checks.title === "Propose a bet" && checks.scopeChips === 5 && checks.statChips >= 10 && checks.entryRows === 1 && checks.rowOneLocked === true && checks.twoStats === 2
-    && /Chase/.test(checks.pickChip) && checks.gameOptions >= 1 && checks.sideTaken === 1 && errors.length === 0;
+    && /Chase/.test(checks.pickChip) && checks.gameOptions >= 1 && checks.sideTaken === 1 && checks.poker === true && errors.length === 0;
   console.log(JSON.stringify({ ...checks, errors }, null, 0));
   console.log(ok ? "E2E OK — screenshot " + shot : "E2E FAILED");
   process.exit(ok ? 0 : 1);
